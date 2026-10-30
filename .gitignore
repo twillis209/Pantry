@@ -11,3 +11,6 @@ pheast/output/*
 .DS_Store
 Pantry.egg-info
 build
+tests/**/input
+tests/**/results
+tests/**/resources

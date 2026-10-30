@@ -1,0 +1,12 @@
+executor: slurm
+jobs: 100
+default-resources:
+  slurm_account: "gdml"
+  slurm_partition: "cpu-core"
+  runtime: 60
+  mem_mb: threads * 7500
+rerun-triggers: mtime
+keep-going: True
+rerun-incomplete: True
+nolock: True
+max-status-checks-per-second: 1
