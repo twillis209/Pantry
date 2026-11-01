@@ -53,8 +53,16 @@ def upstream_load_fastq_map(map_file: Path, fastq_dir: Path, paired_end=None) ->
 
 
 def legacy_config() -> dict:
-    with open(PHENO / "config.yml") as f:
+    """The old-format phenotyping/config.yml, as it was before conversion."""
+    with open(REPO / "tests" / "unit" / "data" / "legacy_config.yml") as f:
         return yaml.safe_load(f)
+
+
+def test_converted_config_matches_legacy_config():
+    with open(PHENO / "config.yml") as f:
+        converted = yaml.safe_load(f)
+    assert "datasets" in converted
+    assert cfg.normalise(converted) == cfg.normalise(legacy_config())
 
 
 def new_config(**dataset_over) -> dict:

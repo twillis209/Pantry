@@ -37,10 +37,15 @@ include: "steps/setup.smk"
 
 
 # These are the target files to be generated (or regenerated if outdated).
-# By default it includes all output files specified in the config file.
+# By default it includes all output files of every dataset in the config file.
 rule all:
+    default_target: True
     input:
-        outputs,
+        [
+            f"<pantry_output>/{name}/{f}"
+            for name, d in CONFIG["datasets"].items()
+            for f in pantry_config.dataset_targets(d)
+        ],
 
 
 ## General functions used by multiple snakefiles

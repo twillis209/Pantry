@@ -1,0 +1,70 @@
+# Two datasets sharing one reference, for dry runs of the {dataset}/{reference}
+# wildcards. Paths are relative to the working directory, which needs an
+# 'input' link to phenotyping/input, e.g.:
+#   mkdir -p /tmp/dr && ln -sfn "$PWD/phenotyping/input" /tmp/dr/input
+#   snakemake -n -s phenotyping/Snakefile \
+#       --configfile tests/configs/dryrun_multi.yml --directory /tmp/dr
+references:
+  grch38_chr1:
+    genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+    annotation: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+    edit_sites_bed: input/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+
+defaults:
+  reference: grch38_chr1
+  modality_groups:
+    alt_TSS_polyA:
+      files:
+        - alt_TSS.bed.gz
+        - alt_TSS.bed.gz.tbi
+        - alt_TSS.phenotype_groups.txt
+        - alt_polyA.bed.gz
+        - alt_polyA.bed.gz.tbi
+        - alt_polyA.phenotype_groups.txt
+    expression:
+      files:
+        - expression.bed.gz
+        - expression.bed.gz.tbi
+        - isoforms.bed.gz
+        - isoforms.bed.gz.tbi
+        - isoforms.phenotype_groups.txt
+    RNA_editing:
+      edit_sites_min_coverage: 20
+      edit_sites_min_samples: 10
+      edit_sites_min_samples_fraction: 0.1
+      edit_sites_cluster: false
+      edit_sites_correlation_threshold: 0.9
+      files:
+        - RNA_editing.bed.gz
+        - RNA_editing.bed.gz.tbi
+        - RNA_editing.phenotype_groups.txt
+        - RNA_editing.site_to_phenotype.tsv
+    splicing:
+      files:
+        - splicing.bed.gz
+        - splicing.bed.gz.tbi
+        - splicing.phenotype_groups.txt
+    stability:
+      files:
+        - stability.bed.gz
+        - stability.bed.gz.tbi
+
+datasets:
+  full:
+    samples: input/samples.txt
+    fastq_map: input/fastq_map.txt
+    fastq_dir: input/fastq
+    paired_end: true
+    read_length: 75
+  ct_CD4.TCM:
+    samples: [HG00108, HG00120, HG00185, HG00231]
+    fastq_map:
+      HG00108: [[chr1_0-2Mb.ERR188166_1.fastq.gz]]
+      HG00120: [[chr1_0-2Mb.ERR188315_1.fastq.gz]]
+      HG00185: [[chr1_0-2Mb.ERR188320_1.fastq.gz]]
+      HG00231: [[chr1_0-2Mb.ERR188212_1.fastq.gz]]
+    fastq_dir: input/fastq
+    paired_end: false
+    read_length: 100
+    fragment_length_mean: 200
+    fragment_length_sd: 50
