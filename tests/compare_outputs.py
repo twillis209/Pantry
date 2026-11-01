@@ -87,14 +87,21 @@ def indep_summary(a: Path, b: Path) -> dict:
         'key overlap': (len(ka & kb), len(ka & kb), len(ka ^ kb), 'keys'),
     }
     m = da.merge(db, on=k, suffixes=('_a', '_b'))
+    n_common = len(m)
     m = m[m['variant_id_a'] == m['variant_id_b']]
-    out['same-variant keys'] = (len(m), len(m), 0, 'info')
+    out['variant-changed keys'] = (n_common, len(m), n_common - len(m), 'count')
+    out['no same-variant keys among common keys'] = (
+        n_common, len(m), int(len(m) == 0 and n_common > 0), 'flag')
     for c in SUMMARY_COLS:
-        rel = ((m[c + '_a'] - m[c + '_b']).abs() / m[c + '_a'].abs().clip(lower=1e-300)).astype(float)
+        x, y = m[c + '_a'].astype(float), m[c + '_b'].astype(float)
+        nan_mis = int((x.isna() != y.isna()).sum())
+        out[f'{c} NaN-pattern mismatches'] = (int(x.isna().sum()), int(y.isna().sum()), nan_mis, 'count')
+        ok = ~(x.isna() | y.isna())
+        rel = ((x - y).abs() / x.abs().clip(lower=1e-300))[ok]
         mx = float(rel.max()) if len(rel) else 0.0
         md = float(rel.median()) if len(rel) else 0.0
-        out[f'{c} max rel diff'] = (mx, mx, mx, 'rel')
-        out[f'{c} median rel diff'] = (md, md, md, 'rel')
+        out[f'{c} max rel diff'] = (None, None, mx, 'rel')
+        out[f'{c} median rel diff'] = (None, None, md, 'rel')
     return out
 
 
@@ -109,6 +116,8 @@ def indep_check(summary: dict, noise_summary: dict) -> list[tuple]:
             allowed = 2 * nd
         elif kind == 'rel':
             allowed = max(2 * nd, 1e-6)
+        elif kind == 'flag':
+            allowed = 0
         else:
             rows.append((name, va, vb, dev, nd, None, True))
             continue
@@ -186,8 +195,11 @@ def _compare_rdat(pairs: list[tuple[Path, Path]]) -> list[str]:
     script = ('a<-new.env();b<-new.env();load(A,a);load(B,b);'
               'stopifnot(isTRUE(all.equal(as.list(a),as.list(b),tolerance=1e-8)))')
     for x, y in pairs:
-        r = subprocess.run(['Rscript', '-e', f'A<-"{x}";B<-"{y}";{script}'],
-                           capture_output=True, text=True)
+        try:
+            r = subprocess.run(['Rscript', '-e', f'A<-"{x}";B<-"{y}";{script}'],
+                               capture_output=True, text=True)
+        except OSError:
+            return ['RDat not compared: Rscript unavailable']
         if r.returncode != 0:
             mism.append(f'{x.name}: RDat differs ({r.stderr.strip().splitlines()[-1:]})')
     return mism
@@ -236,8 +248,14 @@ def _files(d: Path) -> set[str]:
 def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
     """Compare two dirs. Returns (mismatches: {relpath: [msgs]} flattened to list, notes)."""
     expected, actual = Path(expected), Path(actual)
+    bad = [f'{d} is not an existing directory' for d in
+           (expected, actual, *(noise_dirs or ())) if not Path(d).is_dir()]
+    if bad:
+        return bad, []
     fe, fa = _files(expected), _files(actual)
     mism, notes = [], []
+    if not fe:
+        mism.append(f'expected directory {expected} contains no files')
     for r in sorted(fe - fa):
         mism.append(f'{r}: missing from actual')
     for r in sorted(fa - fe):
@@ -255,12 +273,15 @@ def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
                 na, nb = Path(noise_dirs[0]) / r, Path(noise_dirs[1]) / r
                 if na.exists() and nb.exists():
                     noise, rs = table_noise(na, nb)
+                else:
+                    mism.append(f'{r}: noise counterpart missing ({na if not na.exists() else nb})')
+                    continue
             if 'independent' not in name:
                 rs = 0
             if 'independent' in name:
                 summ = indep_summary(e, a)
                 nsumm = None
-                if noise_dirs is not None and na.exists() and nb.exists():
+                if noise_dirs is not None:
                     nsumm = indep_summary(na, nb)
                     chk = indep_check(summ, nsumm)
                     msgs = [f'summary {c[0]}: deviation {c[3]:.3g} > allowed {c[5]:.3g} '
@@ -295,12 +316,15 @@ def main(argv=None) -> int:
     mism, notes = compare_dirs(args.expected, args.actual, args.noise, summaries)
     lines = [f'# Comparison: {args.expected} vs {args.actual}', '',
              f'Noise pair: {" , ".join(map(str, args.noise)) if args.noise else "none"}', '',
+             ('With --noise, cis_independent files are compared ONLY on the summary statistics below '
+              '(no row-level comparison).' if args.noise else
+              'Without --noise, cis_independent files are compared row by row (exact).'), '',
              f'## Mismatches ({len(mism)})', ''] + [f'- {m}' for m in mism] + \
             ['', f'## Notes ({len(notes)})', ''] + [f'- {n}' for n in notes] + \
             ['', '## cis_independent summaries (expected | actual | deviation | noise deviation | allowed | ok)', ''] + \
-            sum([[f'### {r}', '', '| statistic | expected | actual | deviation | noise dev | allowed | ok |',
+            sum([[f'### {r}', '', '| statistic | expected | actual | deviation (rel rows: rel diff vs expected) | noise dev (rel rows: noise-pair rel diff) | allowed | ok |',
                   '|---|---|---|---|---|---|---|'] +
-                 [f'| {c[0]} | {c[1]:.4g} | {c[2]:.4g} | {c[3]:.3g} | '
+                 [f'| {c[0]} | {"-" if c[1] is None else format(c[1], ".4g")} | {"-" if c[2] is None else format(c[2], ".4g")} | {c[3]:.3g} | '
                   f'{"-" if c[4] is None else format(c[4], ".3g")} | '
                   f'{"-" if c[5] is None else format(c[5], ".3g")} | {"yes" if c[6] else "NO"} |' for c in chk] + ['']
                  for r, chk in summaries], []) + \

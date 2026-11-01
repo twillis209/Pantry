@@ -213,3 +213,79 @@ def test_twas_tar_profile_err_ignored_and_list_compared(tmp_path):
     mk2.unlink()
     mk('act', b'b\n', b'2s')
     assert len(co.compare_dirs(tmp_path / 'exp', tmp_path / 'act')[0]) == 1
+
+
+def test_cis_independent_all_variants_changed_fails(tmp_path):
+    a = indep([('g1', 1), ('g2', 1)])
+    b = a.copy()
+    b['variant_id'] = ['chr1_99_A_C_b38', 'chr1_98_A_C_b38']
+    mism, _ = run(tmp_path, a, b, (a, a), IND)
+    assert any('variant-changed keys' in m for m in mism)
+    assert any('no same-variant keys' in m for m in mism)
+
+
+def test_cis_independent_nan_pattern_mismatch_fails(tmp_path):
+    a = indep([('g1', 1), ('g2', 1), ('g3', 1)])
+    b = a.copy()
+    b.loc[[0, 1, 2], 'slope'] = float('nan')  # 3 mismatches > floor of 1
+    mism, _ = run(tmp_path, a, b, (a, a), IND)
+    assert any('slope NaN-pattern' in m for m in mism)
+
+
+def test_missing_directories_fail(tmp_path):
+    write_bed(tmp_path / 'exp' / 'e.bed.gz', 'a\n')
+    mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'nope')
+    assert mism and 'not an existing directory' in mism[0]
+    mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'exp', (tmp_path / 'nope', tmp_path / 'exp'))
+    assert mism and 'nope' in mism[0]
+
+
+def test_empty_expected_fails(tmp_path):
+    (tmp_path / 'exp').mkdir()
+    (tmp_path / 'act').mkdir()
+    mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'act')
+    assert any('contains no files' in m for m in mism)
+
+
+def test_main_exit_nonzero_for_missing_dir(tmp_path):
+    write_bed(tmp_path / 'exp' / 'e.bed.gz', 'a\n')
+    rc = co.main([str(tmp_path / 'exp'), str(tmp_path / 'typo'), '--report', str(tmp_path / 'r.md')])
+    assert rc == 1
+
+
+def test_missing_noise_counterpart_is_mismatch(tmp_path):
+    a = cis_df()
+    exp, act = make_pair(tmp_path, 'x.cis_qtl.txt.gz', a, a)
+    (tmp_path / 'na').mkdir()
+    (tmp_path / 'nb').mkdir()
+    mism, _ = co.compare_dirs(exp, act, (tmp_path / 'na', tmp_path / 'nb'))
+    assert any('noise counterpart missing' in m for m in mism)
+
+
+def test_rdat_rscript_failure_and_unavailable(tmp_path, monkeypatch):
+    import subprocess
+    x, y = tmp_path / 'a.wgt.RDat', tmp_path / 'b.wgt.RDat'
+
+    class R:
+        returncode = 1
+        stderr = 'Error: not equal'
+    monkeypatch.setattr(subprocess, 'run', lambda *a, **k: R())
+    mism = co._compare_rdat([(x, y)])
+    assert len(mism) == 1 and 'differs' in mism[0]
+
+    def boom(*a, **k):
+        raise FileNotFoundError('Rscript')
+    monkeypatch.setattr(subprocess, 'run', boom)
+    assert co._compare_rdat([(x, y)]) == ['RDat not compared: Rscript unavailable']
+
+
+def test_report_states_summary_only_and_labels(tmp_path):
+    a = indep([('g1', 1)])
+    exp, act = make_pair(tmp_path, IND, a, a)
+    write_gz(tmp_path / 'na' / 'qtl' / IND, a)
+    write_gz(tmp_path / 'nb' / 'qtl' / IND, a)
+    rep = tmp_path / 'r.md'
+    rc = co.main([str(exp), str(act), '--report', str(rep), '--noise', str(tmp_path / 'na'), str(tmp_path / 'nb')])
+    txt = rep.read_text()
+    assert rc == 0
+    assert 'ONLY on the summary statistics' in txt and 'rel diff vs expected' in txt
