@@ -7,6 +7,7 @@ workflow is used as a remote module.
 
 import copy
 import math
+import re
 from pathlib import Path
 
 # Legacy keys that leave the dataset: reference files and intermediate dirs.
@@ -62,6 +63,19 @@ def _shim(config: dict) -> dict:
         "datasets": {"default": dataset},
         "legacy_pathvars": _legacy_pathvars(config),
     }
+
+
+def _check_name(kind: str, name):
+    """Reject names that cannot be used as a single path component."""
+    if (
+        not isinstance(name, str)
+        or not re.fullmatch(r"[^/]+", name)
+        or name in (".", "..")
+    ):
+        raise ValueError(
+            f"{kind} name {name!r} must be a non-empty string without '/' "
+            "and not '.' or '..'; it is used as a directory name"
+        )
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -153,6 +167,7 @@ def normalise(config: dict) -> dict:
             raise ValueError(f"{key} must be a mapping")
 
     for name, reference in out["references"].items():
+        _check_name("Reference", name)
         if not isinstance(reference, dict):
             raise ValueError(f"references.{name} must be a mapping")
         annotation = reference.get("annotation")
@@ -162,6 +177,7 @@ def normalise(config: dict) -> dict:
 
     defaults = out.get("defaults", {})
     for name, ds in list(out["datasets"].items()):
+        _check_name("Dataset", name)
         if not isinstance(ds, dict):
             raise ValueError(f"datasets.{name} must be a mapping")
         ds = _deep_merge(defaults, ds)

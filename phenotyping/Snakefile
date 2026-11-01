@@ -126,16 +126,6 @@ rule index_bed:
         "tabix {input}"
 
 
-rule index_fasta:
-    """Index a FASTA file, e.g. to get chromosome lengths from reference genome."""
-    input:
-        "<pantry_reference>/{basename}.fa",
-    output:
-        "<pantry_reference>/{basename}.fa.fai",
-    shell:
-        "samtools faidx {input}"
-
-
 rule write_samples:
     """Write the dataset's sample IDs, one per line, for scripts taking --samples."""
     output:

@@ -215,6 +215,30 @@ def test_unknown_reference_raises():
         cfg.normalise(new_config(reference="nope"))
 
 
+@pytest.mark.parametrize("bad", ["a/b", "", ".", "..", "/abs"])
+def test_dataset_name_must_be_path_component(bad):
+    c = new_config()
+    c["datasets"][bad] = c["datasets"].pop("d1")
+    with pytest.raises(ValueError, match="Dataset name"):
+        cfg.normalise(c)
+
+
+@pytest.mark.parametrize("bad", ["a/b", "", ".", ".."])
+def test_reference_name_must_be_path_component(bad):
+    c = new_config(reference=bad)
+    c["references"][bad] = c["references"].pop("grch38")
+    with pytest.raises(ValueError, match="Reference name"):
+        cfg.normalise(c)
+
+
+def test_dotted_names_allowed():
+    c = new_config(reference="GRCh38.p14")
+    c["references"]["GRCh38.p14"] = c["references"].pop("grch38")
+    c["datasets"]["ct_CD4.TCM"] = c["datasets"].pop("d1")
+    out = cfg.normalise(c)
+    assert list(out["datasets"]) == ["ct_CD4.TCM"]
+
+
 def test_gtf_suffix_enforced():
     raw = legacy_config()
     raw["ref_anno"] = "anno.gtf.gz"
