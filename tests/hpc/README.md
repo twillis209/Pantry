@@ -63,7 +63,7 @@ Snakemake 9.27.0, local run on macOS (throwaway code in /tmp/ckpt-spike, not com
 - PASS: checkpoint output path contains a pathvar (`<pantry_output>/{dataset}/n.txt`).
 - PASS: module loaded by relative path (`../mod/Snakefile`) and by absolute path; host pathvars referencing other pathvars (`pantry_output="<results>/x"`, `results="res"`) land outputs under `res/x/`.
 - PASS: per-rule `localrule: True` inside a rule survives renaming. Checked by `print(r.name, r.name in workflow._localrules)` over `workflow.rules` in the host: only `m_note` is local. (The "localrule" label in `-c1` run logs is NOT discriminating: every rule is labelled local under the local executor.)
-- Gotchas: `pathvars:` entries need trailing commas (`a="x",`); a top-level `localrule: True` line applies to all following rules, so use it inside the rule; the first rule in the host (not an imported one) is the default target, so put `rule all` before `use rule *`.
+- Gotchas: `pathvars:` entries need trailing commas; a top-level `localrule: True` is a silent no-op (parsed as a Python annotation; re-checked: no rule became local), so it must sit inside each rule; the first rule defined is the default target, so with `rule all` after `use rule *` the first imported rule becomes the default; put `default_target: True` on `rule all` as the robust fix.
 
 ```
 # host/Snakefile
