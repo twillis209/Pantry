@@ -1,19 +1,20 @@
 localrules:
     pheno_groups_splicing,
 
+
 rule regtools_junctions:
     """Run regtools junctions for LeafCutter"""
     input:
-        bam = interm_dir / 'bam' / '{sample_id}.bam',
-        bai = interm_dir / 'bam' / '{sample_id}.bam.bai',
+        bam=interm_dir / "bam" / "{sample_id}.bam",
+        bai=interm_dir / "bam" / "{sample_id}.bam.bai",
     output:
-        interm_dir / 'splicing' / '{sample_id}.junc'
+        interm_dir / "splicing" / "{sample_id}.junc",
     params:
-        splice_dir = interm_dir / 'splicing',
-        min_anchor_len = 8,
-        min_intron_len = 50,
-        max_intron_len = 500000,
-        strandedness = "XS",
+        splice_dir=interm_dir / "splicing",
+        min_anchor_len=8,
+        min_intron_len=50,
+        max_intron_len=500000,
+        strandedness="XS",
     shell:
         """
         mkdir -p {params.splice_dir}
@@ -26,21 +27,22 @@ rule regtools_junctions:
             {input.bam}
         """
 
+
 rule cluster_junctions:
     """Cluster splice junctions with common boundaries"""
     input:
-        expand(str(interm_dir / 'splicing' / '{sample_id}.junc'), sample_id=samples),
+        expand(str(interm_dir / "splicing" / "{sample_id}.junc"), sample_id=samples),
     output:
-        interm_dir / 'splicing' / 'leafcutter_perind_numers.counts.gz',
+        interm_dir / "splicing" / "leafcutter_perind_numers.counts.gz",
     params:
-        juncfile_list = interm_dir / 'splicing' / 'juncfiles.txt',
-        splice_dir = interm_dir / 'splicing',
-        max_intron_len = 100000,
-        min_clust_reads = 30,
-        min_clust_ratio = 0.001,
+        juncfile_list=interm_dir / "splicing" / "juncfiles.txt",
+        splice_dir=interm_dir / "splicing",
+        max_intron_len=100000,
+        min_clust_reads=30,
+        min_clust_ratio=0.001,
     shell:
         """
-        printf '%s\\n' {input} > {params.juncfile_list}
+        printf '%s\\n' {input} >{params.juncfile_list}
         python3 scripts/leafcutter_cluster_regtools_py3.py \
             --juncfiles {params.juncfile_list} \
             --rundir {params.splice_dir} \
@@ -49,17 +51,18 @@ rule cluster_junctions:
             --mincluratio {params.min_clust_ratio}
         """
 
+
 rule assemble_splicing_bed:
     """Convert leafcutter output into splicing BED file"""
     input:
-        counts = interm_dir / 'splicing' / 'leafcutter_perind_numers.counts.gz',
-        ref_anno = ref_anno,
+        counts=interm_dir / "splicing" / "leafcutter_perind_numers.counts.gz",
+        ref_anno=ref_anno,
     output:
-        bed = output_dir / 'unnorm' / 'splicing.bed',
-    params:
-        unnorm_dir = output_dir / 'unnorm',
+        bed=output_dir / "unnorm" / "splicing.bed",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -69,17 +72,18 @@ rule assemble_splicing_bed:
             --output {output.bed}
         """
 
+
 rule normalize_splicing:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed = output_dir / 'unnorm' / 'splicing.bed',
-        samples = samples_file,
+        bed=output_dir / "unnorm" / "splicing.bed",
+        samples=samples_file,
     output:
-        output_dir / 'splicing.bed.gz',
-    params:
-        bed = output_dir / 'splicing.bed',
+        output_dir / "splicing.bed.gz",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        bed=output_dir / "splicing.bed",
     shell:
         """
         mkdir -p {output_dir}
@@ -90,17 +94,18 @@ rule normalize_splicing:
         bgzip {params.bed}
         """
 
+
 rule pheno_groups_splicing:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        output_dir / 'splicing.bed.gz',
+        output_dir / "splicing.bed.gz",
     output:
-        output_dir / 'splicing.phenotype_groups.txt',
+        output_dir / "splicing.phenotype_groups.txt",
     shell:
         """
-        zcat < {input} \
+        zcat <{input} \
             | tail -n +2 \
             | cut -f4 \
             | awk '{{ g=$1; sub(/__.*$/, "", g); print $1 "\t" g }}' \
-            > {output}
+                >{output}
         """

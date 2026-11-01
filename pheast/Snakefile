@@ -3,10 +3,13 @@ from pathlib import Path
 import pandas as pd
 from scripts.twas_batches import batch_ranges as twas_batch_ranges
 
-configfile: 'config.yml'
+
+configfile: "config.yml"
+
 
 # This code validates and processes the configuration and sets global variables:
-include: 'steps/setup.smk'
+include: "steps/setup.smk"
+
 
 # These are the target files to be generated (or regenerated if outdated).
 # By default it includes all output files specified in the config file.
@@ -15,6 +18,10 @@ rule all:
         outputs,
         # expand(interm_dir / 'covar' / '{pheno}.covar.tsv', pheno=phenotypes.keys()),
 
-include: 'steps/covariates.smk'
+
+include: "steps/covariates.smk"
+
+
 for analysis in analyses:
-    include: f'steps/{analysis}.smk'
+
+    include: f"steps/{analysis}.smk"

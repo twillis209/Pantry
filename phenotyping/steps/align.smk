@@ -1,25 +1,26 @@
 def genome_size(ref_genome: Path) -> int:
     """Estimate genome size from a FASTA file."""
-    assert ref_genome.suffix != '.gz', 'Reference genome must be uncompressed'
+    assert ref_genome.suffix != ".gz", "Reference genome must be uncompressed"
     return ref_genome.stat().st_size
+
 
 rule star_index:
     """Generate the index for STAR."""
     input:
-        ref_genome = ref_genome,
-        ref_anno = ref_anno,
+        ref_genome=ref_genome,
+        ref_anno=ref_anno,
     output:
         # Among other generated files:
-        ref_dir / f'star_index_{read_length}' / 'SAindex',
-        ref_dir / f'star_index_{read_length}' / 'chrNameLength.txt',
-    params:
-        index_dir = ref_dir / f'star_index_{read_length}',
-        overhang = read_length - 1,
-        genomeSAindexNbases = lambda w: int(np.log2(genome_size(ref_genome)) / 2 - 1),
+        ref_dir / f"star_index_{read_length}" / "SAindex",
+        ref_dir / f"star_index_{read_length}" / "chrNameLength.txt",
     threads: 16
     resources:
-        mem_mb = 60000,
-        runtime = '4h',
+        mem_mb=60000,
+        runtime="4h",
+    params:
+        index_dir=ref_dir / f"star_index_{read_length}",
+        overhang=read_length - 1,
+        genomeSAindexNbases=lambda w: int(np.log2(genome_size(ref_genome)) / 2 - 1),
     shell:
         """
         mkdir -p {params.index_dir}
@@ -34,33 +35,35 @@ rule star_index:
             --runThreadN {threads}
         """
 
+
 def fastq_star_param(wildcards):
     """Get a string listing the fastq input files, with two lists if paired_end.
-    
+
     This is the string supplied directly to the STAR command.
     """
     paths, is_paired = fastq_map[wildcards.sample_id]
     if is_paired:
-        return ' '.join([','.join(paths[0]), ','.join(paths[1])])
+        return " ".join([",".join(paths[0]), ",".join(paths[1])])
     else:
-        return ','.join(paths)
+        return ",".join(paths)
+
 
 rule star_align:
     """Align RNA-Seq reads for a sample using STAR."""
     input:
-        fastq = fastq_inputs,
-        index = ref_dir / f'star_index_{read_length}' / 'SAindex',
+        fastq=fastq_inputs,
+        index=ref_dir / f"star_index_{read_length}" / "SAindex",
     output:
-        interm_dir / 'star_out' / '{sample_id}.Aligned.sortedByCoord.out.bam',
-    params:
-        fastq_list = fastq_star_param,
-        index_dir = ref_dir / f'star_index_{read_length}',
-        star_out_dir = interm_dir / 'star_out',
-        prefix = str(interm_dir / 'star_out' / '{sample_id}.'),
+        interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
     threads: 16
     resources:
-        mem_mb = 60000,
-        runtime = '8h',
+        mem_mb=60000,
+        runtime="8h",
+    params:
+        fastq_list=fastq_star_param,
+        index_dir=ref_dir / f"star_index_{read_length}",
+        star_out_dir=interm_dir / "star_out",
+        prefix=str(interm_dir / "star_out" / "{sample_id}."),
     shell:
         """
         mkdir -p {params.star_out_dir}
@@ -75,19 +78,20 @@ rule star_align:
             --runThreadN {threads}
         """
 
+
 rule shrink_bam:
     """Remove SEQ and QUAL fields from BAM file to reduce size."""
     input:
-        interm_dir / 'star_out' / '{sample_id}.Aligned.sortedByCoord.out.bam',
+        interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
-        interm_dir / 'bam' / '{sample_id}.bam',
+        interm_dir / "bam" / "{sample_id}.bam",
     params:
-        bam_dir = interm_dir / 'bam',
+        bam_dir=interm_dir / "bam",
     shell:
         """
         mkdir -p {params.bam_dir}
         samtools view -h {input} \
             | awk -v OFS="\t" '{{if (substr($0, 1, 1) != "@") {{$10="*"; $11="*"}}; print ;}}' \
             | samtools view -h -b \
-            > {output}
+                >{output}
         """

@@ -1,28 +1,36 @@
 from math import ceil
 
+
 localrules:
     make_majiq_experiments_tsv,
     pheno_groups_intron_retention,
 
-majiq_dir = interm_dir / 'intron_retention'
-majiq_build_dir = majiq_dir / 'build'
-majiq_psicov_dir = majiq_dir / 'psicov'
-majiq_params = modality_groups['intron_retention']
-majiq_annotation_gff3 = Path(majiq_params['annotation_gff3']).expanduser() if 'annotation_gff3' in majiq_params else ref_dir / 'majiq' / 'annotation.gff3'
-majiq_license = Path(majiq_params.get('license', 'scripts/intron_retention/majiq_license_academic_official.lic')).expanduser()
-majiq_threads = majiq_params.get('threads', 8)
-majiq_psicov_batch_size = majiq_params.get('psicov_batch_size', 25)
-majiq_min_experiments = majiq_params.get('min_experiments', 0.01)
+
+majiq_dir = interm_dir / "intron_retention"
+majiq_build_dir = majiq_dir / "build"
+majiq_psicov_dir = majiq_dir / "psicov"
+majiq_params = modality_groups["intron_retention"]
+majiq_annotation_gff3 = (
+    Path(majiq_params["annotation_gff3"]).expanduser()
+    if "annotation_gff3" in majiq_params
+    else ref_dir / "majiq" / "annotation.gff3"
+)
+majiq_license = Path(
+    majiq_params.get(
+        "license", "scripts/intron_retention/majiq_license_academic_official.lic"
+    )
+).expanduser()
+majiq_threads = majiq_params.get("threads", 8)
+majiq_psicov_batch_size = majiq_params.get("psicov_batch_size", 25)
+majiq_min_experiments = majiq_params.get("min_experiments", 0.01)
 majiq_batches = list(range(ceil(len(samples) / majiq_psicov_batch_size)))
 # MAJIQ names junction coverage after the resolved BAM, including symlink targets.
 majiq_sj_by_sample = {
-    sample: majiq_build_dir / f'{(interm_dir / "bam" / f"{sample}.bam").resolve().stem}.sj'
+    sample: majiq_build_dir
+    / f'{(interm_dir / "bam" / f"{sample}.bam").resolve().stem}.sj'
     for sample in samples
 }
-majiq_sj = [
-    directory(majiq_sj_by_sample[sample])
-    for sample in samples
-]
+majiq_sj = [directory(majiq_sj_by_sample[sample]) for sample in samples]
 
 
 def majiq_batch_samples(batch):
@@ -31,24 +39,28 @@ def majiq_batch_samples(batch):
 
 
 def majiq_batch_sj(wildcards):
-    return [str(majiq_sj_by_sample[sample]) for sample in majiq_batch_samples(wildcards.batch)]
+    return [
+        str(majiq_sj_by_sample[sample])
+        for sample in majiq_batch_samples(wildcards.batch)
+    ]
 
 
 def majiq_batch_prefixes(wildcards):
-    return ' '.join(majiq_batch_samples(wildcards.batch))
+    return " ".join(majiq_batch_samples(wildcards.batch))
 
 
-if 'annotation_gff3' not in majiq_params:
+if "annotation_gff3" not in majiq_params:
+
     rule majiq_gff3_from_gtf:
         """Convert the reference GTF to GFF3 for MAJIQ."""
         input:
             ref_anno,
         output:
             majiq_annotation_gff3,
-        params:
-            outdir = ref_dir / 'majiq',
         resources:
-            mem_mb = 32000,
+            mem_mb=32000,
+        params:
+            outdir=ref_dir / "majiq",
         shell:
             """
             mkdir -p {params.outdir}
@@ -61,37 +73,38 @@ if 'annotation_gff3' not in majiq_params:
 rule make_majiq_experiments_tsv:
     """Write MAJIQ experiment groups and BAM paths."""
     input:
-        bams = expand(str(interm_dir / 'bam' / '{sample_id}.bam'), sample_id=samples),
-        bai = expand(str(interm_dir / 'bam' / '{sample_id}.bam.bai'), sample_id=samples),
+        bams=expand(str(interm_dir / "bam" / "{sample_id}.bam"), sample_id=samples),
+        bai=expand(str(interm_dir / "bam" / "{sample_id}.bam.bai"), sample_id=samples),
     output:
-        majiq_dir / 'experiments.tsv',
+        majiq_dir / "experiments.tsv",
     params:
-        group = majiq_params.get('group', 'pantry'),
+        group=majiq_params.get("group", "pantry"),
     run:
         Path(output[0]).parent.mkdir(parents=True, exist_ok=True)
-        with open(output[0], 'w') as out:
-            out.write('group\tpath\n')
+        with open(output[0], "w") as out:
+            out.write("group\tpath\n")
             for bam in input.bams:
-                out.write(f'{params.group}\t{bam}\n')
+                out.write(f"{params.group}\t{bam}\n")
 
 
 rule majiq_build:
     """Build MAJIQ splice graph and per-sample junction coverage."""
     input:
-        gff3 = majiq_annotation_gff3,
-        experiments = rules.make_majiq_experiments_tsv.output,
+        gff3=majiq_annotation_gff3,
+        experiments=rules.make_majiq_experiments_tsv.output,
     output:
-        splicegraph = directory(majiq_build_dir / 'splicegraph.zarr'),
-        sj = majiq_sj,
-    params:
-        outdir = majiq_build_dir,
-        min_experiments = majiq_min_experiments,
-        license = majiq_license,
-    conda: 'majiq3'
+        splicegraph=directory(majiq_build_dir / "splicegraph.zarr"),
+        sj=majiq_sj,
+    conda:
+        "majiq3"
     threads: majiq_threads
     resources:
-        mem_mb = 64000,
-        runtime = '12h',
+        mem_mb=64000,
+        runtime="12h",
+    params:
+        outdir=majiq_build_dir,
+        min_experiments=majiq_min_experiments,
+        license=majiq_license,
     shell:
         """
         mkdir -p {params.outdir}
@@ -111,17 +124,18 @@ rule majiq_build:
 rule majiq_psi_coverage:
     """Calculate MAJIQ PSI coverage in sample batches."""
     input:
-        splicegraph = rules.majiq_build.output.splicegraph,
-        sj = majiq_batch_sj,
+        splicegraph=rules.majiq_build.output.splicegraph,
+        sj=majiq_batch_sj,
     output:
-        psicov = directory(majiq_psicov_dir / 'batch_{batch}.psicov.zarr'),
-    params:
-        prefixes = majiq_batch_prefixes,
-        license = majiq_license,
-    conda: 'majiq3'
+        psicov=directory(majiq_psicov_dir / "batch_{batch}.psicov.zarr"),
+    conda:
+        "majiq3"
     threads: majiq_threads
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        prefixes=majiq_batch_prefixes,
+        license=majiq_license,
     shell:
         """
         mkdir -p {majiq_psicov_dir}
@@ -140,16 +154,19 @@ rule majiq_psi_coverage:
 rule majiq_psi:
     """Estimate MAJIQ PSI values across all batches."""
     input:
-        splicegraph = rules.majiq_build.output.splicegraph,
-        psicov = expand(str(majiq_psicov_dir / 'batch_{batch}.psicov.zarr'), batch=majiq_batches),
+        splicegraph=rules.majiq_build.output.splicegraph,
+        psicov=expand(
+            str(majiq_psicov_dir / "batch_{batch}.psicov.zarr"), batch=majiq_batches
+        ),
     output:
-        majiq_dir / 'majiq.psi.tsv',
-    params:
-        license = majiq_license,
-    conda: 'majiq3'
+        majiq_dir / "majiq.psi.tsv",
+    conda:
+        "majiq3"
     threads: majiq_threads
     resources:
-        mem_mb = 64000,
+        mem_mb=64000,
+    params:
+        license=majiq_license,
     shell:
         """
         majiq psi \
@@ -166,11 +183,11 @@ rule majiq_psi:
 rule extract_retained_introns:
     """Extract retained-intron rows from MAJIQ PSI output."""
     input:
-        majiq_dir / 'majiq.psi.tsv',
+        majiq_dir / "majiq.psi.tsv",
     output:
-        majiq_dir / 'retained_intron_psi.tsv.gz',
+        majiq_dir / "retained_intron_psi.tsv.gz",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
     shell:
         """
         python3 scripts/intron_retention/extract_ir_psi.py \
@@ -182,14 +199,14 @@ rule extract_retained_introns:
 rule assemble_intron_retention_bed:
     """Convert MAJIQ retained-intron PSI values into BED format."""
     input:
-        ir = rules.extract_retained_introns.output,
-        ref_anno = ref_anno,
+        ir=rules.extract_retained_introns.output,
+        ref_anno=ref_anno,
     output:
-        bed = output_dir / 'unnorm' / 'intron_retention.bed',
-    params:
-        unnorm_dir = output_dir / 'unnorm',
+        bed=output_dir / "unnorm" / "intron_retention.bed",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -203,14 +220,14 @@ rule assemble_intron_retention_bed:
 rule normalize_intron_retention:
     """Quantile-normalize retained-intron PSI values for QTL mapping."""
     input:
-        bed = output_dir / 'unnorm' / 'intron_retention.bed',
-        samples = samples_file,
+        bed=output_dir / "unnorm" / "intron_retention.bed",
+        samples=samples_file,
     output:
-        output_dir / 'intron_retention.bed.gz',
-    params:
-        bed = output_dir / 'intron_retention.bed',
+        output_dir / "intron_retention.bed.gz",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        bed=output_dir / "intron_retention.bed",
     shell:
         """
         python3 scripts/normalize_phenotypes.py \
@@ -224,14 +241,14 @@ rule normalize_intron_retention:
 rule pheno_groups_intron_retention:
     """Group retained-intron phenotypes by gene for tensorQTL."""
     input:
-        output_dir / 'intron_retention.bed.gz',
+        output_dir / "intron_retention.bed.gz",
     output:
-        output_dir / 'intron_retention.phenotype_groups.txt',
+        output_dir / "intron_retention.phenotype_groups.txt",
     shell:
         """
-        zcat < {input} \
+        zcat <{input} \
             | tail -n +2 \
             | cut -f4 \
             | awk '{{ g=$1; sub(/__.*$/, "", g); print $1 "\t" g }}' \
-            > {output}
+                >{output}
         """

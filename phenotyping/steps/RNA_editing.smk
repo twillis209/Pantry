@@ -3,17 +3,21 @@ localrules:
     prepare_RNA_editing_phenotypes,
     pheno_groups_RNA_editing,
 
+
 rule query_editing_level:
     input:
-        edit_sites = edit_sites_bed,
-        ref_genome = ref_genome,
-        bam = interm_dir / 'star_out' / '{sample_id}.Aligned.sortedByCoord.out.bam',
+        edit_sites=edit_sites_bed,
+        ref_genome=ref_genome,
+        bam=interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
-        levels = interm_dir / 'RNA_editing' / 'edit_levels' / '{sample_id}.rnaeditlevel.tsv.gz',
-    params:
-        edit_levels_dir = interm_dir / 'RNA_editing' / 'edit_levels',
+        levels=interm_dir
+        / "RNA_editing"
+        / "edit_levels"
+        / "{sample_id}.rnaeditlevel.tsv.gz",
     resources:
-        runtime = '8h',
+        runtime="8h",
+    params:
+        edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
     shell:
         """
         mkdir -p {params.edit_levels_dir}
@@ -24,16 +28,23 @@ rule query_editing_level:
             --output {output.levels}
         """
 
+
 rule shared_sample_sites:
     input:
-        levels = expand(interm_dir / 'RNA_editing' / 'edit_levels' / '{sample_id}.rnaeditlevel.tsv.gz', sample_id=samples),
-        samples = samples_file,
+        levels=expand(
+            interm_dir
+            / "RNA_editing"
+            / "edit_levels"
+            / "{sample_id}.rnaeditlevel.tsv.gz",
+            sample_id=samples,
+        ),
+        samples=samples_file,
     output:
-        matrix = interm_dir / 'RNA_editing' / 'edit_site_matrix.tsv',
+        matrix=interm_dir / "RNA_editing" / "edit_site_matrix.tsv",
     params:
-        edit_levels_dir = interm_dir / 'RNA_editing' / 'edit_levels',
-        min_cov = edit_sites_min_coverage,
-        min_sam = edit_sites_min_samples,
+        edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
+        min_cov=edit_sites_min_coverage,
+        min_sam=edit_sites_min_samples,
     shell:
         """
         python3 scripts/RNA_editing/shared_samples_sites_matrix.py \
@@ -44,27 +55,29 @@ rule shared_sample_sites:
             --min_samples {params.min_sam}
         """
 
+
 rule map_edit_sites_to_genes:
     input:
-        edit_sites = edit_sites_bed,
-        ref_anno = ref_anno,
+        edit_sites=edit_sites_bed,
+        ref_anno=ref_anno,
     output:
-        tsv = ref_dir / 'edit_sites_to_genes.tsv',
+        tsv=ref_dir / "edit_sites_to_genes.tsv",
     shell:
         """
         python3 scripts/RNA_editing/map_edit_sites_to_genes.py {input.edit_sites} {input.ref_anno} {output.tsv}
         """
 
+
 rule prepare_RNA_editing_phenotypes:
     input:
-        matrix = interm_dir / 'RNA_editing' / 'edit_site_matrix.tsv',
-        edit_sites_to_genes = ref_dir / 'edit_sites_to_genes.tsv',
+        matrix=interm_dir / "RNA_editing" / "edit_site_matrix.tsv",
+        edit_sites_to_genes=ref_dir / "edit_sites_to_genes.tsv",
     output:
-        matrix = interm_dir / 'RNA_editing' / 'phenotype_matrix.tsv',
-        site_map = output_dir / 'RNA_editing.site_to_phenotype.tsv',
+        matrix=interm_dir / "RNA_editing" / "phenotype_matrix.tsv",
+        site_map=output_dir / "RNA_editing.site_to_phenotype.tsv",
     params:
-        cluster = '--cluster' if edit_sites_cluster else '',
-        correlation_threshold = edit_sites_correlation_threshold,
+        cluster="--cluster" if edit_sites_cluster else "",
+        correlation_threshold=edit_sites_correlation_threshold,
     shell:
         """
         mkdir -p {output_dir}
@@ -77,17 +90,18 @@ rule prepare_RNA_editing_phenotypes:
             {params.cluster}
         """
 
+
 rule assemble_RNA_editing_bed:
     """Convert RNA editing matrix into BED file"""
     input:
-        matrix = interm_dir / 'RNA_editing' / 'phenotype_matrix.tsv',
-        ref_anno = ref_anno,
+        matrix=interm_dir / "RNA_editing" / "phenotype_matrix.tsv",
+        ref_anno=ref_anno,
     output:
-        bed = output_dir / 'unnorm' / 'RNA_editing.bed',
-    params:
-        unnorm_dir = output_dir / 'unnorm',
+        bed=output_dir / "unnorm" / "RNA_editing.bed",
     resources:
-        mem_mb = 32000,
+        mem_mb=32000,
+    params:
+        unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -97,15 +111,16 @@ rule assemble_RNA_editing_bed:
             --output {output.bed}
         """
 
+
 rule normalize_RNA_editing:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed = output_dir / 'unnorm' / 'RNA_editing.bed',
-        samples = samples_file,
+        bed=output_dir / "unnorm" / "RNA_editing.bed",
+        samples=samples_file,
     output:
-        output_dir / 'RNA_editing.bed.gz',
+        output_dir / "RNA_editing.bed.gz",
     params:
-        bed = output_dir / 'RNA_editing.bed',
+        bed=output_dir / "RNA_editing.bed",
     shell:
         """
         mkdir -p {output_dir}
@@ -116,17 +131,18 @@ rule normalize_RNA_editing:
         bgzip {params.bed}
         """
 
+
 rule pheno_groups_RNA_editing:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        output_dir / 'RNA_editing.bed.gz',
+        output_dir / "RNA_editing.bed.gz",
     output:
-        output_dir / 'RNA_editing.phenotype_groups.txt',
+        output_dir / "RNA_editing.phenotype_groups.txt",
     shell:
         """
-        zcat < {input} \
+        zcat <{input} \
             | tail -n +2 \
             | cut -f4 \
             | awk '{{ g=$1; sub(/__.*$/, "", g); print $1 "\t" g }}' \
-            > {output}
+                >{output}
         """
