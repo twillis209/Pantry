@@ -116,8 +116,9 @@ $defs:
     type: object
     properties:
       enabled: {type: boolean, default: false}
-      dataset_name: {type: string, default: pantry}
-      project_dir: {type: string, default: "<pantry_intermediate>/laddr"}
+      dataset_name:
+        type: string
+        description: Dataset ID in LaDDR's manifest; defaults to the dataset key.
       use_existing_bins: {type: boolean, default: false}
       existing_info_dir: {type: string}
       existing_bins_dir: {type: string}

@@ -135,7 +135,7 @@ An optional top-level `laddr:` section enables latent residual phenotypes. Key o
 - `enabled`: turn LaDDR integration on/off.
 - `regress_modalities`: normalized Pantry modalities to regress out during `laddr coverage`.
 - `use_existing_bins`: if `true`, link existing `info/` and `gene_bins/`; otherwise run `laddr setup` + `laddr binning`.
-- `project_dir`: where LaDDR intermediate files are stored (default `intermediate/laddr`).
+- `dataset_name`: dataset ID in LaDDR's manifest (default: the dataset key). LaDDR intermediate files are stored in `<pantry_intermediate>/{dataset}/laddr` (`project_dir` is no longer used).
 
 ### Input files
 

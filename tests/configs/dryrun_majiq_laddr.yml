@@ -2,6 +2,8 @@
 # are not part of the run-time test configs. Two datasets on two references:
 # one reference converts its GTF to GFF3 for MAJIQ, the other gives
 # annotation_gff3 (any existing file will do for a dry run; the GTF is reused).
+# LaDDR builds bins for one dataset and links existing (here fake) bins for
+# the other.
 # Paths are relative to the working directory, which needs an 'input' link to
 # phenotyping/input, e.g.:
 #   mkdir -p /tmp/dr && ln -sfn "$PWD/phenotyping/input" /tmp/dr/input
@@ -32,7 +34,8 @@ defaults:
         - intron_retention.phenotype_groups.txt
 
 datasets:
-  # GFF3 converted from the GTF; 16 samples in 4 psi-coverage batches.
+  # GFF3 converted from the GTF; 16 samples in 4 psi-coverage batches;
+  # LaDDR builds bins, LaDDR dataset name defaults to 'full'.
   full:
     reference: grch38_chr1
     samples: input/samples.txt
@@ -43,7 +46,10 @@ datasets:
     modality_groups:
       intron_retention:
         psicov_batch_size: 5
-  # Configured annotation_gff3; one psi-coverage batch.
+    laddr:
+      enabled: true
+  # Configured annotation_gff3; one psi-coverage batch; LaDDR links existing
+  # bins and uses its own dataset name.
   ct_CD4.TCM:
     reference: grch38_chr1_gff3
     samples: [HG00108, HG00120, HG00185, HG00231]
@@ -57,3 +63,10 @@ datasets:
     read_length: 100
     fragment_length_mean: 200
     fragment_length_sd: 50
+    laddr:
+      enabled: true
+      dataset_name: cd4_tcm
+      use_existing_bins: true
+      existing_info_dir: /fake/laddr/info
+      existing_bins_dir: /fake/laddr/gene_bins
+      regress_modalities: [expression]

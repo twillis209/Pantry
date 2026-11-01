@@ -126,11 +126,9 @@ datasets:
     laddr:
       enabled: false
 
-      # Name used as dataset ID in LaDDR outputs/manifest.
+      # Name used as dataset ID in LaDDR outputs/manifest (default: the dataset
+      # key). LaDDR works in <pantry_intermediate>/{dataset}/laddr.
       dataset_name: pantry
-
-      # Intermediate LaDDR working directory.
-      project_dir: intermediate/laddr
 
       # If true, link existing LaDDR info/ and gene_bins/ instead of running setup
       # and binning.

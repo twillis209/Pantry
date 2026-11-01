@@ -142,6 +142,16 @@ def _check_dataset(name: str, ds: dict, references: dict):
                 "laddr.regress_modalities contains unknown modality names: "
                 + ", ".join(invalid)
             )
+        if "dataset_name" in laddr:
+            _check_name("LaDDR dataset", laddr["dataset_name"])
+        if "project_dir" in laddr:
+            # LaDDR always works in <pantry_intermediate>/{dataset}/laddr now.
+            if laddr.get("enabled"):
+                print(
+                    f"Note: datasets.{name}.laddr.project_dir is ignored; LaDDR "
+                    f"uses <pantry_intermediate>/{name}/laddr."
+                )
+            del laddr["project_dir"]
         if laddr.get("use_existing_bins"):
             if "existing_info_dir" not in laddr or "existing_bins_dir" not in laddr:
                 raise ValueError(

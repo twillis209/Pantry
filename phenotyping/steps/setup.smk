@@ -131,26 +131,3 @@ def rna_editing_min_samples(w) -> int:
         )
     min_samples = pantry_config.edit_sites_min_samples(configured, fraction, n)
     return min_samples
-
-
-# LaDDR rules do not take a {dataset} wildcard yet; until they do, they run
-# for dataset 'default' only, using these globals.
-for _name, _d in CONFIG["datasets"].items():
-    if _name != "default" and _d.get("laddr", {}).get("enabled", False):
-        raise ValueError(
-            f"datasets.{_name}: laddr is only supported for a dataset named "
-            "'default' (or a single-dataset config) for now."
-        )
-
-_default = CONFIG["datasets"].get("default", {})
-laddr_enabled = _default.get("laddr", {}).get("enabled", False)
-
-if laddr_enabled:
-    _ref = CONFIG["references"][_default["reference"]]
-    samples_file = "<pantry_intermediate>/default/samples.txt"
-    samples = dataset_samples("default")
-    ref_anno = Path(_ref["annotation"]).expanduser()
-    laddr_config = dict(_default.get("laddr", {}))
-    for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
-        if _key in laddr_config:
-            laddr_config[_key] = Path(laddr_config[_key]).expanduser()

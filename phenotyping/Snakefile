@@ -30,6 +30,7 @@ wildcard_constraints:
     batch=r"\d+",
     n_batches=r"\d+",
     feature_type="exonic|intronic",
+    laddr_name="[^/]+",
 
 
 # This code validates and processes the configuration and sets global variables:
@@ -87,11 +88,7 @@ include: "steps/stability.smk"
 include: "steps/alt_TSS_polyA.smk"
 include: "steps/RNA_editing.smk"
 include: "steps/intron_retention.smk"
-
-
-if laddr_enabled:
-
-    include: "steps/laddr.smk"
+include: "steps/laddr.smk"
 
 
 ## Additional general rules

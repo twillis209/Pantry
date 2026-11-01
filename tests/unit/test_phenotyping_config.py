@@ -426,8 +426,6 @@ def test_schema_defaults_land_per_dataset(validate):
     assert laddr == {
         "enabled": True,
         "regress_modalities": ["RNA_editing", "intron_retention"],
-        "dataset_name": "pantry",
-        "project_dir": "<pantry_intermediate>/laddr",
         "use_existing_bins": False,
         "min_samples_expressed": 0.5,
         "binning_method": "adaptive_diffvar",
@@ -490,3 +488,15 @@ def test_shim_keeps_majiq_env_top_level():
     out = cfg.normalise(raw)
     assert out["majiq_env"] == "majiq-site"
     assert "majiq_env" not in out["datasets"]["default"]
+
+
+def test_laddr_project_dir_dropped():
+    out = cfg.normalise(new_config(laddr={"enabled": True, "project_dir": "x/laddr"}))
+    assert "project_dir" not in out["datasets"]["d1"]["laddr"]
+    assert "dataset_name" not in out["datasets"]["d1"]["laddr"]
+
+
+@pytest.mark.parametrize("bad", ["a/b", "", "..", 3])
+def test_laddr_dataset_name_must_be_path_component(bad):
+    with pytest.raises(ValueError, match="LaDDR dataset name"):
+        cfg.normalise(new_config(laddr={"dataset_name": bad}))
