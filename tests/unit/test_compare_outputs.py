@@ -289,3 +289,84 @@ def test_report_states_summary_only_and_labels(tmp_path):
     txt = rep.read_text()
     assert rc == 0
     assert 'ONLY on the summary statistics' in txt and 'rel diff vs expected' in txt
+
+
+HDR = '#chr\tstart\tend\tphenotype_id\ts1\ts2\n'
+
+
+def bed(rows, hdr=HDR):
+    return hdr + ''.join('\t'.join(map(str, r)) + '\n' for r in rows)
+
+
+def bed_run(tmp_path, exp, act, na=None, nb=None, name='expression.bed.gz'):
+    write_bed(tmp_path / 'exp' / name, exp)
+    write_bed(tmp_path / 'act' / name, act)
+    nd = None
+    if na is not None:
+        write_bed(tmp_path / 'na' / name, na)
+        write_bed(tmp_path / 'nb' / name, nb)
+        nd = (tmp_path / 'na', tmp_path / 'nb')
+    return co.compare_dirs(tmp_path / 'exp', tmp_path / 'act', nd)
+
+
+BASE = [('chr1', 1, 2, 'g1', 1.0, 2.0), ('chr1', 3, 4, 'g2', 3.0, 4.0)]
+
+
+def shifted(d, rows=BASE):
+    return [r[:4] + tuple(v + d for v in r[4:]) for r in rows]
+
+
+def test_bed_numeric_within_noise_passes(tmp_path):
+    mism, notes = bed_run(tmp_path, bed(BASE), bed(shifted(0.015)), bed(BASE), bed(shifted(0.01)))
+    assert mism == []
+    assert any('max |diff|' in n and 'allowed' in n for n in notes)
+
+
+def test_bed_numeric_outside_noise_fails(tmp_path):
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(shifted(0.03)), bed(BASE), bed(shifted(0.01)))
+    assert len(mism) == 1 and 'max |diff|' in mism[0]
+
+
+def test_bed_row_order_or_id_change_fails(tmp_path):
+    nz = (bed(BASE), bed(shifted(0.01)))
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(BASE[::-1]), *nz)
+    assert len(mism) == 1
+    renamed = [BASE[0][:3] + ('gX',) + BASE[0][4:], BASE[1]]
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(renamed), *nz)
+    assert len(mism) == 1
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(BASE[:1]), *nz)
+    assert len(mism) == 1
+
+
+def test_bed_header_change_fails(tmp_path):
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(BASE, HDR.replace('s2', 's3')), bed(BASE), bed(shifted(0.01)))
+    assert len(mism) == 1 and 'header' in mism[0]
+
+
+def test_bed_nan_pattern_change_fails(tmp_path):
+    nan_rows = [BASE[0][:5] + ('NA',), BASE[1]]
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(nan_rows), bed(BASE), bed(shifted(0.01)))
+    assert len(mism) == 1 and 'NaN' in mism[0]
+    # same NaN pattern passes
+    mism, _ = bed_run(tmp_path, bed(nan_rows), bed(nan_rows[:1] + [shifted(0.01)[1]]),
+                      bed(BASE), bed(shifted(0.01)))
+    assert mism == []
+
+
+def test_bed_noise_pair_identical_means_zero_tolerance(tmp_path):
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(shifted(0.001)), bed(BASE), bed(BASE))
+    assert len(mism) == 1
+
+
+def test_bed_without_noise_is_byte_exact(tmp_path):
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(shifted(0.001)))
+    assert len(mism) == 1 and 'contents differ' in mism[0]
+
+
+def test_bed_missing_noise_counterpart_fails(tmp_path):
+    write_bed(tmp_path / 'exp' / 'e.bed.gz', bed(BASE))
+    write_bed(tmp_path / 'act' / 'e.bed.gz', bed(shifted(0.01)))
+    (tmp_path / 'na').mkdir()
+    (tmp_path / 'nb').mkdir()
+    mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'act', (tmp_path / 'na', tmp_path / 'nb'))
+    assert any('noise counterpart missing' in m for m in mism)

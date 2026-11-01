@@ -232,6 +232,36 @@ def _compare_tar(a: Path, b: Path):
     return mism
 
 
+def _bed_numeric(a: Path, b: Path):
+    """Numeric BED comparison. Returns (errors, max |diff| over non-NaN value cells)."""
+    la = _read_bytes(a).decode().splitlines()
+    lb = _read_bytes(b).decode().splitlines()
+    if la[:1] != lb[:1]:
+        return ['header differs'], None
+    if len(la) != len(lb):
+        return [f'row count differs ({len(la) - 1} vs {len(lb) - 1})'], None
+    maxd, nan_bad, id_bad = 0.0, 0, []
+    for i, (x, y) in enumerate(zip(la[1:], lb[1:]), start=1):
+        fx, fy = x.split('\t'), y.split('\t')
+        if len(fx) != len(fy) or fx[:4] != fy[:4]:
+            id_bad.append(i)
+            continue
+        vx = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fx[4:]])
+        vy = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fy[4:]])
+        if (np.isnan(vx) != np.isnan(vy)).any():
+            nan_bad += 1
+            continue
+        ok = ~np.isnan(vx)
+        if ok.any():
+            maxd = max(maxd, float(np.abs(vx[ok] - vy[ok]).max()))
+    errs = []
+    if id_bad:
+        errs.append(f'first 4 columns (or column count) differ in {len(id_bad)} rows, e.g. line {id_bad[0]}')
+    if nan_bad:
+        errs.append(f'NaN pattern differs in {nan_bad} rows')
+    return errs, (None if errs else maxd)
+
+
 def _compare_hsq(a: Path, b: Path):
     la, lb = a.read_text().splitlines(), b.read_text().splitlines()
     if la[:1] != lb[:1]:
@@ -297,9 +327,26 @@ def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
             msgs = _compare_tar(e, a)
         elif name.endswith('.hsq.tsv'):
             msgs = _compare_hsq(e, a)
-        else:
-            if _read_bytes(e) != _read_bytes(a):
-                msgs = ['contents differ']
+        elif _read_bytes(e) != _read_bytes(a):
+            msgs = ['contents differ']
+            if noise_dirs is not None and name.endswith(('.bed', '.bed.gz')):
+                na, nb = Path(noise_dirs[0]) / r, Path(noise_dirs[1]) / r
+                if not (na.exists() and nb.exists()):
+                    msgs = [f'noise counterpart missing ({na if not na.exists() else nb})']
+                else:
+                    nerr, nmax = _bed_numeric(na, nb)
+                    if nerr:
+                        msgs = [f'noise pair not numerically comparable: {"; ".join(nerr)}']
+                    else:
+                        errs, dmax = _bed_numeric(e, a)
+                        allowed = 2 * nmax
+                        if errs:
+                            msgs = errs
+                        elif dmax > allowed:
+                            msgs = [f'max |diff| {dmax:.4g} > allowed {allowed:.4g} (noise pair max {nmax:.4g})']
+                        else:
+                            msgs = []
+                            nts = [f'numeric BED: max |diff| {dmax:.4g}, allowed {allowed:.4g}']
         mism += [f'{r}: {m}' for m in msgs]
         notes += [f'{r}: {m}' for m in nts]
     return mism, notes
