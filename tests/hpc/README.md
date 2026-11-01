@@ -55,3 +55,34 @@ With `--noise`, each cis_independent file is judged on summary stats (rows, dist
 diffs of pval_nominal/slope/slope_se/num_var) against 2x the noise-pair deviation (count floor 1, rel floor 1e-6); without `--noise` rows must match exactly.
 - Job 8392773: run1 vs run2 `--noise run1 run2` -> MATCH (0 mismatches), `archive/pheast_noise_calibrated.md`.
 - Job 8392774: run2 vs run1, no `--noise` -> MISMATCH (exit 1, expected; raw differences), `archive/pheast_noise.md` (replaces the earlier raw report).
+
+## Spike result (Task 4): checkpoint inside a prefixed module
+Snakemake 9.27.0, local run on macOS (throwaway code in /tmp/ckpt-spike, not committed). Host imports the module with
+`use rule * from m as m_*` and module-level `pathvars:`. All checks PASS:
+- PASS: checkpoint `summary` in the module, read by input function `checkpoints.summary.get(dataset=w.dataset)` (original name, NOT `m_summary`), works under renaming; `snakemake -c1` completes, `res/x/d1/part{0,1,2}.txt` and `gathered.txt` created.
+- PASS: checkpoint output path contains a pathvar (`<pantry_output>/{dataset}/n.txt`).
+- PASS: module loaded by relative path (`../mod/Snakefile`) and by absolute path; host pathvars referencing other pathvars (`pantry_output="<results>/x"`, `results="res"`) land outputs under `res/x/`.
+- PASS: per-rule `localrule: True` inside a rule survives renaming. Checked by `print(r.name, r.name in workflow._localrules)` over `workflow.rules` in the host: only `m_note` is local. (The "localrule" label in `-c1` run logs is NOT discriminating: every rule is labelled local under the local executor.)
+- Gotchas: `pathvars:` entries need trailing commas (`a="x",`); a top-level `localrule: True` line applies to all following rules, so use it inside the rule; the first rule in the host (not an imported one) is the default target, so put `rule all` before `use rule *`.
+
+```
+# host/Snakefile
+pathvars:
+    results="res",
+    pantry_output="<results>/x",
+rule all:
+    input: "<pantry_output>/d1/gathered.txt"
+module m:
+    snakefile: "/abs/path/mod/Snakefile"
+    pathvars:
+        pantry_output="<results>/x",
+use rule * from m as m_*
+# mod/Snakefile
+checkpoint summary:
+    output: "<pantry_output>/{dataset}/n.txt"
+def parts(w):
+    n = int(open(checkpoints.summary.get(dataset=w.dataset).output[0]).read())
+    return expand("<pantry_output>/{dataset}/part{i}.txt", dataset=w.dataset, i=range(n))
+rule note:
+    localrule: True
+```
