@@ -1,9 +1,9 @@
 rule kallisto_index:
     """Generate the index for kallisto."""
     input:
-        ref_cdna,
+        "<pantry_reference>/{reference}/cDNA.fa.gz",
     output:
-        "<pantry_reference>/kallisto.idx",
+        "<pantry_reference>/{reference}/kallisto.idx",
     resources:
         mem_mb=32000,
     params:
@@ -18,12 +18,12 @@ rule kallisto_index:
 rule kallisto:
     """Quantify expression from FASTQ files using kallisto."""
     input:
-        index="<pantry_reference>/kallisto.idx",
+        index=ref_path("kallisto.idx"),
         fastq=fastq_inputs,
     output:
-        h5="<pantry_intermediate>/expression/{sample_id}/abundance.h5",
-        tsv="<pantry_intermediate>/expression/{sample_id}/abundance.tsv",
-        json="<pantry_intermediate>/expression/{sample_id}/run_info.json",
+        h5="<pantry_intermediate>/{dataset}/expression/{sample_id}/abundance.h5",
+        tsv="<pantry_intermediate>/{dataset}/expression/{sample_id}/abundance.tsv",
+        json="<pantry_intermediate>/{dataset}/expression/{sample_id}/run_info.json",
     threads: 16
     resources:
         runtime="16h",
@@ -50,15 +50,14 @@ rule assemble_expression_bed:
     Currently only tpm is used for downstream analysis.
     """
     input:
-        kallisto=expand(
-            "<pantry_intermediate>/expression/{sample_id}/abundance.tsv",
-            sample_id=samples,
+        kallisto=per_sample(
+            "<pantry_intermediate>/{dataset}/expression/{sample_id}/abundance.tsv"
         ),
-        samples=samples_file,
-        ref_anno=ref_anno,
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
+        ref_anno=ref_file("annotation"),
     output:
-        iso="<pantry_output>/unnorm/isoforms.bed",
-        gene="<pantry_output>/unnorm/expression.bed",
+        iso="<pantry_output>/{dataset}/unnorm/isoforms.bed",
+        gene="<pantry_output>/{dataset}/unnorm/expression.bed",
     resources:
         mem_mb=32000,
     params:
@@ -80,10 +79,10 @@ rule assemble_expression_bed:
 rule normalize_expression:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed="<pantry_output>/unnorm/expression.bed",
-        samples=samples_file,
+        bed="<pantry_output>/{dataset}/unnorm/expression.bed",
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
-        "<pantry_output>/expression.bed.gz",
+        "<pantry_output>/{dataset}/expression.bed.gz",
     resources:
         mem_mb=32000,
     params:
@@ -102,10 +101,10 @@ rule normalize_expression:
 rule normalize_isoforms:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed="<pantry_output>/unnorm/isoforms.bed",
-        samples=samples_file,
+        bed="<pantry_output>/{dataset}/unnorm/isoforms.bed",
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
-        "<pantry_output>/isoforms.bed.gz",
+        "<pantry_output>/{dataset}/isoforms.bed.gz",
     resources:
         mem_mb=32000,
     params:
@@ -126,9 +125,9 @@ rule normalize_isoforms:
 rule pheno_groups_isoforms:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        "<pantry_output>/isoforms.bed.gz",
+        "<pantry_output>/{dataset}/isoforms.bed.gz",
     output:
-        "<pantry_output>/isoforms.phenotype_groups.txt",
+        "<pantry_output>/{dataset}/isoforms.phenotype_groups.txt",
     localrule: True
     shell:
         """
