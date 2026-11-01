@@ -6,6 +6,11 @@ It validates and processes the configuration and sets global variables.
 from copy import deepcopy
 
 
+def script(name: str) -> str:
+    """Path to a bundled script, independent of the working directory."""
+    return workflow.source_path(f"../scripts/{name}")
+
+
 def load_fastq_map(map_file: Path, fastq_dir: Path, paired_end=None) -> dict:
     """Load the FASTQ file paths for each sample.
 

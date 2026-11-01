@@ -11,7 +11,7 @@ majiq_annotation_gff3 = (
 )
 majiq_license = Path(
     majiq_params.get(
-        "license", "scripts/intron_retention/majiq_license_academic_official.lic"
+        "license", script("intron_retention/majiq_license_academic_official.lic")
     )
 ).expanduser()
 majiq_threads = majiq_params.get("threads", 8)
@@ -54,11 +54,12 @@ if "annotation_gff3" not in majiq_params:
         resources:
             mem_mb=32000,
         params:
+            script=script("gtf_to_majiq_gff3.py"),
             outdir=ref_dir / "majiq",
         shell:
             """
             mkdir -p {params.outdir}
-            python3 scripts/gtf_to_majiq_gff3.py \
+            python3 {params.script} \
                 --input {input} \
                 --output {output}
             """
@@ -183,9 +184,11 @@ rule extract_retained_introns:
         majiq_dir / "retained_intron_psi.tsv.gz",
     resources:
         mem_mb=32000,
+    params:
+        script=script("intron_retention/extract_ir_psi.py"),
     shell:
         """
-        python3 scripts/intron_retention/extract_ir_psi.py \
+        python3 {params.script} \
             --input {input} \
             --output {output}
         """
@@ -201,11 +204,12 @@ rule assemble_intron_retention_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py intron-retention \
+        python3 {params.script} intron-retention \
             --input {input.ir} \
             --ref-anno {input.ref_anno} \
             --output {output.bed}
@@ -222,10 +226,11 @@ rule normalize_intron_retention:
     resources:
         mem_mb=32000,
     params:
+        script=script("normalize_phenotypes.py"),
         bed=output_dir / "intron_retention.bed",
     shell:
         """
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

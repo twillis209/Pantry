@@ -9,9 +9,11 @@ rule preprocess_gtf_for_txrevise:
         ref_dir / "txrevise" / "gene_annotations.gtf",
     resources:
         mem_mb=32000,
+    params:
+        script=script("txrevise/preprocess_gtf.py"),
     shell:
         """
-        python3 scripts/txrevise/preprocess_gtf.py \
+        python3 {params.script} \
             --input {input} \
             --output {output}
         """
@@ -27,9 +29,11 @@ rule txrevise_extract_tags:
         ref_dir / "txrevise" / "gene_annotations.gtf",
     output:
         tags=ref_dir / "txrevise" / "transcript_tags.txt",
+    params:
+        script=script("txrevise/extractTranscriptTags.py"),
     shell:
         """
-        python3 scripts/txrevise/extractTranscriptTags.py \
+        python3 {params.script} \
             --gtf <(gzip -c {input}) \
             >{output.tags}
         """
@@ -42,9 +46,11 @@ rule txrevise_prepare_annotations:
         tags=ref_dir / "txrevise" / "transcript_tags.txt",
     output:
         ref_dir / "txrevise" / "txrevise_annotations.rds",
+    params:
+        script=script("txrevise/prepareAnnotations.R"),
     shell:
         """
-        Rscript scripts/txrevise/prepareAnnotations.R \
+        Rscript {params.script} \
             --gtf {input.gtf} \
             --tags {input.tags} \
             --out {output}
@@ -83,11 +89,12 @@ rule txrevise_construct_events:
     resources:
         runtime="16h",
     params:
+        script=script("txrevise/constructEvents.R"),
         batch_str="'{batch} {n_batches}'",
         outdir=ref_dir / "txrevise" / "batch",
     shell:
         """
-        Rscript scripts/txrevise/constructEvents.R \
+        Rscript {params.script} \
             --annot {input} \
             --batch {params.batch_str} \
             --out {params.outdir}
@@ -214,6 +221,7 @@ rule assemble_alt_TSS_polyA_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=str(output_dir / "unnorm"),
         alt_group1_pos_dir=lambda w: str(
             interm_dir
@@ -228,7 +236,7 @@ rule assemble_alt_TSS_polyA_bed:
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py alt-tss-polya \
+        python3 {params.script} alt-tss-polya \
             --group1-dir {params.alt_group1_pos_dir} \
             --group2-dir {params.alt_group2_pos_dir} \
             --samples {input.samples} \
@@ -245,11 +253,12 @@ rule normalize_alt_TSS_polyA:
     output:
         output_dir / "alt_{type}.bed.gz",
     params:
+        script=script("normalize_phenotypes.py"),
         bed=str(output_dir / "alt_{type}.bed"),
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

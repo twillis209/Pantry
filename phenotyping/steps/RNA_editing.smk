@@ -11,11 +11,12 @@ rule query_editing_level:
     resources:
         runtime="8h",
     params:
+        script=script("RNA_editing/query_editing_level.py"),
         edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
     shell:
         """
         mkdir -p {params.edit_levels_dir}
-        python3 scripts/RNA_editing/query_editing_level.py \
+        python3 {params.script} \
             --edit_sites {input.edit_sites} \
             --ref {input.ref_genome} \
             --bam {input.bam} \
@@ -36,12 +37,13 @@ rule shared_sample_sites:
     output:
         matrix=interm_dir / "RNA_editing" / "edit_site_matrix.tsv",
     params:
+        script=script("RNA_editing/shared_samples_sites_matrix.py"),
         edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
         min_cov=edit_sites_min_coverage,
         min_sam=edit_sites_min_samples,
     shell:
         """
-        python3 scripts/RNA_editing/shared_samples_sites_matrix.py \
+        python3 {params.script} \
             --path_to_edit_files {params.edit_levels_dir} \
             --samples_file {input.samples} \
             --output_file {output.matrix} \
@@ -57,9 +59,11 @@ rule map_edit_sites_to_genes:
     output:
         tsv=ref_dir / "edit_sites_to_genes.tsv",
     localrule: True
+    params:
+        script=script("RNA_editing/map_edit_sites_to_genes.py"),
     shell:
         """
-        python3 scripts/RNA_editing/map_edit_sites_to_genes.py {input.edit_sites} {input.ref_anno} {output.tsv}
+        python3 {params.script} {input.edit_sites} {input.ref_anno} {output.tsv}
         """
 
 
@@ -72,12 +76,13 @@ rule prepare_RNA_editing_phenotypes:
         site_map=output_dir / "RNA_editing.site_to_phenotype.tsv",
     localrule: True
     params:
+        script=script("RNA_editing/prepare_rna_editing_phenotypes.py"),
         cluster="--cluster" if edit_sites_cluster else "",
         correlation_threshold=edit_sites_correlation_threshold,
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/RNA_editing/prepare_rna_editing_phenotypes.py \
+        python3 {params.script} \
             --edit-matrix {input.matrix} \
             --site-to-gene {input.edit_sites_to_genes} \
             --output-matrix {output.matrix} \
@@ -97,11 +102,12 @@ rule assemble_RNA_editing_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py rna-editing \
+        python3 {params.script} rna-editing \
             --input {input.matrix} \
             --ref-anno {input.ref_anno} \
             --output {output.bed}
@@ -116,11 +122,12 @@ rule normalize_RNA_editing:
     output:
         output_dir / "RNA_editing.bed.gz",
     params:
+        script=script("normalize_phenotypes.py"),
         bed=output_dir / "RNA_editing.bed",
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

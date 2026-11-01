@@ -5,9 +5,11 @@ rule exonic_intronic_from_GTF:
     output:
         exon_gtf=ref_dir / "exonic.gtf",
         intron_gtf=ref_dir / "intronic.gtf",
+    params:
+        script=script("exonic_intronic_from_gtf.py"),
     shell:
         """
-        python3 scripts/exonic_intronic_from_gtf.py \
+        python3 {params.script} \
             {input.ref_anno} \
             {output.exon_gtf} \
             {output.intron_gtf}
@@ -68,12 +70,13 @@ rule assemble_stability_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
         stab_dir=interm_dir / "stability",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py stability \
+        python3 {params.script} stability \
             --input-dir {params.stab_dir} \
             --samples {input.samples} \
             --ref-anno {input.ref_anno} \
@@ -89,11 +92,12 @@ rule normalize_stability:
     output:
         output_dir / "stability.bed.gz",
     params:
+        script=script("normalize_phenotypes.py"),
         bed=output_dir / "stability.bed",
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

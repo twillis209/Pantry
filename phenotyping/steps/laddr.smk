@@ -64,6 +64,7 @@ rule laddr_config:
         config=LADDR_CONFIG,
     localrule: True
     params:
+        script=script("write_laddr_config.py"),
         project_dir=LADDR_PROJECT_DIR,
         manifest_rel=LADDR_MANIFEST.name,
         min_samples_expressed=laddr_config["min_samples_expressed"],
@@ -82,7 +83,7 @@ rule laddr_config:
     shell:
         """
         mkdir -p {params.project_dir}
-        python3 scripts/write_laddr_config.py \
+        python3 {params.script} \
             --output {output.config} \
             --gtf {ref_anno} \
             --manifest {params.manifest_rel} \
@@ -231,11 +232,12 @@ rule assemble_latent_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py latent \
+        python3 {params.script} latent \
             --input {input.latent} \
             --ref-anno {input.ref_anno} \
             --output {output.bed}
@@ -252,11 +254,12 @@ rule normalize_latent:
     resources:
         mem_mb=32000,
     params:
+        script=script("normalize_phenotypes.py"),
         bed=output_dir / "latent_residual.bed",
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

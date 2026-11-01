@@ -62,12 +62,13 @@ rule assemble_expression_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
         expr_dir=interm_dir / "expression",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py expression \
+        python3 {params.script} expression \
             --input-dir {params.expr_dir} \
             --samples {input.samples} \
             --ref-anno {input.ref_anno} \
@@ -86,10 +87,11 @@ rule normalize_expression:
     resources:
         mem_mb=32000,
     params:
+        script=script("normalize_phenotypes.py"),
         bed=str(output_dir / "expression.bed"),
     shell:
         """
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}
@@ -107,11 +109,12 @@ rule normalize_isoforms:
     resources:
         mem_mb=32000,
     params:
+        script=script("normalize_phenotypes.py"),
         bed=str(output_dir / "isoforms.bed"),
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}

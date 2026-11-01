@@ -31,6 +31,7 @@ rule cluster_junctions:
     output:
         interm_dir / "splicing" / "leafcutter_perind_numers.counts.gz",
     params:
+        script=script("leafcutter_cluster_regtools_py3.py"),
         juncfile_list=interm_dir / "splicing" / "juncfiles.txt",
         splice_dir=interm_dir / "splicing",
         max_intron_len=100000,
@@ -39,7 +40,7 @@ rule cluster_junctions:
     shell:
         """
         printf '%s\\n' {input} >{params.juncfile_list}
-        python3 scripts/leafcutter_cluster_regtools_py3.py \
+        python3 {params.script} \
             --juncfiles {params.juncfile_list} \
             --rundir {params.splice_dir} \
             --maxintronlen {params.max_intron_len} \
@@ -58,11 +59,12 @@ rule assemble_splicing_bed:
     resources:
         mem_mb=32000,
     params:
+        script=script("assemble_bed.py"),
         unnorm_dir=output_dir / "unnorm",
     shell:
         """
         mkdir -p {params.unnorm_dir}
-        python3 scripts/assemble_bed.py splicing \
+        python3 {params.script} splicing \
             --input {input.counts} \
             --ref-anno {input.ref_anno} \
             --output {output.bed}
@@ -79,11 +81,12 @@ rule normalize_splicing:
     resources:
         mem_mb=32000,
     params:
+        script=script("normalize_phenotypes.py"),
         bed=output_dir / "splicing.bed",
     shell:
         """
         mkdir -p {output_dir}
-        python3 scripts/normalize_phenotypes.py \
+        python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
             --output {params.bed}
