@@ -1,9 +1,37 @@
 """This script is loaded near the beginning of the main phenotyping Snakefile.
 
-It validates and processes the configuration and sets global variables.
+It normalises and validates the configuration and defines config helpers.
 """
 
-from copy import deepcopy
+import functools
+import importlib.util
+
+from snakemake.utils import validate
+
+
+def _load_config_lib():
+    """Import lib/config.py by path, so it also works for a remote module."""
+    spec = importlib.util.spec_from_file_location(
+        "pantry_phenotyping_config", str(workflow.source_path("../lib/config.py"))
+    )
+    lib = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lib)
+    return lib
+
+
+pantry_config = _load_config_lib()
+
+CONFIG = pantry_config.normalise(config)
+validate(CONFIG, workflow.source_path("../schemas/config.schema.yaml"))
+
+
+# Legacy intermediate_dir/intermediate_ref_dir override the Snakefile's
+# default pathvars; this registers after them, so it wins.
+if CONFIG["legacy_pathvars"]:
+
+    pathvars:
+        pantry_intermediate=CONFIG["legacy_pathvars"]["pantry_intermediate"],
+        pantry_reference=CONFIG["legacy_pathvars"]["pantry_reference"],
 
 
 def script(name: str):
@@ -27,263 +55,82 @@ def bgzip_source(w, output) -> str:
     return output[0].removesuffix(".gz")
 
 
-def load_fastq_map(map_file: Path, fastq_dir: Path, paired_end=None) -> dict:
-    """Load the FASTQ file paths for each sample.
-
-    Returns a dictionary where each value is a tuple (paths, is_paired).
-    paths is either a list (single-end) or tuple of two lists (paired-end).
-    is_paired is a boolean indicating if the sample is paired-end.
-    """
-    paths = {}
-    with open(map_file, "r") as f:
-        for line in f.read().splitlines():
-            fields = line.split("\t")
-            sample_id = fields[-1]
-            is_paired = len(fields) == 3
-
-            if sample_id not in paths:
-                paths[sample_id] = (
-                    (([], []), is_paired) if is_paired else ([], is_paired)
-                )
-            elif paths[sample_id][1] != is_paired:
-                raise ValueError(
-                    f"Sample {sample_id} has mixed paired-end and single-end reads"
-                )
-
-            if is_paired:
-                paths[sample_id][0][0].append(str(fastq_dir / fields[0]))
-                paths[sample_id][0][1].append(str(fastq_dir / fields[1]))
-            else:
-                paths[sample_id][0].append(str(fastq_dir / fields[0]))
-
-    # Validate against config if specified
-    if paired_end is not None:
-        for sample_id, (_, is_paired) in paths.items():
-            if is_paired != paired_end:
-                raise ValueError(
-                    f"Sample {sample_id} has {'paired' if is_paired else 'single'}-end reads, but config specifies {'paired' if paired_end else 'single'}-end"
-                )
-
-    return paths
+def ds(w) -> dict:
+    """Config of the dataset named by the {dataset} wildcard."""
+    return CONFIG["datasets"][w.dataset]
 
 
-def validate_config(config: dict):
-    """Check that the config has all required fields with valid values"""
-    if len(config.keys()) == 0:
-        raise Exception("No config file provided, or it is empty.")
-    required = [
-        "fastq_dir",
-        "fastq_map",
-        "read_length",
-        "ref_genome",
-        "ref_anno",
-        "samples_file",
-        "modality_groups",
-    ]
-    for field in required:
-        if field not in config:
-            raise KeyError(f"Required config field missing: {field}")
-
-    if not config["ref_anno"].lower().endswith(".gtf"):
-        raise ValueError("ref_anno must be an uncompressed GTF file")
-
-    # paired_end is now optional
-    if "paired_end" in config:
-        if not isinstance(config["paired_end"], bool):
-            raise ValueError("paired_end must be True or False")
-
-    if not isinstance(config["read_length"], int):
-        raise ValueError("read_length must be an integer")
-
-    # fragment length parameters only required for single-end samples
-    if "paired_end" in config and not config["paired_end"]:
-        if "fragment_length_mean" not in config:
-            raise KeyError("fragment_length_mean required for single-end data")
-        if "fragment_length_sd" not in config:
-            raise KeyError("fragment_length_sd required for single-end data")
-
-    if "laddr" in config:
-        if not isinstance(config["laddr"], dict):
-            raise ValueError("laddr must be a mapping")
-        if "enabled" in config["laddr"] and not isinstance(
-            config["laddr"]["enabled"], bool
-        ):
-            raise ValueError("laddr.enabled must be True or False")
-        if "use_existing_bins" in config["laddr"] and not isinstance(
-            config["laddr"]["use_existing_bins"], bool
-        ):
-            raise ValueError("laddr.use_existing_bins must be True or False")
-        if "regress_modalities" in config["laddr"]:
-            if not isinstance(config["laddr"]["regress_modalities"], list) or any(
-                not isinstance(x, str) for x in config["laddr"]["regress_modalities"]
-            ):
-                raise ValueError("laddr.regress_modalities must be a list of strings")
+def ref(w) -> dict:
+    """Reference set of the {dataset} wildcard, else named by {reference}."""
+    name = ds(w)["reference"] if "dataset" in w.keys() else w.reference
+    return CONFIG["references"][name]
 
 
-def available_modalities(modality_groups: dict) -> list:
-    """Get phenotype modality names with normalized BED outputs."""
-    modalities = []
-    for params in modality_groups.values():
-        for f in params["files"]:
-            if f.endswith(".bed.gz"):
-                modalities.append(f.removesuffix(".bed.gz"))
-    return sorted(set(modalities))
+@functools.cache
+def dataset_samples(dataset: str) -> list:
+    """Sample IDs of a dataset, read on first use."""
+    return pantry_config.load_samples(CONFIG["datasets"][dataset]["samples"])
 
 
-def process_config(config: dict):
-    """Prepare user config for use in the pipeline.
-
-    Updates some values in place to expand paths and parse numbers.
-    """
-    paths = [
-        "fastq_dir",
-        "fastq_map",
-        "ref_genome",
-        "ref_anno",
-        "samples_file",
-    ]
-    for path in paths:
-        if path in config.keys():
-            config[path] = Path(config[path]).expanduser()
-
-    samples = pd.read_csv(config["samples_file"], sep="\t", header=None, dtype=str)[
-        0
-    ].tolist()
-    config["samples"] = samples
-
-    config["fastq_map"] = load_fastq_map(
-        config["fastq_map"], config["fastq_dir"], config.get("paired_end", None)
+@functools.cache
+def fastq(dataset: str) -> dict:
+    """FASTQ map of a dataset ({sample: (paths, is_paired)}), read on first use."""
+    d = CONFIG["datasets"][dataset]
+    return pantry_config.load_fastq_map(
+        d["fastq_map"], d.get("fastq_dir"), d.get("paired_end")
     )
 
-    if "laddr" in config:
-        laddr = config["laddr"]
-        laddr.setdefault("enabled", False)
-        laddr.setdefault("dataset_name", "pantry")
-        laddr.setdefault("project_dir", "<pantry_intermediate>/laddr")
-        laddr.setdefault("use_existing_bins", False)
-        laddr.setdefault("min_samples_expressed", 0.5)
-        laddr.setdefault("binning_method", "adaptive_diffvar")
-        laddr.setdefault("batch_size", 40)
-        laddr.setdefault("max_bin_width", 1024)
-        laddr.setdefault("adaptive_max_samples", 256)
-        laddr.setdefault("adaptive_bins_per_gene", 256)
-        laddr.setdefault("adaptive_min_mean_total_covg", 128)
-        laddr.setdefault("adaptive_max_corr", 0.8)
-        laddr.setdefault("model_var_explained_max", 0.8)
-        laddr.setdefault("model_n_pcs_max", 16)
-        laddr.setdefault("bam_coverage_threads", 4)
-        laddr.setdefault("bam_coverage_bin_size", 1)
-        laddr["project_dir"] = Path(laddr["project_dir"]).expanduser()
-        if "existing_info_dir" in laddr:
-            laddr["existing_info_dir"] = Path(laddr["existing_info_dir"]).expanduser()
-        if "existing_bins_dir" in laddr:
-            laddr["existing_bins_dir"] = Path(laddr["existing_bins_dir"]).expanduser()
-        if "regress_modalities" not in laddr:
-            laddr["regress_modalities"] = available_modalities(
-                config["modality_groups"]
-            )
-        valid_modalities = set(available_modalities(config["modality_groups"]))
-        invalid = sorted(set(laddr["regress_modalities"]) - valid_modalities)
-        if invalid:
-            raise ValueError(
-                f'laddr.regress_modalities contains unknown modality names: {", ".join(invalid)}'
-            )
-        if laddr["use_existing_bins"]:
-            if "existing_info_dir" not in laddr or "existing_bins_dir" not in laddr:
-                raise KeyError(
-                    "laddr.existing_info_dir and laddr.existing_bins_dir are required when laddr.use_existing_bins is true"
-                )
 
+# Temporary: the old global names, taken from dataset 'default', until the
+# rules take a {dataset} wildcard.
+if "default" not in CONFIG["datasets"]:
+    raise ValueError(
+        "Until rules take a {dataset} wildcard, the phenotyping config needs a "
+        "dataset named 'default' (or a single-dataset config without 'datasets')."
+    )
+_ds = CONFIG["datasets"]["default"]
+_ref = CONFIG["references"][_ds["reference"]]
 
-def validate_reference(ref_genome: Path, ref_anno: Path):
-    """Validate the reference genome and annotations.
+samples_file = Path(_ds["samples"]).expanduser()
+samples = dataset_samples("default")
 
-    Confirm both files exist and that the GTF includes transcript entries, which
-    are lacking in some annotation files such as RefSeq Select GTFs.
-    """
-    if not ref_genome.exists():
-        raise FileNotFoundError(f"Reference genome file not found: {ref_genome}")
-    if not ref_anno.exists():
-        raise FileNotFoundError(f"Reference annotation file not found: {ref_anno}")
-
-    has_transcript = False
-    with open(ref_anno, "r") as fh:
-        checked = 0
-        for line in fh:
-            if line.startswith("#"):
-                continue
-            cols = line.split("\t")
-            if cols[2] == "transcript":
-                has_transcript = True
-                break
-            checked += 1
-            if checked >= 1000:
-                break
-    if not has_transcript:
-        raise ValueError(
-            f"Reference annotation file does not contain transcript entries (at least not in the first 1000 lines): {ref_anno}"
-        )
-
-
-validate_config(config)
-# Keep Snakemake's config serializable, including nested modality and LaDDR settings.
-pipeline_config = deepcopy(config)
-process_config(pipeline_config)
-
-samples_file = pipeline_config["samples_file"]
-samples = pipeline_config["samples"]
-
-paired_end = pipeline_config.get("paired_end", None)
-read_length = pipeline_config["read_length"]
-fastq_dir = pipeline_config["fastq_dir"]
-fastq_map = pipeline_config["fastq_map"]
+paired_end = _ds.get("paired_end", None)
+read_length = _ds["read_length"]
+fastq_map = fastq("default")
 if any(not is_paired for paths, is_paired in fastq_map.values()):
-    fragment_length_mean = pipeline_config["fragment_length_mean"]
-    fragment_length_sd = pipeline_config["fragment_length_sd"]
+    fragment_length_mean = _ds["fragment_length_mean"]
+    fragment_length_sd = _ds["fragment_length_sd"]
 
-ref_genome = pipeline_config["ref_genome"]
-ref_anno = pipeline_config["ref_anno"]
+ref_genome = Path(_ref["genome"]).expanduser()
+ref_anno = Path(_ref["annotation"]).expanduser()
 ref_cdna = "<pantry_reference>/cDNA.fa.gz"
-validate_reference(ref_genome, ref_anno)
 
-modality_groups = pipeline_config["modality_groups"]
-laddr_config = pipeline_config.get("laddr", {})
+modality_groups = _ds["modality_groups"]
+laddr_config = dict(_ds.get("laddr", {}))
+for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
+    if _key in laddr_config:
+        laddr_config[_key] = Path(laddr_config[_key]).expanduser()
 laddr_enabled = laddr_config.get("enabled", False)
 
 if "RNA_editing" in modality_groups:
     rna_editing_params = modality_groups["RNA_editing"]
-    edit_sites_bed = rna_editing_params["edit_sites_bed"]
+    edit_sites_bed = Path(_ref["edit_sites_bed"]).expanduser()
     edit_sites_min_coverage = rna_editing_params["edit_sites_min_coverage"]
-    configured_min_samples = rna_editing_params["edit_sites_min_samples"]
-    edit_sites_min_samples_fraction = rna_editing_params.get(
-        "edit_sites_min_samples_fraction", 0.1
+    edit_sites_min_samples = pantry_config.edit_sites_min_samples(
+        rna_editing_params["edit_sites_min_samples"],
+        rna_editing_params["edit_sites_min_samples_fraction"],
+        len(samples),
     )
-    fraction_min_samples = math.ceil(edit_sites_min_samples_fraction * len(samples))
-    edit_sites_min_samples = min(
-        max(configured_min_samples, fraction_min_samples), len(samples)
-    )
-    edit_sites_cluster = rna_editing_params.get("edit_sites_cluster", True)
-    edit_sites_correlation_threshold = rna_editing_params.get(
-        "edit_sites_correlation_threshold", 0.9
-    )
-    edit_sites_bed = Path(edit_sites_bed).expanduser()
-    if not edit_sites_bed.exists():
-        raise FileNotFoundError(f"Edit sites BED file not found: {edit_sites_bed}")
-    if max(configured_min_samples, fraction_min_samples) > len(samples):
+    edit_sites_cluster = rna_editing_params["edit_sites_cluster"]
+    edit_sites_correlation_threshold = rna_editing_params[
+        "edit_sites_correlation_threshold"
+    ]
+    if max(
+        rna_editing_params["edit_sites_min_samples"],
+        math.ceil(rna_editing_params["edit_sites_min_samples_fraction"] * len(samples)),
+    ) > len(samples):
         print(
             f"Note: RNA editing site sample threshold is greater than the number of samples ({len(samples)}). Setting to {len(samples)}."
         )
 
-outputs = []
-for modality_group, params in modality_groups.items():
-    for f in params["files"]:
-        outputs.append(f"<pantry_output>/{f}")
-
-if laddr_enabled:
-    outputs.extend(
-        [
-            "<pantry_output>/latent_residual.bed.gz",
-            "<pantry_output>/latent_residual.bed.gz.tbi",
-            "<pantry_output>/latent_residual.phenotype_groups.txt",
-        ]
-    )
+outputs = [f"<pantry_output>/{f}" for f in pantry_config.dataset_targets(_ds)]

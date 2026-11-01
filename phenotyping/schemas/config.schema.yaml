@@ -1,0 +1,134 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+description: >-
+  Pantry phenotyping config, after normalisation (legacy single-dataset configs
+  are wrapped as reference 'default' and dataset 'default' before validation).
+  Defaults are scalars only: snakemake.utils.validate inserts the schema's own
+  default object, which would be shared between datasets if it were mutable.
+type: object
+required: [references, datasets]
+properties:
+  references:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/reference"}
+  defaults:
+    type: object
+    description: Deep-merged under every dataset before validation.
+  datasets:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/dataset"}
+  legacy_pathvars:
+    type: object
+    description: Set by the shim from legacy intermediate_dir/intermediate_ref_dir.
+    additionalProperties: {type: string}
+  majiq_env:
+    type: string
+    description: Name of the conda environment providing MAJIQ.
+    default: majiq3
+
+$defs:
+  reference:
+    type: object
+    required: [genome, annotation]
+    properties:
+      genome:
+        type: string
+        description: Uncompressed reference genome FASTA.
+      annotation:
+        type: string
+        description: Uncompressed GTF; must contain transcript rows.
+      edit_sites_bed:
+        type: string
+        description: Edit sites BED; required if a dataset uses RNA_editing.
+      annotation_gff3:
+        type: string
+        description: GFF3 for MAJIQ; converted from the GTF if absent.
+
+  dataset:
+    type: object
+    required: [reference, samples, fastq_map, read_length, modality_groups]
+    properties:
+      reference: {type: string}
+      samples:
+        description: Sample IDs, or path to a one-column file.
+        oneOf:
+          - {type: array, items: {type: string}}
+          - {type: string}
+      fastq_map:
+        description: >-
+          Path to a tab-separated FASTQ map file, or
+          {sample: [[R1...], [R2...]]} / {sample: [[R...]]}.
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties:
+              type: array
+              minItems: 1
+              maxItems: 2
+              items: {type: array, items: {type: string}}
+      fastq_dir: {type: string}
+      paired_end: {type: boolean}
+      read_length: {type: integer}
+      fragment_length_mean: {type: number}
+      fragment_length_sd: {type: number}
+      modality_groups:
+        type: object
+        additionalProperties: {$ref: "#/$defs/modality_group"}
+        properties:
+          RNA_editing:
+            allOf: [{$ref: "#/$defs/modality_group"}]
+            required: [edit_sites_min_coverage, edit_sites_min_samples]
+            properties:
+              edit_sites_min_coverage: {type: integer}
+              edit_sites_min_samples: {type: integer}
+              edit_sites_min_samples_fraction: {type: number, default: 0.1}
+              edit_sites_cluster: {type: boolean, default: true}
+              edit_sites_correlation_threshold: {type: number, default: 0.9}
+          intron_retention:
+            allOf: [{$ref: "#/$defs/modality_group"}]
+            properties:
+              license: {type: string}
+              threads: {type: integer, default: 8}
+              psicov_batch_size: {type: integer, default: 25}
+              min_experiments: {type: number, default: 0.01}
+      cross_modality:
+        type: object
+        required: [modalities]
+        properties:
+          modalities: {type: array, items: {type: string}}
+      laddr: {$ref: "#/$defs/laddr"}
+    if:
+      properties:
+        fastq_map: {type: string}
+    then:
+      required: [fastq_dir]
+
+  modality_group:
+    type: object
+    required: [files]
+    properties:
+      files: {type: array, items: {type: string}}
+
+  laddr:
+    type: object
+    properties:
+      enabled: {type: boolean, default: false}
+      dataset_name: {type: string, default: pantry}
+      project_dir: {type: string, default: "<pantry_intermediate>/laddr"}
+      use_existing_bins: {type: boolean, default: false}
+      existing_info_dir: {type: string}
+      existing_bins_dir: {type: string}
+      regress_modalities: {type: array, items: {type: string}}
+      min_samples_expressed: {type: number, default: 0.5}
+      binning_method: {type: string, default: adaptive_diffvar}
+      batch_size: {type: integer, default: 40}
+      max_bin_width: {type: integer, default: 1024}
+      adaptive_max_samples: {type: integer, default: 256}
+      adaptive_bins_per_gene: {type: integer, default: 256}
+      adaptive_min_mean_total_covg: {type: number, default: 128}
+      adaptive_max_corr: {type: number, default: 0.8}
+      model_var_explained_max: {type: number, default: 0.8}
+      model_n_pcs_max: {type: integer, default: 16}
+      bam_coverage_threads: {type: integer, default: 4}
+      bam_coverage_bin_size: {type: integer, default: 1}

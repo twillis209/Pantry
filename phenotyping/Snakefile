@@ -18,22 +18,6 @@ pathvars:
     pantry_reference="intermediate/reference",
 
 
-# Legacy config keys for the intermediate directories override the defaults.
-if "intermediate_dir" in config or "intermediate_ref_dir" in config:
-    _legacy_intermediate = str(
-        Path(config.get("intermediate_dir", "intermediate")).expanduser()
-    )
-    _legacy_reference = str(
-        Path(
-            config.get("intermediate_ref_dir", f"{_legacy_intermediate}/reference")
-        ).expanduser()
-    )
-
-    pathvars:
-        pantry_intermediate=_legacy_intermediate,
-        pantry_reference=_legacy_reference,
-
-
 wildcard_constraints:
     sample_id="[^/]+",
     pheno="[^/]+",
