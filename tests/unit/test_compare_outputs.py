@@ -370,3 +370,44 @@ def test_bed_missing_noise_counterpart_fails(tmp_path):
     (tmp_path / 'nb').mkdir()
     mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'act', (tmp_path / 'na', tmp_path / 'nb'))
     assert any('noise counterpart missing' in m for m in mism)
+
+
+def test_bed_matching_inf_does_not_hide_other_diffs(tmp_path):
+    exp = [('chr1', 1, 2, 'g1', 'inf', 5.0)]
+    nz = (bed(exp), bed([('chr1', 1, 2, 'g1', 'inf', 5.01)]))
+    mism, _ = bed_run(tmp_path, bed(exp), bed([('chr1', 1, 2, 'g1', 'inf', 99.0)]), *nz)
+    assert len(mism) == 1 and 'max |diff|' in mism[0]
+    mism, _ = bed_run(tmp_path, bed(exp), bed([('chr1', 1, 2, 'g1', 'inf', 5.015)]), *nz)
+    assert mism == []
+
+
+def test_bed_differing_inf_fails(tmp_path):
+    exp = [('chr1', 1, 2, 'g1', 'inf', 5.0)]
+    nz = (bed(exp), bed([('chr1', 1, 2, 'g1', 'inf', 5.01)]))
+    mism, _ = bed_run(tmp_path, bed(exp), bed([('chr1', 1, 2, 'g1', '-inf', 5.0)]), *nz)
+    assert any('infinite' in m for m in mism)
+
+
+def test_bed_noise_pair_inf_diff_fails(tmp_path):
+    exp = [('chr1', 1, 2, 'g1', 'inf', 5.0)]
+    nz = (bed(exp), bed([('chr1', 1, 2, 'g1', 5.0, 5.0)]))
+    mism, _ = bed_run(tmp_path, bed(exp), bed([('chr1', 1, 2, 'g1', 'inf', 5.1)]), *nz)
+    assert any('noise pair not numerically comparable' in m for m in mism)
+
+
+def test_bed_unparseable_value_is_mismatch(tmp_path):
+    nz = (bed(BASE), bed(shifted(0.01)))
+    bad = [BASE[0][:5] + ('na',), BASE[1]]
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(bad), *nz)
+    assert len(mism) == 1 and 'unparseable value in row 1' in mism[0]
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(BASE), bed(bad), bed(BASE))
+    assert mism == []  # identical files never reach numeric parsing
+
+
+def test_bed_formatting_only_difference_passes(tmp_path):
+    a = [('chr1', 1, 2, 'g1', '1.0', '2.0')]
+    b = [('chr1', 1, 2, 'g1', '1.00', '2.0')]
+    mism, _ = bed_run(tmp_path, bed(a), bed(b), bed(a), bed([('chr1', 1, 2, 'g1', '1.01', '2.0')]))
+    assert mism == []
+    mism, _ = bed_run(tmp_path, bed(a), bed(b), bed(a), bed(a))
+    assert mism == []  # zero tolerance still passes: values are equal

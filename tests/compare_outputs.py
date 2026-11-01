@@ -240,25 +240,40 @@ def _bed_numeric(a: Path, b: Path):
         return ['header differs'], None
     if len(la) != len(lb):
         return [f'row count differs ({len(la) - 1} vs {len(lb) - 1})'], None
-    maxd, nan_bad, id_bad = 0.0, 0, []
+    maxd, nan_bad, inf_bad, id_bad, bad_val = 0.0, 0, 0, [], []
     for i, (x, y) in enumerate(zip(la[1:], lb[1:]), start=1):
         fx, fy = x.split('\t'), y.split('\t')
         if len(fx) != len(fy) or fx[:4] != fy[:4]:
             id_bad.append(i)
             continue
-        vx = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fx[4:]])
-        vy = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fy[4:]])
+        try:
+            vx = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fx[4:]])
+            vy = np.array([float(v) if v not in ('NA', 'nan', 'NaN', '') else np.nan for v in fy[4:]])
+        except ValueError:
+            bad_val.append(i)
+            continue
         if (np.isnan(vx) != np.isnan(vy)).any():
             nan_bad += 1
             continue
         ok = ~np.isnan(vx)
-        if ok.any():
-            maxd = max(maxd, float(np.abs(vx[ok] - vy[ok]).max()))
+        vx, vy = vx[ok], vy[ok]
+        same = vx == vy  # equal values, including matching infinities
+        if (np.isinf(vx) | np.isinf(vy))[~same].any():
+            inf_bad += 1
+            continue
+        if (~same).any():
+            maxd = max(maxd, float(np.abs(vx[~same] - vy[~same]).max()))
     errs = []
     if id_bad:
         errs.append(f'first 4 columns (or column count) differ in {len(id_bad)} rows, e.g. line {id_bad[0]}')
     if nan_bad:
         errs.append(f'NaN pattern differs in {nan_bad} rows')
+    if inf_bad:
+        errs.append(f'infinite values differ in {inf_bad} rows')
+    if bad_val:
+        errs.append(f'unparseable value in row {bad_val[0]} ({len(bad_val)} rows)')
+    if not errs and np.isnan(maxd):
+        errs.append('max |diff| is NaN')
     return errs, (None if errs else maxd)
 
 
