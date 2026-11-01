@@ -167,7 +167,7 @@ def test_cis_independent_rowset_diff_noise_pair_identical_fails(tmp_path):
 def test_heritability_row_order_ignored(tmp_path):
     for s, txt in (('exp', 'phenotype_id\thsq\na\t1\nb\t2\n'), ('act', 'phenotype_id\thsq\nb\t2\na\t1\n')):
         p = tmp_path / s / 'heritability' / 'x.hsq.tsv'
-        p.parent.mkdir(parents=True)
+        p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(txt)
     mism, _ = co.compare_dirs(tmp_path / 'exp', tmp_path / 'act')
     assert mism == []
@@ -191,7 +191,7 @@ def test_twas_tar_profile_err_ignored_and_list_compared(tmp_path):
 
     def mk(side, lst, err):
         p = tmp_path / side / 'twas' / 'x.tar.bz2'
-        p.parent.mkdir(parents=True)
+        p.parent.mkdir(parents=True, exist_ok=True)
         with tarfile.open(p, 'w:bz2') as t:
             for n, d in (('x.list', lst), ('x.profile.err', err)):
                 ti = tarfile.TarInfo(n)
