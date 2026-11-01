@@ -5,11 +5,16 @@ H=/data/hps/assoc/private/gdml/user/twil15. All via `sjob`; ssh prefix: `source 
 - Test data: tarballs from README.md (dropbox, `dl=1`) extracted locally, then `tar | ssh` to `$H/pantry-testdata/{phenotyping,pheast}/input`.
 - `git clone https://github.com/twillis209/Pantry.git $H/Pantry -b module` (profile at `$H/Pantry/tests/profile`);
   `git clone ... $H/pantry-baseline && git checkout 8da7787`.
-- Envs (job 8391825, 1h07, `bash logs/mkenv.sh`): upstream environment.yml with the `defaults` channel removed
-  (copies in `$H/pantry-baseline-envs/`), `mamba env create -n pantry-baseline-{pheno,pheast} -f ... --override-channels -c conda-forge -c bioconda`.
-  First attempt (8387946) failed with SSL errors on repo.anaconda.com (`defaults`).
-  Extra: pheast env had pandas 3.0.6 (unpinned), which makes tensorqtl 1.0.10 `read_phenotype_bed` assert
-  "Positions in BED file must be sorted" on the (sorted) test BEDs. Fixed with `mamba install -n pantry-baseline-pheast "pandas<3"` (job 8392577 -> pandas 2.3.3). Later tasks must use the same pin.
+- Envs: committed files `tests/hpc/envs/baseline-{pheno,pheast}.yml` = upstream `environment.yml` (identical at 8da7787) with the
+  `defaults` channel removed (SSL errors on repo.anaconda.com, job 8387946) and, for pheast, `pandas<3` (name changed to `pantry-baseline-*`).
+  Create (inside an sjob, e.g. `-c 4 -m 7500M -t 0-02:00:00 -e base`; job 8391825 took 1h07):
+  `mamba env create -y -f tests/hpc/envs/baseline-pheno.yml --override-channels -c conda-forge -c bioconda` and likewise `baseline-pheast.yml`.
+  Why pandas<3: the unpinned env resolved pandas 3.0.6, and tensorqtl 1.0.10 `read_phenotype_bed` then asserts
+  "Positions in BED file must be sorted" on the (sorted) test BEDs. The actual HPC env was fixed post hoc with
+  `mamba install -n pantry-baseline-pheast --override-channels -c conda-forge -c bioconda "pandas<3"` (job 8392577 -> pandas 2.3.3);
+  the committed yml encodes that, so a fresh create should match.
+  Exact snapshots of the real envs: `tests/hpc/envs/baseline-{pheno,pheast}.lock.txt` (`mamba list --explicit`; the pheast file also
+  carries the pip packages as trailing comments, since `--explicit` omits them, e.g. tensorqtl 1.0.10, torch 2.3.1).
 - Stage dirs: `input -> $H/pantry-testdata/<stage>/input`, `config.yml` copied from `tests/configs/*_baseline.yml`;
   `pheast_run2` = `cp -a` of `pheast`.
 - Run (in each stage dir): `sjob -c 2 -m 7500M -t 0-12:00:00 -n <name> -e <env> snakemake --profile $H/Pantry/tests/profile`
@@ -25,6 +30,13 @@ H=/data/hps/assoc/private/gdml/user/twil15. All via `sjob`; ssh prefix: `source 
 
 Archives: `$H/pantry-baseline/archive/{phenotyping,pheast_run1,pheast_run2,phenotyping_reference_files.txt}`.
 Pheast modalities in test data: alt_polyA, alt_TSS, expression, intron_retention, isoforms, RNA_editing, splicing, stability (all 8 kept).
+
+## Resume after the pandas failure
+The first pheast attempts (8391927 / 8391928) failed only in `tensorqtl_cis` (8 jobs); with keep-going everything else finished, and the
+resumed jobs (8392578 / 8392579) re-ran only `all`, `tensorqtl_cis` x8, `tensorqtl_cis_independent` x8. Reused from the first attempt (identically in
+both copies): `qtl_genotype_qc`, `prune_for_covar`, `plink_covariates` x8, `covariates` x8, `calculate_heritability_chr_batch` x80,
+`combine_heritability_chr` x8, `twas_geno`, `twas_pos_file` x8, `twas_compute_weights_batch` x37, `twas_assemble_summary` x8,
+`twas_compress_output` x8 (all heritability, TWAS and covariate outputs; only QTL outputs are from the post-fix env). None of these depend on pandas-sensitive code paths that failed.
 
 ## Run1 vs run2
 heritability/*.hsq.tsv and qtl/genotype_qc.tsv are identical. `qtl/*.cis_qtl.txt.gz` and `cis_independent` differ
