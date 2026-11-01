@@ -8,11 +8,6 @@ configfile: 'config.yml'
 # This code validates and processes the configuration and sets global variables:
 include: 'steps/setup.smk'
 
-# List short steps here so they will not be submitted as cluster jobs:
-# (These can be specified on a per-file basis)
-localrules:
-    # index_bed,
-
 # These are the target files to be generated (or regenerated if outdated).
 # By default it includes all output files specified in the config file.
 rule all:
