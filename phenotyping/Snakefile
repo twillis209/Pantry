@@ -12,13 +12,6 @@ configfile: "config.yml"
 include: "steps/setup.smk"
 
 
-# List short steps here so they will not be submitted as cluster jobs:
-# (These can be specified on a per-file basis)
-localrules:
-    index_bed,
-    extract_cdna,
-
-
 # These are the target files to be generated (or regenerated if outdated).
 # By default it includes all output files specified in the config file.
 rule all:
@@ -96,6 +89,7 @@ rule index_bed:
         output_dir / "{pheno}.bed.gz",
     output:
         output_dir / "{pheno}.bed.gz.tbi",
+    localrule: True
     shell:
         "tabix {input}"
 
@@ -122,6 +116,7 @@ rule extract_cdna:
         ref_anno=ref_anno,
     output:
         ref_cdna,
+    localrule: True
     shell:
         """
         sed '/transcript_id "";/d' {input.ref_anno} \

@@ -1,11 +1,5 @@
 from math import ceil
 
-
-localrules:
-    make_majiq_experiments_tsv,
-    pheno_groups_intron_retention,
-
-
 majiq_dir = interm_dir / "intron_retention"
 majiq_build_dir = majiq_dir / "build"
 majiq_psicov_dir = majiq_dir / "psicov"
@@ -77,6 +71,7 @@ rule make_majiq_experiments_tsv:
         bai=expand(str(interm_dir / "bam" / "{sample_id}.bam.bai"), sample_id=samples),
     output:
         majiq_dir / "experiments.tsv",
+    localrule: True
     params:
         group=majiq_params.get("group", "pantry"),
     run:
@@ -244,6 +239,7 @@ rule pheno_groups_intron_retention:
         output_dir / "intron_retention.bed.gz",
     output:
         output_dir / "intron_retention.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \

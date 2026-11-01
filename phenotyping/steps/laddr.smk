@@ -1,9 +1,3 @@
-localrules:
-    laddr_manifest,
-    laddr_config,
-    pheno_groups_latent,
-
-
 LADDR_PROJECT_DIR = laddr_config["project_dir"]
 LADDR_DATASET = laddr_config["dataset_name"]
 LADDR_MANIFEST = LADDR_PROJECT_DIR / "coverage_manifest.tsv"
@@ -49,6 +43,7 @@ rule laddr_manifest:
         expand(str(LADDR_BW_DIR / "{sample_id}.bw"), sample_id=samples),
     output:
         manifest=LADDR_MANIFEST,
+    localrule: True
     params:
         dataset=LADDR_DATASET,
     run:
@@ -67,6 +62,7 @@ rule laddr_config:
         phenos=laddr_pheno_inputs,
     output:
         config=LADDR_CONFIG,
+    localrule: True
     params:
         project_dir=LADDR_PROJECT_DIR,
         manifest_rel=LADDR_MANIFEST.name,
@@ -274,6 +270,7 @@ rule pheno_groups_latent:
         output_dir / "latent_residual.bed.gz",
     output:
         output_dir / "latent_residual.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \

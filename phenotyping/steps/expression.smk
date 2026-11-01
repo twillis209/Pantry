@@ -1,7 +1,3 @@
-localrules:
-    pheno_groups_isoforms,
-
-
 rule kallisto_index:
     """Generate the index for kallisto."""
     input:
@@ -129,6 +125,7 @@ rule pheno_groups_isoforms:
         output_dir / "isoforms.bed.gz",
     output:
         output_dir / "isoforms.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \

@@ -1,9 +1,3 @@
-localrules:
-    map_edit_sites_to_genes,
-    prepare_RNA_editing_phenotypes,
-    pheno_groups_RNA_editing,
-
-
 rule query_editing_level:
     input:
         edit_sites=edit_sites_bed,
@@ -62,6 +56,7 @@ rule map_edit_sites_to_genes:
         ref_anno=ref_anno,
     output:
         tsv=ref_dir / "edit_sites_to_genes.tsv",
+    localrule: True
     shell:
         """
         python3 scripts/RNA_editing/map_edit_sites_to_genes.py {input.edit_sites} {input.ref_anno} {output.tsv}
@@ -75,6 +70,7 @@ rule prepare_RNA_editing_phenotypes:
     output:
         matrix=interm_dir / "RNA_editing" / "phenotype_matrix.tsv",
         site_map=output_dir / "RNA_editing.site_to_phenotype.tsv",
+    localrule: True
     params:
         cluster="--cluster" if edit_sites_cluster else "",
         correlation_threshold=edit_sites_correlation_threshold,
@@ -138,6 +134,7 @@ rule pheno_groups_RNA_editing:
         output_dir / "RNA_editing.bed.gz",
     output:
         output_dir / "RNA_editing.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \

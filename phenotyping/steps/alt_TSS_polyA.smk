@@ -1,7 +1,3 @@
-localrules:
-    pheno_groups_alt_TSS_polyA,
-
-
 TXREVISE_N_BATCHES = 100
 
 
@@ -267,6 +263,7 @@ rule pheno_groups_alt_TSS_polyA:
         output_dir / "alt_{type}.bed.gz",
     output:
         output_dir / "alt_{type}.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \

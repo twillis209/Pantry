@@ -1,7 +1,3 @@
-localrules:
-    pheno_groups_splicing,
-
-
 rule regtools_junctions:
     """Run regtools junctions for LeafCutter"""
     input:
@@ -101,6 +97,7 @@ rule pheno_groups_splicing:
         output_dir / "splicing.bed.gz",
     output:
         output_dir / "splicing.phenotype_groups.txt",
+    localrule: True
     shell:
         """
         zcat <{input} \
