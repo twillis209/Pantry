@@ -86,11 +86,7 @@ include: "steps/splicing.smk"
 include: "steps/stability.smk"
 include: "steps/alt_TSS_polyA.smk"
 include: "steps/RNA_editing.smk"
-
-
-if intron_retention_enabled:
-
-    include: "steps/intron_retention.smk"
+include: "steps/intron_retention.smk"
 
 
 if laddr_enabled:

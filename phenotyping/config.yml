@@ -29,6 +29,10 @@ references:
     # Optional GFF3 annotation for MAJIQ (intron_retention).
     # annotation_gff3: input/ref/gencode.v47.annotation.gff3.gz
 
+# Name of the conda environment providing MAJIQ (intron_retention), shared by
+# all datasets.
+# majiq_env: majiq3
+
 # Optional settings deep-merged under every dataset, e.g. shared modality_groups.
 # defaults: {}
 

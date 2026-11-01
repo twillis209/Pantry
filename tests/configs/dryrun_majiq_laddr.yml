@@ -1,0 +1,59 @@
+# Dry-run-only config for the MAJIQ (intron_retention) and LaDDR rules, which
+# are not part of the run-time test configs. Two datasets on two references:
+# one reference converts its GTF to GFF3 for MAJIQ, the other gives
+# annotation_gff3 (any existing file will do for a dry run; the GTF is reused).
+# Paths are relative to the working directory, which needs an 'input' link to
+# phenotyping/input, e.g.:
+#   mkdir -p /tmp/dr && ln -sfn "$PWD/phenotyping/input" /tmp/dr/input
+#   snakemake -n -s phenotyping/Snakefile \
+#       --configfile tests/configs/dryrun_majiq_laddr.yml --directory /tmp/dr
+references:
+  grch38_chr1:
+    genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+    annotation: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+  grch38_chr1_gff3:
+    genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+    annotation: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+    annotation_gff3: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+
+defaults:
+  modality_groups:
+    expression:
+      files:
+        - expression.bed.gz
+        - expression.bed.gz.tbi
+        - isoforms.bed.gz
+        - isoforms.bed.gz.tbi
+        - isoforms.phenotype_groups.txt
+    intron_retention:
+      files:
+        - intron_retention.bed.gz
+        - intron_retention.bed.gz.tbi
+        - intron_retention.phenotype_groups.txt
+
+datasets:
+  # GFF3 converted from the GTF; 16 samples in 4 psi-coverage batches.
+  full:
+    reference: grch38_chr1
+    samples: input/samples.txt
+    fastq_map: input/fastq_map.txt
+    fastq_dir: input/fastq
+    paired_end: true
+    read_length: 75
+    modality_groups:
+      intron_retention:
+        psicov_batch_size: 5
+  # Configured annotation_gff3; one psi-coverage batch.
+  ct_CD4.TCM:
+    reference: grch38_chr1_gff3
+    samples: [HG00108, HG00120, HG00185, HG00231]
+    fastq_map:
+      HG00108: [[chr1_0-2Mb.ERR188166_1.fastq.gz]]
+      HG00120: [[chr1_0-2Mb.ERR188315_1.fastq.gz]]
+      HG00185: [[chr1_0-2Mb.ERR188320_1.fastq.gz]]
+      HG00231: [[chr1_0-2Mb.ERR188212_1.fastq.gz]]
+    fastq_dir: input/fastq
+    paired_end: false
+    read_length: 100
+    fragment_length_mean: 200
+    fragment_length_sd: 50

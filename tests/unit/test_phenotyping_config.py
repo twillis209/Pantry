@@ -482,3 +482,11 @@ def test_check_annotation_looks_at_first_1000_rows_only(tmp_path):
     with pytest.raises(ValueError):
         cfg.check_annotation(_gtf(tmp_path, ["exon"] * 1000 + ["transcript"]))
     cfg.check_annotation(_gtf(tmp_path, ["exon"] * 999 + ["transcript"]))
+
+
+def test_shim_keeps_majiq_env_top_level():
+    raw = legacy_config()
+    raw["majiq_env"] = "majiq-site"
+    out = cfg.normalise(raw)
+    assert out["majiq_env"] == "majiq-site"
+    assert "majiq_env" not in out["datasets"]["default"]

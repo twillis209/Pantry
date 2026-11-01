@@ -58,11 +58,15 @@ def _shim(config: dict) -> dict:
     for key in _LEGACY_DIR_KEYS:
         dataset.pop(key, None)
     dataset["reference"] = "default"
-    return {
+    out = {
         "references": {"default": reference},
         "datasets": {"default": dataset},
         "legacy_pathvars": _legacy_pathvars(config),
     }
+    # Top-level settings shared by all datasets stay top-level.
+    if "majiq_env" in dataset:
+        out["majiq_env"] = dataset.pop("majiq_env")
+    return out
 
 
 def _check_name(kind: str, name):

@@ -5,7 +5,6 @@ It normalises and validates the configuration and defines config helpers.
 
 import functools
 import math
-from copy import deepcopy
 import importlib.util
 
 from snakemake.utils import validate
@@ -134,34 +133,23 @@ def rna_editing_min_samples(w) -> int:
     return min_samples
 
 
-# MAJIQ and LaDDR rules do not take a {dataset} wildcard yet; until they do,
-# they run for dataset 'default' only, using these globals.
+# LaDDR rules do not take a {dataset} wildcard yet; until they do, they run
+# for dataset 'default' only, using these globals.
 for _name, _d in CONFIG["datasets"].items():
-    if _name != "default" and (
-        "intron_retention" in _d["modality_groups"]
-        or _d.get("laddr", {}).get("enabled", False)
-    ):
+    if _name != "default" and _d.get("laddr", {}).get("enabled", False):
         raise ValueError(
-            f"datasets.{_name}: intron_retention and laddr are only supported for "
-            "a dataset named 'default' (or a single-dataset config) for now."
+            f"datasets.{_name}: laddr is only supported for a dataset named "
+            "'default' (or a single-dataset config) for now."
         )
 
 _default = CONFIG["datasets"].get("default", {})
-intron_retention_enabled = "intron_retention" in _default.get("modality_groups", {})
 laddr_enabled = _default.get("laddr", {}).get("enabled", False)
 
-if intron_retention_enabled or laddr_enabled:
+if laddr_enabled:
     _ref = CONFIG["references"][_default["reference"]]
-    default_reference = _default["reference"]
     samples_file = "<pantry_intermediate>/default/samples.txt"
     samples = dataset_samples("default")
     ref_anno = Path(_ref["annotation"]).expanduser()
-
-    modality_groups = deepcopy(_default["modality_groups"])
-    # The shim moved annotation_gff3 to the reference; intron_retention.smk
-    # still reads it from the modality group.
-    if intron_retention_enabled and "annotation_gff3" in _ref:
-        modality_groups["intron_retention"]["annotation_gff3"] = _ref["annotation_gff3"]
     laddr_config = dict(_default.get("laddr", {}))
     for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
         if _key in laddr_config:

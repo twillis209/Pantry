@@ -24,7 +24,9 @@ properties:
     additionalProperties: {type: string}
   majiq_env:
     type: string
-    description: Name of the conda environment providing MAJIQ.
+    description: >-
+      Name of the conda environment providing MAJIQ (intron_retention). One
+      top-level setting shared by all datasets of a module instance.
     default: majiq3
 
 $defs:
