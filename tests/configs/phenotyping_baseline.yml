@@ -114,7 +114,6 @@ laddr:
     - alt_TSS
     - alt_polyA
     - expression
-    - intron_retention
     - isoforms
     - RNA_editing
     - splicing
