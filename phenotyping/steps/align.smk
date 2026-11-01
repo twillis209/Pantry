@@ -61,7 +61,7 @@ rule star_align:
         runtime="8h",
     params:
         fastq_list=fastq_star_param,
-        index_dir=lambda w, input: Path(input.index).parent,
+        index_dir=lambda w, input: str(Path(input.index).parent),
         star_out_dir=parent_dir,
         prefix=lambda w, output: output[0].removesuffix("Aligned.sortedByCoord.out.bam"),
     shell:

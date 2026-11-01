@@ -32,7 +32,7 @@ rule shared_sample_sites:
         matrix="<pantry_intermediate>/RNA_editing/edit_site_matrix.tsv",
     params:
         script=script("RNA_editing/shared_samples_sites_matrix.py"),
-        edit_levels_dir=lambda w, input: Path(input.levels[0]).parent,
+        edit_levels_dir=lambda w, input: str(Path(input.levels[0]).parent),
         min_cov=edit_sites_min_coverage,
         min_sam=edit_sites_min_samples,
     shell:
@@ -73,7 +73,7 @@ rule prepare_RNA_editing_phenotypes:
         script=script("RNA_editing/prepare_rna_editing_phenotypes.py"),
         cluster="--cluster" if edit_sites_cluster else "",
         correlation_threshold=edit_sites_correlation_threshold,
-        outdir=lambda w, output: Path(output.site_map).parent,
+        outdir=lambda w, output: str(Path(output.site_map).parent),
     shell:
         """
         mkdir -p {params.outdir}

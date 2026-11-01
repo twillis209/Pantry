@@ -9,11 +9,11 @@ majiq_annotation_gff3 = (
     if "annotation_gff3" in majiq_params
     else "<pantry_reference>/majiq/annotation.gff3"
 )
-majiq_license = Path(
-    majiq_params.get(
-        "license", script("intron_retention/majiq_license_academic_official.lic")
-    )
-).expanduser()
+majiq_license = (
+    str(Path(majiq_params["license"]).expanduser())
+    if "license" in majiq_params
+    else script("intron_retention/majiq_license_academic_official.lic")
+)
 majiq_threads = majiq_params.get("threads", 8)
 majiq_psicov_batch_size = majiq_params.get("psicov_batch_size", 25)
 majiq_min_experiments = majiq_params.get("min_experiments", 0.01)
@@ -102,7 +102,7 @@ rule majiq_build:
         mem_mb=64000,
         runtime="12h",
     params:
-        outdir=lambda w, output: Path(output.splicegraph).parent,
+        outdir=lambda w, output: str(Path(output.splicegraph).parent),
         min_experiments=majiq_min_experiments,
         license=majiq_license,
     shell:

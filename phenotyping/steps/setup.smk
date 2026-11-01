@@ -6,9 +6,15 @@ It validates and processes the configuration and sets global variables.
 from copy import deepcopy
 
 
-def script(name: str) -> str:
-    """Path to a bundled script, independent of the working directory."""
-    return workflow.source_path(f"../scripts/{name}")
+def script(name: str):
+    """Params callable giving the path to a bundled script.
+
+    source_path returns a per-process cache path, so it is wrapped in a
+    callable taking input: such derived params are excluded from the params
+    rerun trigger.
+    """
+    path = workflow.source_path(f"../scripts/{name}")
+    return lambda wildcards, input: path
 
 
 def parent_dir(w, output) -> str:

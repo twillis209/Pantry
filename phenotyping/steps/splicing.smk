@@ -32,7 +32,7 @@ rule cluster_junctions:
         "<pantry_intermediate>/splicing/leafcutter_perind_numers.counts.gz",
     params:
         script=script("leafcutter_cluster_regtools_py3.py"),
-        juncfile_list=lambda w, output: Path(output[0]).parent / "juncfiles.txt",
+        juncfile_list=lambda w, output: str(Path(output[0]).parent / "juncfiles.txt"),
         splice_dir=parent_dir,
         max_intron_len=100000,
         min_clust_reads=30,

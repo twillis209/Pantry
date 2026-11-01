@@ -28,7 +28,7 @@ rule kallisto:
     resources:
         runtime="16h",
     params:
-        expr_dir=lambda w, output: Path(output.h5).parent.parent,
+        expr_dir=lambda w, output: str(Path(output.h5).parent.parent),
         out_dir=parent_dir,
         single_end_flag=kallisto_single_end_flag,
         # TODO add strandedness parameter
@@ -64,7 +64,7 @@ rule assemble_expression_bed:
     params:
         script=script("assemble_bed.py"),
         unnorm_dir=parent_dir,
-        expr_dir=lambda w, input: Path(input.kallisto[0]).parent.parent,
+        expr_dir=lambda w, input: str(Path(input.kallisto[0]).parent.parent),
     shell:
         """
         mkdir -p {params.unnorm_dir}

@@ -72,7 +72,7 @@ rule assemble_stability_bed:
     params:
         script=script("assemble_bed.py"),
         unnorm_dir=parent_dir,
-        stab_dir=lambda w, input: Path(input.exon[0]).parent,
+        stab_dir=lambda w, input: str(Path(input.exon[0]).parent),
     shell:
         """
         mkdir -p {params.unnorm_dir}

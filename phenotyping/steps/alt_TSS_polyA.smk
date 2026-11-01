@@ -148,7 +148,7 @@ rule alt_TSS_polyA_kallisto:
     resources:
         runtime="16h",
     params:
-        alt_group_pos_dir=lambda w, output: Path(output.h5).parent.parent,
+        alt_group_pos_dir=lambda w, output: str(Path(output.h5).parent.parent),
         out_dir=parent_dir,
         single_end_flag=kallisto_single_end_flag,
         # TODO add strandedness parameter
@@ -183,8 +183,8 @@ rule assemble_alt_TSS_polyA_bed:
         script=script("assemble_bed.py"),
         unnorm_dir=parent_dir,
         # input.kallisto lists all grp_1 samples, then all grp_2 samples.
-        alt_group1_pos_dir=lambda w, input: Path(input.kallisto[0]).parent.parent,
-        alt_group2_pos_dir=lambda w, input: Path(input.kallisto[-1]).parent.parent,
+        alt_group1_pos_dir=lambda w, input: str(Path(input.kallisto[0]).parent.parent),
+        alt_group2_pos_dir=lambda w, input: str(Path(input.kallisto[-1]).parent.parent),
     shell:
         """
         mkdir -p {params.unnorm_dir}
