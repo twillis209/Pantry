@@ -76,13 +76,28 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def _check_dataset(name: str, ds: dict, references: dict):
-    """Cross-field checks a JSON schema cannot express."""
-    if ds.get("reference") not in references:
+    """Cross-field checks a JSON schema cannot express.
+
+    These run before schema validation, so they guard the types they touch.
+    """
+    if not isinstance(ds.get("reference"), str) or ds["reference"] not in references:
         raise ValueError(
             f"datasets.{name}.reference {ds.get('reference')!r} is not one of the "
             f"configured references: {', '.join(references) or '(none)'}"
         )
     reference = references[ds["reference"]]
+    if not isinstance(reference, dict):
+        raise ValueError(f"references.{ds['reference']} must be a mapping")
+
+    groups = ds.get("modality_groups", {})
+    if not isinstance(groups, dict) or any(
+        not isinstance(g, dict) or not isinstance(g.get("files"), list)
+        for g in groups.values()
+    ):
+        raise ValueError(
+            f"datasets.{name}.modality_groups must map group names to mappings "
+            "with a 'files' list"
+        )
 
     # Fragment length parameters are only required for single-end samples.
     if ds.get("paired_end") is False:
@@ -90,7 +105,6 @@ def _check_dataset(name: str, ds: dict, references: dict):
             if key not in ds:
                 raise ValueError(f"datasets.{name}: {key} required for single-end data")
 
-    groups = ds.get("modality_groups", {})
     if "RNA_editing" in groups and "edit_sites_bed" not in reference:
         raise ValueError(
             f"datasets.{name} uses RNA_editing, so references.{ds['reference']} "
@@ -134,8 +148,13 @@ def normalise(config: dict) -> dict:
     else:
         out = _shim(config)
     out.setdefault("references", {})
+    for key in ("references", "datasets", "defaults"):
+        if not isinstance(out.get(key, {}), dict):
+            raise ValueError(f"{key} must be a mapping")
 
     for name, reference in out["references"].items():
+        if not isinstance(reference, dict):
+            raise ValueError(f"references.{name} must be a mapping")
         annotation = reference.get("annotation")
         if isinstance(annotation, str) and not annotation.lower().endswith(".gtf"):
             what = "ref_anno" if "datasets" not in config else f"references.{name}.annotation"
@@ -143,6 +162,8 @@ def normalise(config: dict) -> dict:
 
     defaults = out.get("defaults", {})
     for name, ds in list(out["datasets"].items()):
+        if not isinstance(ds, dict):
+            raise ValueError(f"datasets.{name} must be a mapping")
         ds = _deep_merge(defaults, ds)
         out["datasets"][name] = ds
         _check_dataset(name, ds, out["references"])

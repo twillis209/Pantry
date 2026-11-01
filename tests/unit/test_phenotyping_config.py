@@ -111,6 +111,25 @@ def test_shim_moves_annotation_gff3():
     assert "annotation_gff3" not in groups["intron_retention"]
 
 
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda c: c.update(datasets=["d1"]),
+        lambda c: c["datasets"].update(d1="oops"),
+        lambda c: c["references"].update(grch38="oops"),
+        lambda c: c["datasets"]["d1"].update(reference=["grch38"]),
+        lambda c: c["datasets"]["d1"].update(modality_groups=["expression"]),
+        lambda c: c["datasets"]["d1"]["modality_groups"].update(expression="x"),
+        lambda c: c["datasets"]["d1"]["modality_groups"].update(expression={}),
+    ],
+)
+def test_malformed_config_raises_value_error(mutate):
+    c = new_config()
+    mutate(c)
+    with pytest.raises(ValueError):
+        cfg.normalise(c)
+
+
 def test_shim_maps_intermediate_dir():
     raw = legacy_config()
     raw["intermediate_dir"] = "foo"

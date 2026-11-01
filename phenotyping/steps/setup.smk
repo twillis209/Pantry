@@ -4,6 +4,7 @@ It normalises and validates the configuration and defines config helpers.
 """
 
 import functools
+from copy import deepcopy
 import importlib.util
 
 from snakemake.utils import validate
@@ -91,6 +92,11 @@ if "default" not in CONFIG["datasets"]:
 _ds = CONFIG["datasets"]["default"]
 _ref = CONFIG["references"][_ds["reference"]]
 
+if not isinstance(_ds["samples"], str):
+    raise ValueError(
+        "Inline sample lists are not supported yet: until rules take a {dataset} "
+        "wildcard, 'samples' must be a path to a one-column file."
+    )
 samples_file = Path(_ds["samples"]).expanduser()
 samples = dataset_samples("default")
 
@@ -105,7 +111,11 @@ ref_genome = Path(_ref["genome"]).expanduser()
 ref_anno = Path(_ref["annotation"]).expanduser()
 ref_cdna = "<pantry_reference>/cDNA.fa.gz"
 
-modality_groups = _ds["modality_groups"]
+modality_groups = deepcopy(_ds["modality_groups"])
+# The shim moved annotation_gff3 to the reference; intron_retention.smk still
+# reads it from the modality group.
+if "intron_retention" in modality_groups and "annotation_gff3" in _ref:
+    modality_groups["intron_retention"]["annotation_gff3"] = _ref["annotation_gff3"]
 laddr_config = dict(_ds.get("laddr", {}))
 for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
     if _key in laddr_config:
