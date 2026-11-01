@@ -19,6 +19,9 @@ pathvars:
 
 
 wildcard_constraints:
+    dataset="[^/]+",
+    reference="[^/]+",
+    read_length=r"\d+",
     sample_id="[^/]+",
     pheno="[^/]+",
     type="TSS|polyA",
@@ -50,7 +53,7 @@ def fastq_inputs(wildcards) -> list:
     in the list, e.g. [runA_1.fq.gz runA_2.fq.gz runB_1.fq.gz runB_2.fq.gz].
     For single-end samples, returns just the list of files.
     """
-    paths, is_paired = fastq_map[wildcards.sample_id]
+    paths, is_paired = fastq(wildcards.dataset)[wildcards.sample_id]
     if is_paired:
         result = []
         for i in range(len(paths[0])):
@@ -63,23 +66,26 @@ def fastq_inputs(wildcards) -> list:
 
 def kallisto_single_end_flag(wildcards):
     """Get the kallisto single-end flag for a sample."""
-    paths, is_paired = fastq_map[wildcards.sample_id]
-    return (
-        ""
-        if is_paired
-        else f"--single --fragment-length {fragment_length_mean} --sd {fragment_length_sd}"
-    )
+    if is_paired(wildcards):
+        return ""
+    d = ds(wildcards)
+    return f"--single --fragment-length {d['fragment_length_mean']} --sd {d['fragment_length_sd']}"
 
 
 ## Load rules from all the snakefiles
 
 
 include: "steps/align.smk"
+include: "steps/expression.smk"
+include: "steps/splicing.smk"
+include: "steps/stability.smk"
+include: "steps/alt_TSS_polyA.smk"
+include: "steps/RNA_editing.smk"
 
 
-for modality_group in modality_groups:
+if intron_retention_enabled:
 
-    include: f"steps/{modality_group}.smk"
+    include: "steps/intron_retention.smk"
 
 
 if laddr_enabled:
@@ -93,9 +99,9 @@ if laddr_enabled:
 rule index_bam:
     """Index a BAM file."""
     input:
-        "<pantry_intermediate>/bam/{sample_id}.bam",
+        "<pantry_intermediate>/{dataset}/bam/{sample_id}.bam",
     output:
-        "<pantry_intermediate>/bam/{sample_id}.bam.bai",
+        "<pantry_intermediate>/{dataset}/bam/{sample_id}.bam.bai",
     threads: 8
     params:
         add_threads=lambda w, threads: threads - 1,
@@ -107,9 +113,9 @@ rule index_bam:
 rule index_bed:
     """Index a BED file."""
     input:
-        "<pantry_output>/{pheno}.bed.gz",
+        "<pantry_output>/{dataset}/{pheno}.bed.gz",
     output:
-        "<pantry_output>/{pheno}.bed.gz.tbi",
+        "<pantry_output>/{dataset}/{pheno}.bed.gz.tbi",
     localrule: True
     shell:
         "tabix {input}"
@@ -125,6 +131,30 @@ rule index_fasta:
         "samtools faidx {input}"
 
 
+rule write_samples:
+    """Write the dataset's sample IDs, one per line, for scripts taking --samples."""
+    output:
+        "<pantry_intermediate>/{dataset}/samples.txt",
+    localrule: True
+    params:
+        samples=lambda w: dataset_samples(w.dataset),
+    run:
+        Path(output[0]).parent.mkdir(parents=True, exist_ok=True)
+        with open(output[0], "w") as out:
+            out.write("".join(f"{sample_id}\n" for sample_id in params.samples))
+
+
+rule validate_annotation:
+    """Check that the reference annotation GTF contains transcript rows."""
+    input:
+        ref_anno=ref_file("annotation"),
+    output:
+        touch("<pantry_reference>/{reference}/annotation.ok"),
+    localrule: True
+    run:
+        pantry_config.check_annotation(input.ref_anno)
+
+
 rule extract_cdna:
     """Extract cDNA sequences from a genome and GTF file.
 
@@ -133,10 +163,11 @@ rule extract_cdna:
     before running gffread.
     """
     input:
-        ref_genome=ref_genome,
-        ref_anno=ref_anno,
+        ref_genome=ref_file("genome"),
+        ref_anno=ref_file("annotation"),
+        anno_ok="<pantry_reference>/{reference}/annotation.ok",
     output:
-        ref_cdna,
+        "<pantry_reference>/{reference}/cDNA.fa.gz",
     localrule: True
     shell:
         """

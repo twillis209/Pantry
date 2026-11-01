@@ -4,6 +4,7 @@ It normalises and validates the configuration and defines config helpers.
 """
 
 import functools
+import math
 from copy import deepcopy
 import importlib.util
 
@@ -82,65 +83,86 @@ def fastq(dataset: str) -> dict:
     )
 
 
-# Temporary: the old global names, taken from dataset 'default', until the
-# rules take a {dataset} wildcard.
-if "default" not in CONFIG["datasets"]:
-    raise ValueError(
-        "Until rules take a {dataset} wildcard, the phenotyping config needs a "
-        "dataset named 'default' (or a single-dataset config without 'datasets')."
-    )
-_ds = CONFIG["datasets"]["default"]
-_ref = CONFIG["references"][_ds["reference"]]
+def ref_file(key: str):
+    """Input function: a file of the reference set (genome, annotation, ...)."""
 
-if not isinstance(_ds["samples"], str):
-    raise ValueError(
-        "Inline sample lists are not supported yet: until rules take a {dataset} "
-        "wildcard, 'samples' must be a path to a one-column file."
-    )
-samples_file = Path(_ds["samples"]).expanduser()
-samples = dataset_samples("default")
+    def path(w) -> str:
+        return str(Path(ref(w)[key]).expanduser())
 
-paired_end = _ds.get("paired_end", None)
-read_length = _ds["read_length"]
-fastq_map = fastq("default")
-if any(not is_paired for paths, is_paired in fastq_map.values()):
-    fragment_length_mean = _ds["fragment_length_mean"]
-    fragment_length_sd = _ds["fragment_length_sd"]
+    return path
 
-ref_genome = Path(_ref["genome"]).expanduser()
-ref_anno = Path(_ref["annotation"]).expanduser()
-ref_cdna = "<pantry_reference>/cDNA.fa.gz"
 
-modality_groups = deepcopy(_ds["modality_groups"])
-# The shim moved annotation_gff3 to the reference; intron_retention.smk still
-# reads it from the modality group.
-if "intron_retention" in modality_groups and "annotation_gff3" in _ref:
-    modality_groups["intron_retention"]["annotation_gff3"] = _ref["annotation_gff3"]
-laddr_config = dict(_ds.get("laddr", {}))
-for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
-    if _key in laddr_config:
-        laddr_config[_key] = Path(laddr_config[_key]).expanduser()
-laddr_enabled = laddr_config.get("enabled", False)
+def ref_path(name: str):
+    """Input function: a generated file under the {dataset}'s reference directory."""
 
-if "RNA_editing" in modality_groups:
-    rna_editing_params = modality_groups["RNA_editing"]
-    edit_sites_bed = Path(_ref["edit_sites_bed"]).expanduser()
-    edit_sites_min_coverage = rna_editing_params["edit_sites_min_coverage"]
-    edit_sites_min_samples = pantry_config.edit_sites_min_samples(
-        rna_editing_params["edit_sites_min_samples"],
-        rna_editing_params["edit_sites_min_samples_fraction"],
-        len(samples),
-    )
-    edit_sites_cluster = rna_editing_params["edit_sites_cluster"]
-    edit_sites_correlation_threshold = rna_editing_params[
-        "edit_sites_correlation_threshold"
-    ]
-    if max(
-        rna_editing_params["edit_sites_min_samples"],
-        math.ceil(rna_editing_params["edit_sites_min_samples_fraction"] * len(samples)),
-    ) > len(samples):
+    def path(w) -> str:
+        return f"<pantry_reference>/{ds(w)['reference']}/{name}"
+
+    return path
+
+
+def per_sample(pattern: str):
+    """Input function: pattern expanded over the {dataset}'s samples."""
+
+    def paths(w) -> list:
+        return expand(pattern, dataset=w.dataset, sample_id=dataset_samples(w.dataset))
+
+    return paths
+
+
+def is_paired(w) -> bool:
+    """Whether the {sample_id} of the {dataset} has paired-end reads."""
+    return fastq(w.dataset)[w.sample_id][1]
+
+
+def rna_editing(w) -> dict:
+    """RNA_editing modality group settings of the {dataset}."""
+    return ds(w)["modality_groups"]["RNA_editing"]
+
+
+def rna_editing_min_samples(w) -> int:
+    """Effective RNA editing sample threshold of the {dataset}."""
+    params = rna_editing(w)
+    n = len(dataset_samples(w.dataset))
+    configured = params["edit_sites_min_samples"]
+    fraction = params["edit_sites_min_samples_fraction"]
+    if max(configured, math.ceil(fraction * n)) > n:
         print(
-            f"Note: RNA editing site sample threshold is greater than the number of samples ({len(samples)}). Setting to {len(samples)}."
+            f"Note: RNA editing site sample threshold is greater than the number of samples ({n}). Setting to {n}."
+        )
+    min_samples = pantry_config.edit_sites_min_samples(configured, fraction, n)
+    return min_samples
+
+
+# MAJIQ and LaDDR rules do not take a {dataset} wildcard yet; until they do,
+# they run for dataset 'default' only, using these globals.
+for _name, _d in CONFIG["datasets"].items():
+    if _name != "default" and (
+        "intron_retention" in _d["modality_groups"]
+        or _d.get("laddr", {}).get("enabled", False)
+    ):
+        raise ValueError(
+            f"datasets.{_name}: intron_retention and laddr are only supported for "
+            "a dataset named 'default' (or a single-dataset config) for now."
         )
 
-outputs = [f"<pantry_output>/{f}" for f in pantry_config.dataset_targets(_ds)]
+_default = CONFIG["datasets"].get("default", {})
+intron_retention_enabled = "intron_retention" in _default.get("modality_groups", {})
+laddr_enabled = _default.get("laddr", {}).get("enabled", False)
+
+if intron_retention_enabled or laddr_enabled:
+    _ref = CONFIG["references"][_default["reference"]]
+    default_reference = _default["reference"]
+    samples_file = "<pantry_intermediate>/default/samples.txt"
+    samples = dataset_samples("default")
+    ref_anno = Path(_ref["annotation"]).expanduser()
+
+    modality_groups = deepcopy(_default["modality_groups"])
+    # The shim moved annotation_gff3 to the reference; intron_retention.smk
+    # still reads it from the modality group.
+    if intron_retention_enabled and "annotation_gff3" in _ref:
+        modality_groups["intron_retention"]["annotation_gff3"] = _ref["annotation_gff3"]
+    laddr_config = dict(_default.get("laddr", {}))
+    for _key in ("project_dir", "existing_info_dir", "existing_bins_dir"):
+        if _key in laddr_config:
+            laddr_config[_key] = Path(laddr_config[_key]).expanduser()

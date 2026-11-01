@@ -15,15 +15,16 @@ def laddr_project_dir(w, input) -> str:
 
 def laddr_pheno_inputs(wildcards=None):
     return [
-        f"<pantry_output>/{name}.bed.gz" for name in laddr_config["regress_modalities"]
+        f"<pantry_output>/default/{name}.bed.gz"
+        for name in laddr_config["regress_modalities"]
     ]
 
 
 rule bam_to_bigwig:
     """Convert BAM alignments to base-resolution bigWig coverage."""
     input:
-        bam="<pantry_intermediate>/bam/{sample_id}.bam",
-        bai="<pantry_intermediate>/bam/{sample_id}.bam.bai",
+        bam="<pantry_intermediate>/default/bam/{sample_id}.bam",
+        bai="<pantry_intermediate>/default/bam/{sample_id}.bam.bai",
     output:
         bw=LADDR_BW_DIR / "{sample_id}.bw",
     threads: laddr_config["bam_coverage_threads"]
@@ -233,7 +234,7 @@ rule assemble_latent_bed:
         / f"latent_phenos.{LADDR_DATASET}.tsv.gz",
         ref_anno=ref_anno,
     output:
-        bed="<pantry_output>/unnorm/latent_residual.bed",
+        bed="<pantry_output>/default/unnorm/latent_residual.bed",
     resources:
         mem_mb=32000,
     params:
@@ -252,10 +253,10 @@ rule assemble_latent_bed:
 rule normalize_latent:
     """Quantile-normalize latent phenotypes for QTL mapping."""
     input:
-        bed="<pantry_output>/unnorm/latent_residual.bed",
+        bed="<pantry_output>/default/unnorm/latent_residual.bed",
         samples=samples_file,
     output:
-        "<pantry_output>/latent_residual.bed.gz",
+        "<pantry_output>/default/latent_residual.bed.gz",
     resources:
         mem_mb=32000,
     params:
@@ -276,9 +277,9 @@ rule normalize_latent:
 rule pheno_groups_latent:
     """Group latent phenotypes by gene for tensorQTL."""
     input:
-        "<pantry_output>/latent_residual.bed.gz",
+        "<pantry_output>/default/latent_residual.bed.gz",
     output:
-        "<pantry_output>/latent_residual.phenotype_groups.txt",
+        "<pantry_output>/default/latent_residual.phenotype_groups.txt",
     localrule: True
     shell:
         """

@@ -254,6 +254,31 @@ def load_fastq_map(spec, fastq_dir, paired_end) -> dict:
     return paths
 
 
+def check_annotation(ref_anno):
+    """Check that the GTF includes transcript entries.
+
+    These are lacking in some annotation files such as RefSeq Select GTFs.
+    """
+    has_transcript = False
+    with open(ref_anno, "r") as fh:
+        checked = 0
+        for line in fh:
+            if line.startswith("#"):
+                continue
+            cols = line.split("\t")
+            if cols[2] == "transcript":
+                has_transcript = True
+                break
+            checked += 1
+            if checked >= 1000:
+                break
+    if not has_transcript:
+        raise ValueError(
+            "Reference annotation file does not contain transcript entries "
+            f"(at least not in the first 1000 lines): {ref_anno}"
+        )
+
+
 def edit_sites_min_samples(configured: int, fraction: float, n: int) -> int:
     """Effective RNA editing sample threshold, capped at the number of samples."""
     return min(max(configured, math.ceil(fraction * n)), n)

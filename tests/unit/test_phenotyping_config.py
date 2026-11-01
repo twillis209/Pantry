@@ -421,3 +421,32 @@ def test_schema_rejects_bad_types(validate):
     del out["datasets"]["d1"]["fastq_dir"]
     with pytest.raises(Exception, match="fastq_dir"):
         validate(out)
+
+
+# check_annotation: upstream validate_reference's transcript-row check.
+def _gtf(tmp_path, rows):
+    path = tmp_path / "anno.gtf"
+    path.write_text("".join("\t".join(["1", "src", f, "1", "2", ".", "+", ".", "x"]) + "\n" for f in rows))
+    return path
+
+
+def test_check_annotation_accepts_transcript_rows(tmp_path):
+    path = _gtf(tmp_path, ["gene", "transcript", "exon"])
+    path.write_text("#!comment\n" + path.read_text())
+    cfg.check_annotation(path)
+
+
+def test_check_annotation_rejects_missing_transcripts(tmp_path):
+    path = _gtf(tmp_path, ["gene", "exon"])
+    with pytest.raises(ValueError) as e:
+        cfg.check_annotation(path)
+    assert str(e.value) == (
+        "Reference annotation file does not contain transcript entries "
+        f"(at least not in the first 1000 lines): {path}"
+    )
+
+
+def test_check_annotation_looks_at_first_1000_rows_only(tmp_path):
+    with pytest.raises(ValueError):
+        cfg.check_annotation(_gtf(tmp_path, ["exon"] * 1000 + ["transcript"]))
+    cfg.check_annotation(_gtf(tmp_path, ["exon"] * 999 + ["transcript"]))

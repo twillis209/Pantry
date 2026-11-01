@@ -1,13 +1,13 @@
 from math import ceil
 
-majiq_dir = "<pantry_intermediate>/intron_retention"
+majiq_dir = "<pantry_intermediate>/default/intron_retention"
 majiq_build_dir = f"{majiq_dir}/build"
 majiq_psicov_dir = f"{majiq_dir}/psicov"
 majiq_params = modality_groups["intron_retention"]
 majiq_annotation_gff3 = (
     Path(majiq_params["annotation_gff3"]).expanduser()
     if "annotation_gff3" in majiq_params
-    else "<pantry_reference>/majiq/annotation.gff3"
+    else f"<pantry_reference>/{default_reference}/majiq/annotation.gff3"
 )
 majiq_license = (
     str(Path(majiq_params["license"]).expanduser())
@@ -22,7 +22,7 @@ majiq_batches = list(range(ceil(len(samples) / majiq_psicov_batch_size)))
 # Resolving needs the real path, so the pathvar is applied here at parse time.
 majiq_sj_by_sample = {
     sample: f"{majiq_build_dir}/"
-    + Path(workflow.pathvars.apply(f"<pantry_intermediate>/bam/{sample}.bam"))
+    + Path(workflow.pathvars.apply(f"<pantry_intermediate>/default/bam/{sample}.bam"))
     .resolve()
     .stem
     + ".sj"
@@ -72,8 +72,12 @@ if "annotation_gff3" not in majiq_params:
 rule make_majiq_experiments_tsv:
     """Write MAJIQ experiment groups and BAM paths."""
     input:
-        bams=expand("<pantry_intermediate>/bam/{sample_id}.bam", sample_id=samples),
-        bai=expand("<pantry_intermediate>/bam/{sample_id}.bam.bai", sample_id=samples),
+        bams=expand(
+            "<pantry_intermediate>/default/bam/{sample_id}.bam", sample_id=samples
+        ),
+        bai=expand(
+            "<pantry_intermediate>/default/bam/{sample_id}.bam.bai", sample_id=samples
+        ),
     output:
         f"{majiq_dir}/experiments.tsv",
     localrule: True
@@ -205,7 +209,7 @@ rule assemble_intron_retention_bed:
         ir=rules.extract_retained_introns.output,
         ref_anno=ref_anno,
     output:
-        bed="<pantry_output>/unnorm/intron_retention.bed",
+        bed="<pantry_output>/default/unnorm/intron_retention.bed",
     resources:
         mem_mb=32000,
     params:
@@ -224,10 +228,10 @@ rule assemble_intron_retention_bed:
 rule normalize_intron_retention:
     """Quantile-normalize retained-intron PSI values for QTL mapping."""
     input:
-        bed="<pantry_output>/unnorm/intron_retention.bed",
+        bed="<pantry_output>/default/unnorm/intron_retention.bed",
         samples=samples_file,
     output:
-        "<pantry_output>/intron_retention.bed.gz",
+        "<pantry_output>/default/intron_retention.bed.gz",
     resources:
         mem_mb=32000,
     params:
@@ -246,9 +250,9 @@ rule normalize_intron_retention:
 rule pheno_groups_intron_retention:
     """Group retained-intron phenotypes by gene for tensorQTL."""
     input:
-        "<pantry_output>/intron_retention.bed.gz",
+        "<pantry_output>/default/intron_retention.bed.gz",
     output:
-        "<pantry_output>/intron_retention.phenotype_groups.txt",
+        "<pantry_output>/default/intron_retention.phenotype_groups.txt",
     localrule: True
     shell:
         """
