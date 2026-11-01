@@ -1,12 +1,12 @@
 rule regtools_junctions:
     """Run regtools junctions for LeafCutter"""
     input:
-        bam=interm_dir / "bam" / "{sample_id}.bam",
-        bai=interm_dir / "bam" / "{sample_id}.bam.bai",
+        bam="<pantry_intermediate>/bam/{sample_id}.bam",
+        bai="<pantry_intermediate>/bam/{sample_id}.bam.bai",
     output:
-        interm_dir / "splicing" / "{sample_id}.junc",
+        "<pantry_intermediate>/splicing/{sample_id}.junc",
     params:
-        splice_dir=interm_dir / "splicing",
+        splice_dir=parent_dir,
         min_anchor_len=8,
         min_intron_len=50,
         max_intron_len=500000,
@@ -27,13 +27,13 @@ rule regtools_junctions:
 rule cluster_junctions:
     """Cluster splice junctions with common boundaries"""
     input:
-        expand(str(interm_dir / "splicing" / "{sample_id}.junc"), sample_id=samples),
+        expand("<pantry_intermediate>/splicing/{sample_id}.junc", sample_id=samples),
     output:
-        interm_dir / "splicing" / "leafcutter_perind_numers.counts.gz",
+        "<pantry_intermediate>/splicing/leafcutter_perind_numers.counts.gz",
     params:
         script=script("leafcutter_cluster_regtools_py3.py"),
-        juncfile_list=interm_dir / "splicing" / "juncfiles.txt",
-        splice_dir=interm_dir / "splicing",
+        juncfile_list=lambda w, output: Path(output[0]).parent / "juncfiles.txt",
+        splice_dir=parent_dir,
         max_intron_len=100000,
         min_clust_reads=30,
         min_clust_ratio=0.001,
@@ -52,15 +52,15 @@ rule cluster_junctions:
 rule assemble_splicing_bed:
     """Convert leafcutter output into splicing BED file"""
     input:
-        counts=interm_dir / "splicing" / "leafcutter_perind_numers.counts.gz",
+        counts="<pantry_intermediate>/splicing/leafcutter_perind_numers.counts.gz",
         ref_anno=ref_anno,
     output:
-        bed=output_dir / "unnorm" / "splicing.bed",
+        bed="<pantry_output>/unnorm/splicing.bed",
     resources:
         mem_mb=32000,
     params:
         script=script("assemble_bed.py"),
-        unnorm_dir=output_dir / "unnorm",
+        unnorm_dir=parent_dir,
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -74,18 +74,19 @@ rule assemble_splicing_bed:
 rule normalize_splicing:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed=output_dir / "unnorm" / "splicing.bed",
+        bed="<pantry_output>/unnorm/splicing.bed",
         samples=samples_file,
     output:
-        output_dir / "splicing.bed.gz",
+        "<pantry_output>/splicing.bed.gz",
     resources:
         mem_mb=32000,
     params:
         script=script("normalize_phenotypes.py"),
-        bed=output_dir / "splicing.bed",
+        bed=bgzip_source,
+        outdir=parent_dir,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
@@ -97,9 +98,9 @@ rule normalize_splicing:
 rule pheno_groups_splicing:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        output_dir / "splicing.bed.gz",
+        "<pantry_output>/splicing.bed.gz",
     output:
-        output_dir / "splicing.phenotype_groups.txt",
+        "<pantry_output>/splicing.phenotype_groups.txt",
     localrule: True
     shell:
         """

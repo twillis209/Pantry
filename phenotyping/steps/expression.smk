@@ -3,11 +3,11 @@ rule kallisto_index:
     input:
         ref_cdna,
     output:
-        ref_dir / "kallisto.idx",
+        "<pantry_reference>/kallisto.idx",
     resources:
         mem_mb=32000,
     params:
-        ref_dir=ref_dir,
+        ref_dir=parent_dir,
     shell:
         """
         mkdir -p {params.ref_dir}
@@ -18,18 +18,18 @@ rule kallisto_index:
 rule kallisto:
     """Quantify expression from FASTQ files using kallisto."""
     input:
-        index=ref_dir / "kallisto.idx",
+        index="<pantry_reference>/kallisto.idx",
         fastq=fastq_inputs,
     output:
-        h5=interm_dir / "expression" / "{sample_id}" / "abundance.h5",
-        tsv=interm_dir / "expression" / "{sample_id}" / "abundance.tsv",
-        json=interm_dir / "expression" / "{sample_id}" / "run_info.json",
+        h5="<pantry_intermediate>/expression/{sample_id}/abundance.h5",
+        tsv="<pantry_intermediate>/expression/{sample_id}/abundance.tsv",
+        json="<pantry_intermediate>/expression/{sample_id}/run_info.json",
     threads: 16
     resources:
         runtime="16h",
     params:
-        expr_dir=interm_dir / "expression",
-        out_dir=str(interm_dir / "expression" / "{sample_id}"),
+        expr_dir=lambda w, output: Path(output.h5).parent.parent,
+        out_dir=parent_dir,
         single_end_flag=kallisto_single_end_flag,
         # TODO add strandedness parameter
     shell:
@@ -51,20 +51,20 @@ rule assemble_expression_bed:
     """
     input:
         kallisto=expand(
-            str(interm_dir / "expression" / "{sample_id}" / "abundance.tsv"),
+            "<pantry_intermediate>/expression/{sample_id}/abundance.tsv",
             sample_id=samples,
         ),
         samples=samples_file,
         ref_anno=ref_anno,
     output:
-        iso=output_dir / "unnorm" / "isoforms.bed",
-        gene=output_dir / "unnorm" / "expression.bed",
+        iso="<pantry_output>/unnorm/isoforms.bed",
+        gene="<pantry_output>/unnorm/expression.bed",
     resources:
         mem_mb=32000,
     params:
         script=script("assemble_bed.py"),
-        unnorm_dir=output_dir / "unnorm",
-        expr_dir=interm_dir / "expression",
+        unnorm_dir=parent_dir,
+        expr_dir=lambda w, input: Path(input.kallisto[0]).parent.parent,
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -80,15 +80,15 @@ rule assemble_expression_bed:
 rule normalize_expression:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed=output_dir / "unnorm" / "expression.bed",
+        bed="<pantry_output>/unnorm/expression.bed",
         samples=samples_file,
     output:
-        output_dir / "expression.bed.gz",
+        "<pantry_output>/expression.bed.gz",
     resources:
         mem_mb=32000,
     params:
         script=script("normalize_phenotypes.py"),
-        bed=str(output_dir / "expression.bed"),
+        bed=bgzip_source,
     shell:
         """
         python3 {params.script} \
@@ -102,18 +102,19 @@ rule normalize_expression:
 rule normalize_isoforms:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed=output_dir / "unnorm" / "isoforms.bed",
+        bed="<pantry_output>/unnorm/isoforms.bed",
         samples=samples_file,
     output:
-        output_dir / "isoforms.bed.gz",
+        "<pantry_output>/isoforms.bed.gz",
     resources:
         mem_mb=32000,
     params:
         script=script("normalize_phenotypes.py"),
-        bed=str(output_dir / "isoforms.bed"),
+        bed=bgzip_source,
+        outdir=parent_dir,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
@@ -125,9 +126,9 @@ rule normalize_isoforms:
 rule pheno_groups_isoforms:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        output_dir / "isoforms.bed.gz",
+        "<pantry_output>/isoforms.bed.gz",
     output:
-        output_dir / "isoforms.phenotype_groups.txt",
+        "<pantry_output>/isoforms.phenotype_groups.txt",
     localrule: True
     shell:
         """

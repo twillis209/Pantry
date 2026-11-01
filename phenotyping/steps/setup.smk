@@ -11,6 +11,16 @@ def script(name: str) -> str:
     return workflow.source_path(f"../scripts/{name}")
 
 
+def parent_dir(w, output) -> str:
+    """Directory of a rule's first output, e.g. for mkdir -p in params."""
+    return str(Path(output[0]).parent)
+
+
+def bgzip_source(w, output) -> str:
+    """Uncompressed path that bgzip turns into a rule's first (.gz) output."""
+    return output[0].removesuffix(".gz")
+
+
 def load_fastq_map(map_file: Path, fastq_dir: Path, paired_end=None) -> dict:
     """Load the FASTQ file paths for each sample.
 
@@ -125,8 +135,6 @@ def process_config(config: dict):
         "ref_genome",
         "ref_anno",
         "samples_file",
-        "intermediate_dir",
-        "intermediate_ref_dir",
     ]
     for path in paths:
         if path in config.keys():
@@ -137,11 +145,6 @@ def process_config(config: dict):
     ].tolist()
     config["samples"] = samples
 
-    if "intermediate_dir" not in config:
-        config["intermediate_dir"] = Path("intermediate")
-    if "intermediate_ref_dir" not in config:
-        config["intermediate_ref_dir"] = config["intermediate_dir"] / "reference"
-
     config["fastq_map"] = load_fastq_map(
         config["fastq_map"], config["fastq_dir"], config.get("paired_end", None)
     )
@@ -150,7 +153,7 @@ def process_config(config: dict):
         laddr = config["laddr"]
         laddr.setdefault("enabled", False)
         laddr.setdefault("dataset_name", "pantry")
-        laddr.setdefault("project_dir", config["intermediate_dir"] / "laddr")
+        laddr.setdefault("project_dir", "<pantry_intermediate>/laddr")
         laddr.setdefault("use_existing_bins", False)
         laddr.setdefault("min_samples_expressed", 0.5)
         laddr.setdefault("binning_method", "adaptive_diffvar")
@@ -221,10 +224,6 @@ validate_config(config)
 pipeline_config = deepcopy(config)
 process_config(pipeline_config)
 
-interm_dir = pipeline_config["intermediate_dir"]
-ref_dir = pipeline_config["intermediate_ref_dir"]
-output_dir = Path("output")
-
 samples_file = pipeline_config["samples_file"]
 samples = pipeline_config["samples"]
 
@@ -238,7 +237,7 @@ if any(not is_paired for paths, is_paired in fastq_map.values()):
 
 ref_genome = pipeline_config["ref_genome"]
 ref_anno = pipeline_config["ref_anno"]
-ref_cdna = ref_dir / "cDNA.fa.gz"
+ref_cdna = "<pantry_reference>/cDNA.fa.gz"
 validate_reference(ref_genome, ref_anno)
 
 modality_groups = pipeline_config["modality_groups"]
@@ -272,13 +271,13 @@ if "RNA_editing" in modality_groups:
 outputs = []
 for modality_group, params in modality_groups.items():
     for f in params["files"]:
-        outputs.append(output_dir / f)
+        outputs.append(f"<pantry_output>/{f}")
 
 if laddr_enabled:
     outputs.extend(
         [
-            output_dir / "latent_residual.bed.gz",
-            output_dir / "latent_residual.bed.gz.tbi",
-            output_dir / "latent_residual.phenotype_groups.txt",
+            "<pantry_output>/latent_residual.bed.gz",
+            "<pantry_output>/latent_residual.bed.gz.tbi",
+            "<pantry_output>/latent_residual.phenotype_groups.txt",
         ]
     )

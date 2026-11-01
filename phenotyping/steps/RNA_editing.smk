@@ -2,17 +2,14 @@ rule query_editing_level:
     input:
         edit_sites=edit_sites_bed,
         ref_genome=ref_genome,
-        bam=interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
+        bam="<pantry_intermediate>/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
-        levels=interm_dir
-        / "RNA_editing"
-        / "edit_levels"
-        / "{sample_id}.rnaeditlevel.tsv.gz",
+        levels="<pantry_intermediate>/RNA_editing/edit_levels/{sample_id}.rnaeditlevel.tsv.gz",
     resources:
         runtime="8h",
     params:
         script=script("RNA_editing/query_editing_level.py"),
-        edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
+        edit_levels_dir=parent_dir,
     shell:
         """
         mkdir -p {params.edit_levels_dir}
@@ -27,18 +24,15 @@ rule query_editing_level:
 rule shared_sample_sites:
     input:
         levels=expand(
-            interm_dir
-            / "RNA_editing"
-            / "edit_levels"
-            / "{sample_id}.rnaeditlevel.tsv.gz",
+            "<pantry_intermediate>/RNA_editing/edit_levels/{sample_id}.rnaeditlevel.tsv.gz",
             sample_id=samples,
         ),
         samples=samples_file,
     output:
-        matrix=interm_dir / "RNA_editing" / "edit_site_matrix.tsv",
+        matrix="<pantry_intermediate>/RNA_editing/edit_site_matrix.tsv",
     params:
         script=script("RNA_editing/shared_samples_sites_matrix.py"),
-        edit_levels_dir=interm_dir / "RNA_editing" / "edit_levels",
+        edit_levels_dir=lambda w, input: Path(input.levels[0]).parent,
         min_cov=edit_sites_min_coverage,
         min_sam=edit_sites_min_samples,
     shell:
@@ -57,7 +51,7 @@ rule map_edit_sites_to_genes:
         edit_sites=edit_sites_bed,
         ref_anno=ref_anno,
     output:
-        tsv=ref_dir / "edit_sites_to_genes.tsv",
+        tsv="<pantry_reference>/edit_sites_to_genes.tsv",
     localrule: True
     params:
         script=script("RNA_editing/map_edit_sites_to_genes.py"),
@@ -69,19 +63,20 @@ rule map_edit_sites_to_genes:
 
 rule prepare_RNA_editing_phenotypes:
     input:
-        matrix=interm_dir / "RNA_editing" / "edit_site_matrix.tsv",
-        edit_sites_to_genes=ref_dir / "edit_sites_to_genes.tsv",
+        matrix="<pantry_intermediate>/RNA_editing/edit_site_matrix.tsv",
+        edit_sites_to_genes="<pantry_reference>/edit_sites_to_genes.tsv",
     output:
-        matrix=interm_dir / "RNA_editing" / "phenotype_matrix.tsv",
-        site_map=output_dir / "RNA_editing.site_to_phenotype.tsv",
+        matrix="<pantry_intermediate>/RNA_editing/phenotype_matrix.tsv",
+        site_map="<pantry_output>/RNA_editing.site_to_phenotype.tsv",
     localrule: True
     params:
         script=script("RNA_editing/prepare_rna_editing_phenotypes.py"),
         cluster="--cluster" if edit_sites_cluster else "",
         correlation_threshold=edit_sites_correlation_threshold,
+        outdir=lambda w, output: Path(output.site_map).parent,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --edit-matrix {input.matrix} \
             --site-to-gene {input.edit_sites_to_genes} \
@@ -95,15 +90,15 @@ rule prepare_RNA_editing_phenotypes:
 rule assemble_RNA_editing_bed:
     """Convert RNA editing matrix into BED file"""
     input:
-        matrix=interm_dir / "RNA_editing" / "phenotype_matrix.tsv",
+        matrix="<pantry_intermediate>/RNA_editing/phenotype_matrix.tsv",
         ref_anno=ref_anno,
     output:
-        bed=output_dir / "unnorm" / "RNA_editing.bed",
+        bed="<pantry_output>/unnorm/RNA_editing.bed",
     resources:
         mem_mb=32000,
     params:
         script=script("assemble_bed.py"),
-        unnorm_dir=output_dir / "unnorm",
+        unnorm_dir=parent_dir,
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -117,16 +112,17 @@ rule assemble_RNA_editing_bed:
 rule normalize_RNA_editing:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed=output_dir / "unnorm" / "RNA_editing.bed",
+        bed="<pantry_output>/unnorm/RNA_editing.bed",
         samples=samples_file,
     output:
-        output_dir / "RNA_editing.bed.gz",
+        "<pantry_output>/RNA_editing.bed.gz",
     params:
         script=script("normalize_phenotypes.py"),
-        bed=output_dir / "RNA_editing.bed",
+        bed=bgzip_source,
+        outdir=parent_dir,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
@@ -138,9 +134,9 @@ rule normalize_RNA_editing:
 rule pheno_groups_RNA_editing:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        output_dir / "RNA_editing.bed.gz",
+        "<pantry_output>/RNA_editing.bed.gz",
     output:
-        output_dir / "RNA_editing.phenotype_groups.txt",
+        "<pantry_output>/RNA_editing.phenotype_groups.txt",
     localrule: True
     shell:
         """

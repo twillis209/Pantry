@@ -3,8 +3,8 @@ rule exonic_intronic_from_GTF:
     input:
         ref_anno=ref_anno,
     output:
-        exon_gtf=ref_dir / "exonic.gtf",
-        intron_gtf=ref_dir / "intronic.gtf",
+        exon_gtf="<pantry_reference>/exonic.gtf",
+        intron_gtf="<pantry_reference>/intronic.gtf",
     params:
         script=script("exonic_intronic_from_gtf.py"),
     shell:
@@ -25,15 +25,15 @@ rule run_featureCounts:
     exon.
     """
     input:
-        bam=interm_dir / "bam" / "{sample_id}.bam",
-        gtf=ref_dir / "{feature_type}.gtf",
+        bam="<pantry_intermediate>/bam/{sample_id}.bam",
+        gtf="<pantry_reference>/{feature_type}.gtf",
     output:
-        interm_dir / "stability" / "{sample_id}.{feature_type}.counts.txt",
+        "<pantry_intermediate>/stability/{sample_id}.{feature_type}.counts.txt",
     threads: 8
     resources:
         runtime="16h",
     params:
-        stab_dir=interm_dir / "stability",
+        stab_dir=parent_dir,
         paired_flag=lambda w: "-p" if fastq_map[w.sample_id][1] else "",
         feature_id=lambda w: {"exonic": "exon", "intronic": "intron"}[w.feature_type],
         frac_overlap=lambda w: {"exonic": 1, "intronic": 0}[w.feature_type],
@@ -56,23 +56,23 @@ rule assemble_stability_bed:
     """Assemble exon to intron read ratios into mRNA stability BED file"""
     input:
         exon=expand(
-            str(interm_dir / "stability" / "{sample_id}.exonic.counts.txt"),
+            "<pantry_intermediate>/stability/{sample_id}.exonic.counts.txt",
             sample_id=samples,
         ),
         intron=expand(
-            str(interm_dir / "stability" / "{sample_id}.intronic.counts.txt"),
+            "<pantry_intermediate>/stability/{sample_id}.intronic.counts.txt",
             sample_id=samples,
         ),
         samples=samples_file,
         ref_anno=ref_anno,
     output:
-        bed=output_dir / "unnorm" / "stability.bed",
+        bed="<pantry_output>/unnorm/stability.bed",
     resources:
         mem_mb=32000,
     params:
         script=script("assemble_bed.py"),
-        unnorm_dir=output_dir / "unnorm",
-        stab_dir=interm_dir / "stability",
+        unnorm_dir=parent_dir,
+        stab_dir=lambda w, input: Path(input.exon[0]).parent,
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -87,16 +87,17 @@ rule assemble_stability_bed:
 rule normalize_stability:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed=output_dir / "unnorm" / "stability.bed",
+        bed="<pantry_output>/unnorm/stability.bed",
         samples=samples_file,
     output:
-        output_dir / "stability.bed.gz",
+        "<pantry_output>/stability.bed.gz",
     params:
         script=script("normalize_phenotypes.py"),
-        bed=output_dir / "stability.bed",
+        bed=bgzip_source,
+        outdir=parent_dir,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \

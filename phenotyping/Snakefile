@@ -3,9 +3,46 @@ from gtfparse import read_gtf
 import math
 import numpy as np
 import pandas as pd
+from snakemake.utils import min_version
+
+min_version("9.12")
 
 
 configfile: "config.yml"
+
+
+# Output roots. A host workflow importing this one as a module can override them.
+pathvars:
+    pantry_output="output",
+    pantry_intermediate="intermediate",
+    pantry_reference="intermediate/reference",
+
+
+# Legacy config keys for the intermediate directories override the defaults.
+if "intermediate_dir" in config or "intermediate_ref_dir" in config:
+    _legacy_intermediate = str(
+        Path(config.get("intermediate_dir", "intermediate")).expanduser()
+    )
+    _legacy_reference = str(
+        Path(
+            config.get("intermediate_ref_dir", f"{_legacy_intermediate}/reference")
+        ).expanduser()
+    )
+
+    pathvars:
+        pantry_intermediate=_legacy_intermediate,
+        pantry_reference=_legacy_reference,
+
+
+wildcard_constraints:
+    sample_id="[^/]+",
+    pheno="[^/]+",
+    type="TSS|polyA",
+    group="grp_[12]",
+    position="upstream|contained|downstream",
+    batch=r"\d+",
+    n_batches=r"\d+",
+    feature_type="exonic|intronic",
 
 
 # This code validates and processes the configuration and sets global variables:
@@ -72,9 +109,9 @@ if laddr_enabled:
 rule index_bam:
     """Index a BAM file."""
     input:
-        "{basename}.bam",
+        "<pantry_intermediate>/bam/{sample_id}.bam",
     output:
-        "{basename}.bam.bai",
+        "<pantry_intermediate>/bam/{sample_id}.bam.bai",
     threads: 8
     params:
         add_threads=lambda w, threads: threads - 1,
@@ -86,9 +123,9 @@ rule index_bam:
 rule index_bed:
     """Index a BED file."""
     input:
-        output_dir / "{pheno}.bed.gz",
+        "<pantry_output>/{pheno}.bed.gz",
     output:
-        output_dir / "{pheno}.bed.gz.tbi",
+        "<pantry_output>/{pheno}.bed.gz.tbi",
     localrule: True
     shell:
         "tabix {input}"
@@ -97,9 +134,9 @@ rule index_bed:
 rule index_fasta:
     """Index a FASTA file, e.g. to get chromosome lengths from reference genome."""
     input:
-        "{basename}.fa",
+        "<pantry_reference>/{basename}.fa",
     output:
-        "{basename}.fa.fai",
+        "<pantry_reference>/{basename}.fa.fai",
     shell:
         "samtools faidx {input}"
 

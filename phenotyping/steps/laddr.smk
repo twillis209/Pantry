@@ -8,22 +8,27 @@ LADDR_COVERAGE_DONE = LADDR_PROJECT_DIR / "covg_norm" / LADDR_DATASET / ".covera
 LADDR_FIT_DONE = LADDR_PROJECT_DIR / "models" / ".fit_done"
 
 
+def laddr_project_dir(w, input) -> str:
+    """LaDDR project directory, derived from the LaDDR config input."""
+    return str(Path(input.config).parent)
+
+
 def laddr_pheno_inputs(wildcards=None):
     return [
-        output_dir / f"{name}.bed.gz" for name in laddr_config["regress_modalities"]
+        f"<pantry_output>/{name}.bed.gz" for name in laddr_config["regress_modalities"]
     ]
 
 
 rule bam_to_bigwig:
     """Convert BAM alignments to base-resolution bigWig coverage."""
     input:
-        bam=interm_dir / "bam" / "{sample_id}.bam",
-        bai=interm_dir / "bam" / "{sample_id}.bam.bai",
+        bam="<pantry_intermediate>/bam/{sample_id}.bam",
+        bai="<pantry_intermediate>/bam/{sample_id}.bam.bai",
     output:
         bw=LADDR_BW_DIR / "{sample_id}.bw",
     threads: laddr_config["bam_coverage_threads"]
     params:
-        outdir=LADDR_BW_DIR,
+        outdir=parent_dir,
         bin_size=laddr_config["bam_coverage_bin_size"],
     shell:
         """
@@ -65,7 +70,7 @@ rule laddr_config:
     localrule: True
     params:
         script=script("write_laddr_config.py"),
-        project_dir=LADDR_PROJECT_DIR,
+        project_dir=parent_dir,
         manifest_rel=LADDR_MANIFEST.name,
         min_samples_expressed=laddr_config["min_samples_expressed"],
         binning_method=laddr_config["binning_method"],
@@ -112,7 +117,7 @@ if laddr_config["use_existing_bins"]:
         output:
             ready=LADDR_BINS_READY,
         params:
-            project_dir=LADDR_PROJECT_DIR,
+            project_dir=laddr_project_dir,
             info_dir=laddr_config["existing_info_dir"],
             bins_dir=laddr_config["existing_bins_dir"],
         shell:
@@ -139,7 +144,7 @@ else:
             n_batches=LADDR_PROJECT_DIR / "info" / "n_batches.txt",
             median_covg=LADDR_PROJECT_DIR / "info" / "median_coverage.txt",
         params:
-            project_dir=LADDR_PROJECT_DIR,
+            project_dir=laddr_project_dir,
         shell:
             """
             laddr setup -p {params.project_dir} -c {input.config}
@@ -156,7 +161,7 @@ else:
         output:
             ready=LADDR_BINS_READY,
         params:
-            project_dir=LADDR_PROJECT_DIR,
+            project_dir=laddr_project_dir,
         shell:
             """
             laddr binning -p {params.project_dir} -c {input.config}
@@ -176,7 +181,7 @@ rule laddr_coverage:
     output:
         done=LADDR_COVERAGE_DONE,
     params:
-        project_dir=LADDR_PROJECT_DIR,
+        project_dir=laddr_project_dir,
         dataset=LADDR_DATASET,
     shell:
         """
@@ -193,7 +198,7 @@ rule laddr_fit:
     output:
         done=LADDR_FIT_DONE,
     params:
-        project_dir=LADDR_PROJECT_DIR,
+        project_dir=laddr_project_dir,
     shell:
         """
         laddr fit -p {params.project_dir} -c {input.config}
@@ -212,7 +217,7 @@ rule laddr_transform:
         / "phenotypes"
         / f"latent_phenos.{LADDR_DATASET}.tsv.gz",
     params:
-        project_dir=LADDR_PROJECT_DIR,
+        project_dir=laddr_project_dir,
         dataset=LADDR_DATASET,
     shell:
         """
@@ -228,12 +233,12 @@ rule assemble_latent_bed:
         / f"latent_phenos.{LADDR_DATASET}.tsv.gz",
         ref_anno=ref_anno,
     output:
-        bed=output_dir / "unnorm" / "latent_residual.bed",
+        bed="<pantry_output>/unnorm/latent_residual.bed",
     resources:
         mem_mb=32000,
     params:
         script=script("assemble_bed.py"),
-        unnorm_dir=output_dir / "unnorm",
+        unnorm_dir=parent_dir,
     shell:
         """
         mkdir -p {params.unnorm_dir}
@@ -247,18 +252,19 @@ rule assemble_latent_bed:
 rule normalize_latent:
     """Quantile-normalize latent phenotypes for QTL mapping."""
     input:
-        bed=output_dir / "unnorm" / "latent_residual.bed",
+        bed="<pantry_output>/unnorm/latent_residual.bed",
         samples=samples_file,
     output:
-        output_dir / "latent_residual.bed.gz",
+        "<pantry_output>/latent_residual.bed.gz",
     resources:
         mem_mb=32000,
     params:
         script=script("normalize_phenotypes.py"),
-        bed=output_dir / "latent_residual.bed",
+        bed=bgzip_source,
+        outdir=parent_dir,
     shell:
         """
-        mkdir -p {output_dir}
+        mkdir -p {params.outdir}
         python3 {params.script} \
             --input {input.bed} \
             --samples {input.samples} \
@@ -270,9 +276,9 @@ rule normalize_latent:
 rule pheno_groups_latent:
     """Group latent phenotypes by gene for tensorQTL."""
     input:
-        output_dir / "latent_residual.bed.gz",
+        "<pantry_output>/latent_residual.bed.gz",
     output:
-        output_dir / "latent_residual.phenotype_groups.txt",
+        "<pantry_output>/latent_residual.phenotype_groups.txt",
     localrule: True
     shell:
         """

@@ -11,14 +11,14 @@ rule star_index:
         ref_anno=ref_anno,
     output:
         # Among other generated files:
-        ref_dir / f"star_index_{read_length}" / "SAindex",
-        ref_dir / f"star_index_{read_length}" / "chrNameLength.txt",
+        f"<pantry_reference>/star_index_{read_length}/SAindex",
+        f"<pantry_reference>/star_index_{read_length}/chrNameLength.txt",
     threads: 16
     resources:
         mem_mb=60000,
         runtime="4h",
     params:
-        index_dir=ref_dir / f"star_index_{read_length}",
+        index_dir=parent_dir,
         overhang=read_length - 1,
         genomeSAindexNbases=lambda w: int(np.log2(genome_size(ref_genome)) / 2 - 1),
     shell:
@@ -52,18 +52,18 @@ rule star_align:
     """Align RNA-Seq reads for a sample using STAR."""
     input:
         fastq=fastq_inputs,
-        index=ref_dir / f"star_index_{read_length}" / "SAindex",
+        index=f"<pantry_reference>/star_index_{read_length}/SAindex",
     output:
-        interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
+        "<pantry_intermediate>/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
     threads: 16
     resources:
         mem_mb=60000,
         runtime="8h",
     params:
         fastq_list=fastq_star_param,
-        index_dir=ref_dir / f"star_index_{read_length}",
-        star_out_dir=interm_dir / "star_out",
-        prefix=str(interm_dir / "star_out" / "{sample_id}."),
+        index_dir=lambda w, input: Path(input.index).parent,
+        star_out_dir=parent_dir,
+        prefix=lambda w, output: output[0].removesuffix("Aligned.sortedByCoord.out.bam"),
     shell:
         """
         mkdir -p {params.star_out_dir}
@@ -82,11 +82,11 @@ rule star_align:
 rule shrink_bam:
     """Remove SEQ and QUAL fields from BAM file to reduce size."""
     input:
-        interm_dir / "star_out" / "{sample_id}.Aligned.sortedByCoord.out.bam",
+        "<pantry_intermediate>/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
-        interm_dir / "bam" / "{sample_id}.bam",
+        "<pantry_intermediate>/bam/{sample_id}.bam",
     params:
-        bam_dir=interm_dir / "bam",
+        bam_dir=parent_dir,
     shell:
         """
         mkdir -p {params.bam_dir}
