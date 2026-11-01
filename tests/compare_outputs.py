@@ -69,6 +69,53 @@ def table_noise(a: Path, b: Path, noisy_cols=NOISY_COLS) -> tuple[dict[str, floa
     return noise, n_diff
 
 
+SUMMARY_COLS = ['pval_nominal', 'slope', 'slope_se', 'num_var']
+
+
+def indep_summary(a: Path, b: Path) -> dict:
+    """Summary statistics of two cis_independent tables.
+
+    Returns {stat: (value_a, value_b, deviation, kind)}, kind in count/keys/rel.
+    """
+    da, db = pd.read_csv(a, sep='\t'), pd.read_csv(b, sep='\t')
+    k = ['phenotype_id', 'rank']
+    ka, kb = set(map(tuple, da[k].values)), set(map(tuple, db[k].values))
+    out = {
+        'rows': (len(da), len(db), abs(len(da) - len(db)), 'count'),
+        'distinct phenotype_id': (da.phenotype_id.nunique(), db.phenotype_id.nunique(),
+                                  abs(da.phenotype_id.nunique() - db.phenotype_id.nunique()), 'count'),
+        'key overlap': (len(ka & kb), len(ka & kb), len(ka ^ kb), 'keys'),
+    }
+    m = da.merge(db, on=k, suffixes=('_a', '_b'))
+    m = m[m['variant_id_a'] == m['variant_id_b']]
+    out['same-variant keys'] = (len(m), len(m), 0, 'info')
+    for c in SUMMARY_COLS:
+        rel = ((m[c + '_a'] - m[c + '_b']).abs() / m[c + '_a'].abs().clip(lower=1e-300)).astype(float)
+        mx = float(rel.max()) if len(rel) else 0.0
+        md = float(rel.median()) if len(rel) else 0.0
+        out[f'{c} max rel diff'] = (mx, mx, mx, 'rel')
+        out[f'{c} median rel diff'] = (md, md, md, 'rel')
+    return out
+
+
+def indep_check(summary: dict, noise_summary: dict) -> list[tuple]:
+    """Rows (stat, expected, actual, dev, noise_dev, allowed, ok)."""
+    rows = []
+    for name, (va, vb, dev, kind) in summary.items():
+        nd = noise_summary[name][2]
+        if kind == 'count':
+            allowed = max(2 * nd, 1)
+        elif kind == 'keys':
+            allowed = 2 * nd
+        elif kind == 'rel':
+            allowed = max(2 * nd, 1e-6)
+        else:
+            rows.append((name, va, vb, dev, nd, None, True))
+            continue
+        rows.append((name, va, vb, dev, nd, allowed, dev <= allowed))
+    return rows
+
+
 def _compare_tables(a: Path, b: Path, exact_cols, noisy_cols, noise, rowset_noise=0):
     mism, notes = [], []
     da, db = pd.read_csv(a, sep='\t'), pd.read_csv(b, sep='\t')
@@ -186,7 +233,7 @@ def _files(d: Path) -> set[str]:
     return {str(p.relative_to(d)) for p in d.rglob('*') if p.is_file()}
 
 
-def compare_dirs(expected: Path, actual: Path, noise_dirs=None):
+def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
     """Compare two dirs. Returns (mismatches: {relpath: [msgs]} flattened to list, notes)."""
     expected, actual = Path(expected), Path(actual)
     fe, fa = _files(expected), _files(actual)
@@ -210,7 +257,21 @@ def compare_dirs(expected: Path, actual: Path, noise_dirs=None):
                     noise, rs = table_noise(na, nb)
             if 'independent' not in name:
                 rs = 0
-            msgs, nts = _compare_tables(e, a, exact, noisy, noise, rs)
+            if 'independent' in name:
+                summ = indep_summary(e, a)
+                nsumm = None
+                if noise_dirs is not None and na.exists() and nb.exists():
+                    nsumm = indep_summary(na, nb)
+                    chk = indep_check(summ, nsumm)
+                    msgs = [f'summary {c[0]}: deviation {c[3]:.3g} > allowed {c[5]:.3g} '
+                            f'(noise {c[4]:.3g})' for c in chk if not c[6]]
+                else:
+                    chk = [(n, v[0], v[1], v[2], None, None, True) for n, v in summ.items()]
+                    msgs, nts = _compare_tables(e, a, exact, noisy, noise, rs)
+                if summaries is not None:
+                    summaries.append((r, chk))
+            else:
+                msgs, nts = _compare_tables(e, a, exact, noisy, noise, rs)
         elif name.endswith('.tar.bz2'):
             msgs = _compare_tar(e, a)
         elif name.endswith('.hsq.tsv'):
@@ -230,11 +291,19 @@ def main(argv=None) -> int:
     ap.add_argument('--report', type=Path, required=True)
     ap.add_argument('--noise', nargs=2, type=Path, metavar=('DIR_A', 'DIR_B'))
     args = ap.parse_args(argv)
-    mism, notes = compare_dirs(args.expected, args.actual, args.noise)
+    summaries = []
+    mism, notes = compare_dirs(args.expected, args.actual, args.noise, summaries)
     lines = [f'# Comparison: {args.expected} vs {args.actual}', '',
              f'Noise pair: {" , ".join(map(str, args.noise)) if args.noise else "none"}', '',
              f'## Mismatches ({len(mism)})', ''] + [f'- {m}' for m in mism] + \
             ['', f'## Notes ({len(notes)})', ''] + [f'- {n}' for n in notes] + \
+            ['', '## cis_independent summaries (expected | actual | deviation | noise deviation | allowed | ok)', ''] + \
+            sum([[f'### {r}', '', '| statistic | expected | actual | deviation | noise dev | allowed | ok |',
+                  '|---|---|---|---|---|---|---|'] +
+                 [f'| {c[0]} | {c[1]:.4g} | {c[2]:.4g} | {c[3]:.3g} | '
+                  f'{"-" if c[4] is None else format(c[4], ".3g")} | '
+                  f'{"-" if c[5] is None else format(c[5], ".3g")} | {"yes" if c[6] else "NO"} |' for c in chk] + ['']
+                 for r, chk in summaries], []) + \
             ['', f'**Result: {"MATCH" if not mism else "MISMATCH"}**', '']
     args.report.write_text('\n'.join(lines))
     print('\n'.join(lines))

@@ -127,23 +127,42 @@ def indep(rows):
     return df.drop(columns=['qval', 'pval_nominal_threshold'])
 
 
-def test_cis_independent_rowset_diff_noise_level(tmp_path):
-    name = 'x.cis_independent_qtl.txt.gz'
+IND = 'x.cis_independent_qtl.txt.gz'
+
+
+def test_cis_independent_within_noise_band_passes(tmp_path):
     a = indep([('g1', 1), ('g2', 1)])
-    b = indep([('g1', 1), ('g2', 1), ('g2', 2)])
-    noise = (a, b)  # one differing key
-    mism, notes = run(tmp_path, a, b, noise, name)
+    noise_b = indep([('g1', 1), ('g2', 1), ('g2', 2)])  # 1 differing key
+    actual = indep([('g1', 1), ('g2', 1), ('g3', 1)])  # 1 differing key
+    actual['pval_nominal'] *= 1 + 1e-5  # noise pair has 1e-5 -> allowed 2e-5
+    noise_b['pval_nominal'] *= 1 + 1e-5
+    mism, _ = run(tmp_path, a, actual, (a, noise_b), IND)
     assert mism == []
-    assert any('noise-level row-set difference' in n for n in notes)
 
 
-def test_cis_independent_rowset_diff_too_big_fails(tmp_path):
-    name = 'x.cis_independent_qtl.txt.gz'
+def test_cis_independent_out_of_band_fails(tmp_path):
     a = indep([('g1', 1)])
-    b = indep([('g1', 1), ('g2', 1), ('g2', 2), ('g3', 1)])
-    noise = (a, indep([('g1', 1), ('g2', 1)]))  # 1 differing key; actual has 3
-    mism, _ = run(tmp_path, a, b, noise, name)
-    assert any('row set' in m for m in mism)
+    noise_b = indep([('g1', 1), ('g2', 1)])  # 1 differing key
+    actual = indep([('g1', 1), ('g2', 1), ('g2', 2), ('g3', 1), ('g4', 1)])  # 4 keys
+    mism, _ = run(tmp_path, a, actual, (a, noise_b), IND)
+    assert any('key overlap' in m for m in mism)
+
+
+def test_cis_independent_rel_diff_out_of_band_fails(tmp_path):
+    a = indep([('g1', 1), ('g2', 1)])
+    noise_b = a.copy()
+    noise_b['pval_nominal'] *= 1 + 1e-5
+    actual = a.copy()
+    actual['pval_nominal'] *= 1 + 1e-3
+    mism, _ = run(tmp_path, a, actual, (a, noise_b), IND)
+    assert any('pval_nominal max rel diff' in m for m in mism)
+
+
+def test_cis_independent_identical_noise_pair_is_strict_on_keys(tmp_path):
+    a = indep([('g1', 1)])
+    b = indep([('g1', 1), ('g1', 2)])
+    mism, _ = run(tmp_path, a, b, (a, a), IND)
+    assert any('key overlap' in m for m in mism)
 
 
 def test_cis_independent_rowset_diff_without_noise_fails(tmp_path):
@@ -151,16 +170,6 @@ def test_cis_independent_rowset_diff_without_noise_fails(tmp_path):
     a = indep([('g1', 1)])
     b = indep([('g1', 1), ('g1', 2)])
     mism, _ = run(tmp_path, a, b, None, name)
-    assert any('row set' in m for m in mism)
-
-
-def test_cis_independent_rowset_diff_noise_pair_identical_fails(tmp_path):
-    name = 'x.cis_independent_qtl.txt.gz'
-    a = indep([('g1', 1)])
-    b = indep([('g1', 1), ('g1', 2)])
-    mism, _ = run(tmp_path, a, a, None, name)  # sanity: identical passes
-    assert mism == []
-    mism, _ = run(tmp_path, a, b, (a, a), name)
     assert any('row set' in m for m in mism)
 
 
