@@ -4,9 +4,10 @@ TXREVISE_N_BATCHES = 100
 rule preprocess_gtf_for_txrevise:
     """Preprocess the GTF file for txrevise"""
     input:
-        ref_anno,
+        ref_anno=ref_file("annotation"),
+        anno_ok="<pantry_reference>/{reference}/annotation.ok",
     output:
-        "<pantry_reference>/txrevise/gene_annotations.gtf",
+        "<pantry_reference>/{reference}/txrevise/gene_annotations.gtf",
     resources:
         mem_mb=32000,
     params:
@@ -14,7 +15,7 @@ rule preprocess_gtf_for_txrevise:
     shell:
         """
         python3 {params.script} \
-            --input {input} \
+            --input {input.ref_anno} \
             --output {output}
         """
 
@@ -26,9 +27,9 @@ rule txrevise_extract_tags:
 
     """
     input:
-        "<pantry_reference>/txrevise/gene_annotations.gtf",
+        "<pantry_reference>/{reference}/txrevise/gene_annotations.gtf",
     output:
-        tags="<pantry_reference>/txrevise/transcript_tags.txt",
+        tags="<pantry_reference>/{reference}/txrevise/transcript_tags.txt",
     params:
         script=script("txrevise/extractTranscriptTags.py"),
     shell:
@@ -42,10 +43,10 @@ rule txrevise_extract_tags:
 rule txrevise_prepare_annotations:
     """Prepare annotations"""
     input:
-        gtf="<pantry_reference>/txrevise/gene_annotations.gtf",
-        tags="<pantry_reference>/txrevise/transcript_tags.txt",
+        gtf="<pantry_reference>/{reference}/txrevise/gene_annotations.gtf",
+        tags="<pantry_reference>/{reference}/txrevise/transcript_tags.txt",
     output:
-        "<pantry_reference>/txrevise/txrevise_annotations.rds",
+        "<pantry_reference>/{reference}/txrevise/txrevise_annotations.rds",
     params:
         script=script("txrevise/prepareAnnotations.R"),
     shell:
@@ -60,14 +61,14 @@ rule txrevise_prepare_annotations:
 rule txrevise_construct_events:
     """Construct events for annotations"""
     input:
-        "<pantry_reference>/txrevise/txrevise_annotations.rds",
+        "<pantry_reference>/{reference}/txrevise/txrevise_annotations.rds",
     output:
-        "<pantry_reference>/txrevise/batch/txrevise.grp_1.upstream.{batch}_{n_batches}.gff3",
-        "<pantry_reference>/txrevise/batch/txrevise.grp_2.upstream.{batch}_{n_batches}.gff3",
-        "<pantry_reference>/txrevise/batch/txrevise.grp_1.contained.{batch}_{n_batches}.gff3",
-        "<pantry_reference>/txrevise/batch/txrevise.grp_2.contained.{batch}_{n_batches}.gff3",
-        "<pantry_reference>/txrevise/batch/txrevise.grp_1.downstream.{batch}_{n_batches}.gff3",
-        "<pantry_reference>/txrevise/batch/txrevise.grp_2.downstream.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_1.upstream.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_2.upstream.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_1.contained.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_2.contained.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_1.downstream.{batch}_{n_batches}.gff3",
+        "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_2.downstream.{batch}_{n_batches}.gff3",
     resources:
         runtime="16h",
     params:
@@ -87,12 +88,12 @@ rule txrevise_merge_gff_files:
     """Merge txrevise output files"""
     input:
         gff=expand(
-            "<pantry_reference>/txrevise/batch/txrevise.{{group}}.{{position}}.{batch}_{n_batches}.gff3",
+            "<pantry_reference>/{{reference}}/txrevise/batch/txrevise.{{group}}.{{position}}.{batch}_{n_batches}.gff3",
             batch=[i for i in range(1, TXREVISE_N_BATCHES + 1)],
             n_batches=TXREVISE_N_BATCHES,
         ),
     output:
-        gff="<pantry_reference>/txrevise/txrevise.{group}.{position}.gff3",
+        gff="<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.gff3",
     shell:
         'cat {input.gff} | grep -v "^#" > {output.gff}'
 
@@ -101,13 +102,13 @@ rule txrevise_make_one:
     """Iterate over groups and positions"""
     input:
         gff=expand(
-            "<pantry_reference>/txrevise/txrevise.{group}.{position}.gff3",
+            "<pantry_reference>/{{reference}}/txrevise/txrevise.{group}.{position}.gff3",
             group=["grp_1", "grp_2"],
             position=["upstream", "contained", "downstream"],
         ),
         # metadata = 'processed/{annotation}_{kind}/txrevise_{kind}_phenotype_metadata.tsv.gz'
     output:
-        "<pantry_reference>/txrevise/completed.txt",
+        "<pantry_reference>/{reference}/txrevise/completed.txt",
     shell:
         "echo 'Done!' > {output}"
 
@@ -115,10 +116,10 @@ rule txrevise_make_one:
 rule alt_TSS_polyA_transcript_seqs:
     """Generate transcript sequences from txrevise annotations for kallisto."""
     input:
-        ref_genome=ref_genome,
-        gff3="<pantry_reference>/txrevise/txrevise.{group}.{position}.gff3",
+        ref_genome=ref_file("genome"),
+        gff3="<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.gff3",
     output:
-        "<pantry_reference>/txrevise/txrevise.{group}.{position}.fa.gz",
+        "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.fa.gz",
     shell:
         "gffread {input.gff3} -g {input.ref_genome} -w - | bgzip -c > {output}"
 
@@ -126,24 +127,29 @@ rule alt_TSS_polyA_transcript_seqs:
 rule alt_TSS_polyA_kallisto_index:
     """Generate the index for kallisto using annotations from txrevise."""
     input:
-        "<pantry_reference>/txrevise/txrevise.{group}.{position}.fa.gz",
+        "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.fa.gz",
     output:
-        "<pantry_reference>/txrevise/txrevise.{group}.{position}.idx",
+        "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.idx",
     resources:
         mem_mb=32000,
     shell:
         "kallisto index --index {output} {input}"
 
 
+def txrevise_index(w) -> str:
+    """The txrevise kallisto index of the {dataset}'s reference."""
+    return ref_path(f"txrevise/txrevise.{w.group}.{w.position}.idx")(w)
+
+
 rule alt_TSS_polyA_kallisto:
     """Quantify expression using annotations from txrevise."""
     input:
-        index="<pantry_reference>/txrevise/txrevise.{group}.{position}.idx",
+        index=txrevise_index,
         fastq=fastq_inputs,
     output:
-        h5="<pantry_intermediate>/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.h5",
-        tsv="<pantry_intermediate>/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.tsv",
-        json="<pantry_intermediate>/alt_TSS_polyA/{group}.{position}/{sample_id}/run_info.json",
+        h5="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.h5",
+        tsv="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.tsv",
+        json="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/run_info.json",
     threads: 16
     resources:
         runtime="16h",
@@ -168,15 +174,16 @@ rule assemble_alt_TSS_polyA_bed:
     """Assemble kallisto log2 and tpm outputs into alt TSS/polyA BED files"""
     input:
         kallisto=lambda w: expand(
-            "<pantry_intermediate>/alt_TSS_polyA/grp_{grp}.{position}/{sample_id}/abundance.tsv",
+            "<pantry_intermediate>/{dataset}/alt_TSS_polyA/grp_{grp}.{position}/{sample_id}/abundance.tsv",
             grp=[1, 2],
             position=dict(TSS="upstream", polyA="downstream")[w.type],
-            sample_id=samples,
+            dataset=w.dataset,
+            sample_id=dataset_samples(w.dataset),
         ),
-        samples=samples_file,
-        ref_anno=ref_anno,
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
+        ref_anno=ref_file("annotation"),
     output:
-        "<pantry_output>/unnorm/alt_{type}.bed",
+        "<pantry_output>/{dataset}/unnorm/alt_{type}.bed",
     resources:
         mem_mb=32000,
     params:
@@ -200,10 +207,10 @@ rule assemble_alt_TSS_polyA_bed:
 rule normalize_alt_TSS_polyA:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed="<pantry_output>/unnorm/alt_{type}.bed",
-        samples=samples_file,
+        bed="<pantry_output>/{dataset}/unnorm/alt_{type}.bed",
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
-        "<pantry_output>/alt_{type}.bed.gz",
+        "<pantry_output>/{dataset}/alt_{type}.bed.gz",
     params:
         script=script("normalize_phenotypes.py"),
         bed=bgzip_source,
@@ -222,9 +229,9 @@ rule normalize_alt_TSS_polyA:
 rule pheno_groups_alt_TSS_polyA:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        "<pantry_output>/alt_{type}.bed.gz",
+        "<pantry_output>/{dataset}/alt_{type}.bed.gz",
     output:
-        "<pantry_output>/alt_{type}.phenotype_groups.txt",
+        "<pantry_output>/{dataset}/alt_{type}.phenotype_groups.txt",
     localrule: True
     shell:
         """
