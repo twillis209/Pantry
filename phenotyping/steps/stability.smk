@@ -1,10 +1,16 @@
+def feature_gtf(w) -> str:
+    """The {feature_type} GTF of the {dataset}'s reference."""
+    return ref_path(f"{w.feature_type}.gtf")(w)
+
+
 rule exonic_intronic_from_GTF:
     """Extract exonic and intronic regions from GTF"""
     input:
-        ref_anno=ref_anno,
+        ref_anno=ref_file("annotation"),
+        anno_ok="<pantry_reference>/{reference}/annotation.ok",
     output:
-        exon_gtf="<pantry_reference>/exonic.gtf",
-        intron_gtf="<pantry_reference>/intronic.gtf",
+        exon_gtf="<pantry_reference>/{reference}/exonic.gtf",
+        intron_gtf="<pantry_reference>/{reference}/intronic.gtf",
     params:
         script=script("exonic_intronic_from_gtf.py"),
     shell:
@@ -25,16 +31,16 @@ rule run_featureCounts:
     exon.
     """
     input:
-        bam="<pantry_intermediate>/bam/{sample_id}.bam",
-        gtf="<pantry_reference>/{feature_type}.gtf",
+        bam="<pantry_intermediate>/{dataset}/bam/{sample_id}.bam",
+        gtf=feature_gtf,
     output:
-        "<pantry_intermediate>/stability/{sample_id}.{feature_type}.counts.txt",
+        "<pantry_intermediate>/{dataset}/stability/{sample_id}.{feature_type}.counts.txt",
     threads: 8
     resources:
         runtime="16h",
     params:
         stab_dir=parent_dir,
-        paired_flag=lambda w: "-p" if fastq_map[w.sample_id][1] else "",
+        paired_flag=lambda w: "-p" if is_paired(w) else "",
         feature_id=lambda w: {"exonic": "exon", "intronic": "intron"}[w.feature_type],
         frac_overlap=lambda w: {"exonic": 1, "intronic": 0}[w.feature_type],
         # TODO add strandedness parameter
@@ -55,18 +61,16 @@ rule run_featureCounts:
 rule assemble_stability_bed:
     """Assemble exon to intron read ratios into mRNA stability BED file"""
     input:
-        exon=expand(
-            "<pantry_intermediate>/stability/{sample_id}.exonic.counts.txt",
-            sample_id=samples,
+        exon=per_sample(
+            "<pantry_intermediate>/{dataset}/stability/{sample_id}.exonic.counts.txt"
         ),
-        intron=expand(
-            "<pantry_intermediate>/stability/{sample_id}.intronic.counts.txt",
-            sample_id=samples,
+        intron=per_sample(
+            "<pantry_intermediate>/{dataset}/stability/{sample_id}.intronic.counts.txt"
         ),
-        samples=samples_file,
-        ref_anno=ref_anno,
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
+        ref_anno=ref_file("annotation"),
     output:
-        bed="<pantry_output>/unnorm/stability.bed",
+        bed="<pantry_output>/{dataset}/unnorm/stability.bed",
     resources:
         mem_mb=32000,
     params:
@@ -87,10 +91,10 @@ rule assemble_stability_bed:
 rule normalize_stability:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed="<pantry_output>/unnorm/stability.bed",
-        samples=samples_file,
+        bed="<pantry_output>/{dataset}/unnorm/stability.bed",
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
-        "<pantry_output>/stability.bed.gz",
+        "<pantry_output>/{dataset}/stability.bed.gz",
     params:
         script=script("normalize_phenotypes.py"),
         bed=bgzip_source,

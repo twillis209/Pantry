@@ -1,10 +1,10 @@
 rule regtools_junctions:
     """Run regtools junctions for LeafCutter"""
     input:
-        bam="<pantry_intermediate>/bam/{sample_id}.bam",
-        bai="<pantry_intermediate>/bam/{sample_id}.bam.bai",
+        bam="<pantry_intermediate>/{dataset}/bam/{sample_id}.bam",
+        bai="<pantry_intermediate>/{dataset}/bam/{sample_id}.bam.bai",
     output:
-        "<pantry_intermediate>/splicing/{sample_id}.junc",
+        "<pantry_intermediate>/{dataset}/splicing/{sample_id}.junc",
     params:
         splice_dir=parent_dir,
         min_anchor_len=8,
@@ -27,9 +27,9 @@ rule regtools_junctions:
 rule cluster_junctions:
     """Cluster splice junctions with common boundaries"""
     input:
-        expand("<pantry_intermediate>/splicing/{sample_id}.junc", sample_id=samples),
+        per_sample("<pantry_intermediate>/{dataset}/splicing/{sample_id}.junc"),
     output:
-        "<pantry_intermediate>/splicing/leafcutter_perind_numers.counts.gz",
+        "<pantry_intermediate>/{dataset}/splicing/leafcutter_perind_numers.counts.gz",
     params:
         script=script("leafcutter_cluster_regtools_py3.py"),
         juncfile_list=lambda w, output: str(Path(output[0]).parent / "juncfiles.txt"),
@@ -52,10 +52,10 @@ rule cluster_junctions:
 rule assemble_splicing_bed:
     """Convert leafcutter output into splicing BED file"""
     input:
-        counts="<pantry_intermediate>/splicing/leafcutter_perind_numers.counts.gz",
-        ref_anno=ref_anno,
+        counts="<pantry_intermediate>/{dataset}/splicing/leafcutter_perind_numers.counts.gz",
+        ref_anno=ref_file("annotation"),
     output:
-        bed="<pantry_output>/unnorm/splicing.bed",
+        bed="<pantry_output>/{dataset}/unnorm/splicing.bed",
     resources:
         mem_mb=32000,
     params:
@@ -74,10 +74,10 @@ rule assemble_splicing_bed:
 rule normalize_splicing:
     """Quantile-normalize values for QTL mapping"""
     input:
-        bed="<pantry_output>/unnorm/splicing.bed",
-        samples=samples_file,
+        bed="<pantry_output>/{dataset}/unnorm/splicing.bed",
+        samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
-        "<pantry_output>/splicing.bed.gz",
+        "<pantry_output>/{dataset}/splicing.bed.gz",
     resources:
         mem_mb=32000,
     params:
@@ -98,9 +98,9 @@ rule normalize_splicing:
 rule pheno_groups_splicing:
     """Group phenotypes by gene for tensorQTL"""
     input:
-        "<pantry_output>/splicing.bed.gz",
+        "<pantry_output>/{dataset}/splicing.bed.gz",
     output:
-        "<pantry_output>/splicing.phenotype_groups.txt",
+        "<pantry_output>/{dataset}/splicing.phenotype_groups.txt",
     localrule: True
     shell:
         """
