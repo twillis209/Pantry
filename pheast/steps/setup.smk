@@ -3,6 +3,39 @@
 It validates and processes the configuration and sets global variables.
 """
 
+import importlib.util
+
+
+def _load_source(name: str, rel_path: str):
+    """Import a bundled Python file by path, so it also works for a remote module."""
+    spec = importlib.util.spec_from_file_location(
+        name, str(workflow.source_path(rel_path))
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+twas_batch_ranges = _load_source(
+    "pantry_pheast_twas_batches", "../scripts/twas_batches.py"
+).batch_ranges
+
+
+def script(name: str):
+    """Params callable giving the path to a bundled script.
+
+    source_path returns a per-process cache path, so it is wrapped in a
+    callable taking input: such derived params are excluded from the params
+    rerun trigger.
+    """
+    path = workflow.source_path(f"../scripts/{name}")
+    return lambda wildcards, input: path
+
+
+def parent_dir(w, output) -> str:
+    """Directory of a rule's first output, e.g. for mkdir -p in params."""
+    return str(Path(output[0]).parent)
+
 
 def validate_config(config: dict):
     """Validate the configuration"""
@@ -49,9 +82,6 @@ def process_config(config: dict):
         config["samples_file"], sep="\t", header=None, dtype=str
     )[0].tolist()
 
-    if "intermediate_dir" not in config:
-        config["intermediate_dir"] = "intermediate"
-
     if "qtl_min_allele_count" not in config:
         config["qtl_min_allele_count"] = 10
     config["qtl_min_allele_count"] = int(config["qtl_min_allele_count"])
@@ -75,9 +105,17 @@ def process_config(config: dict):
 validate_config(config)
 process_config(config)
 
+
+# The legacy intermediate_dir key overrides the Snakefile's default pathvars;
+# this registers after them, so it wins.
+if "intermediate_dir" in config:
+
+    pathvars:
+        pantry_intermediate=config["intermediate_dir"],
+        pantry_resources=f"{config['intermediate_dir']}/resources",
+
+
 pheno_dir = Path(config["phenotype_dir"])
-interm_dir = Path(config["intermediate_dir"])
-output_dir = Path("output")
 geno_prefix = config["geno_prefix"]
 
 samples = config["samples"]
@@ -99,9 +137,11 @@ analyses = config["analyses"]
 outputs = []
 for analysis, params in analyses.items():
     if analysis == "qtl":
-        outputs.append(output_dir / analysis / "genotype_qc.tsv")
+        outputs.append(f"<pantry_output>/{analysis}/genotype_qc.tsv")
     for f in params["files"]:
-        outputs.append(expand(output_dir / analysis / f, modality=modalities.keys()))
+        outputs.append(
+            expand(f"<pantry_output>/{analysis}/{f}", modality=modalities.keys())
+        )
 
 qtl_min_allele_count = config["qtl_min_allele_count"]
 qtl_maf_threshold = config.get("qtl_maf_threshold")

@@ -1,9 +1,5 @@
-localrules:
-    twas_pos_file,
-
-
 twas_geno_prefix = (
-    interm_dir / "twas" / "geno" if "twas_snps" in config else geno_prefix
+    "<pantry_intermediate>/twas/geno" if "twas_snps" in config else geno_prefix
 )
 twas_snps = Path(config["twas_snps"]) if "twas_snps" in config else ""
 
@@ -19,10 +15,10 @@ rule twas_geno:
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
         snps=twas_snps,
     output:
-        multiext(str(interm_dir / "twas" / "geno"), ".bed", ".bim", ".fam"),
+        multiext("<pantry_intermediate>/twas/geno", ".bed", ".bim", ".fam"),
     params:
         in_geno_prefix=geno_prefix,
-        out_geno_prefix=interm_dir / "twas" / "geno",
+        out_geno_prefix=lambda w, output: output[0].removesuffix(".bed"),
     shell:
         """
         plink \
@@ -37,24 +33,25 @@ rule twas_compute_weights_batch:
     """Use FUSION to compute TWAS weights from expression and genotypes.
 
     Outputs also include the actual weights
-    ('{interm_dir}/twas/{modality}/{gene}.wgt.RDat'), but the genes for
+    ('<pantry_intermediate>/twas/{modality}/{gene}.wgt.RDat'), but the genes for
     which we end up with outputs are not known until the rule is run.
     """
     input:
         geno=multiext(str(twas_geno_prefix), ".bed", ".bim", ".fam"),
         bed=pheno_dir / "{modality}.bed.gz",
-        covar=interm_dir / "covar" / "{modality}.covar.plink.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
     output:
-        interm_dir / "twas" / "status_{modality}" / "{batch_start}_{batch_end}.tsv",
+        "<pantry_intermediate>/twas/status_{modality}/{batch_start}_{batch_end}.tsv",
     threads: config["twas_threads"]
     resources:
         runtime="8h",
     params:
-        twas_geno_prefix=twas_geno_prefix,
-        twas_interm_dir=interm_dir / "twas",
+        script=script("fit_twas_weights.py"),
+        twas_geno_prefix=lambda w, input: input.geno[0].removesuffix(".bed"),
+        twas_interm_dir=lambda w, output: str(Path(output[0]).parent.parent),
     shell:
         """
-        python scripts/fit_twas_weights.py \
+        python {params.script} \
             --geno {params.twas_geno_prefix} \
             --bed {input.bed} \
             --covar {input.covar} \
@@ -75,7 +72,7 @@ def twas_batch_status_input(wildcards):
     if n_models < 1:
         raise ValueError(f"No TWAS models found for modality {wildcards.modality}")
     for start, end in twas_batch_ranges(n_models, config["twas_models_per_job"]):
-        yield interm_dir / "twas" / f"status_{wildcards.modality}" / f"{start}_{end}.tsv"
+        yield f"<pantry_intermediate>/twas/status_{wildcards.modality}/{start}_{end}.tsv"
 
 
 rule twas_assemble_summary:
@@ -87,21 +84,22 @@ rule twas_assemble_summary:
     input:
         status=twas_batch_status_input,
     output:
-        file_list=interm_dir / "twas" / "{modality}.list",
-        profile=interm_dir / "twas" / "{modality}.profile",
-        summary=interm_dir / "twas" / "{modality}.profile.err",
+        file_list="<pantry_intermediate>/twas/{modality}.list",
+        profile="<pantry_intermediate>/twas/{modality}.profile",
+        summary="<pantry_intermediate>/twas/{modality}.profile.err",
     params:
-        twas_interm_dir=interm_dir / "twas",
+        script=script("assemble_twas_weight_list.py"),
+        # An absolute path, as the shell changes into the intermediate dir:
+        profile_script=script("fusion_twas/utils/FUSION.profile_wgt.R"),
+        twas_interm_dir=lambda w, output: str(Path(output.file_list).parent),
     shell:
         """
-        # Avoid using relative path in case intermediate dir is a symlink:
-        scripts_dir="$(realpath scripts)"
-        python scripts/assemble_twas_weight_list.py \
+        python {params.script} \
             --status {input.status} \
             --weights-dir {params.twas_interm_dir} \
             --output {output.file_list}
         cd {params.twas_interm_dir}
-        Rscript $scripts_dir/fusion_twas/utils/FUSION.profile_wgt.R \
+        Rscript {params.profile_script} \
             {wildcards.modality}.list \
             >{wildcards.modality}.profile \
             2>{wildcards.modality}.profile.err
@@ -110,10 +108,11 @@ rule twas_assemble_summary:
 
 rule twas_pos_file:
     input:
-        file_list=interm_dir / "twas" / "{modality}.list",
+        file_list="<pantry_intermediate>/twas/{modality}.list",
         bed=pheno_dir / "{modality}.bed.gz",
     output:
-        pos_file=interm_dir / "twas" / "{modality}.pos",
+        pos_file="<pantry_intermediate>/twas/{modality}.pos",
+    localrule: True
     params:
         n_samples=len(samples),
     shell:
@@ -136,15 +135,15 @@ rule twas_compress_output:
     http://gusevlab.org/projects/fusion/#single-tissue-gene-expression
     """
     input:
-        file_list=interm_dir / "twas" / "{modality}.list",
-        profile=interm_dir / "twas" / "{modality}.profile",
-        summary=interm_dir / "twas" / "{modality}.profile.err",
-        pos_file=interm_dir / "twas" / "{modality}.pos",
+        file_list="<pantry_intermediate>/twas/{modality}.list",
+        profile="<pantry_intermediate>/twas/{modality}.profile",
+        summary="<pantry_intermediate>/twas/{modality}.profile.err",
+        pos_file="<pantry_intermediate>/twas/{modality}.pos",
     output:
-        output_dir / "twas" / "{modality}.tar.bz2",
+        "<pantry_output>/twas/{modality}.tar.bz2",
     params:
-        twas_interm_dir=interm_dir / "twas",
-        twas_output_dir=output_dir / "twas",
+        twas_interm_dir=lambda w, input: str(Path(input.file_list).parent),
+        twas_output_dir=parent_dir,
     shell:
         """
         mkdir -p {params.twas_output_dir}

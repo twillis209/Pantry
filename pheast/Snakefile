@@ -1,10 +1,27 @@
 import gzip
 from pathlib import Path
 import pandas as pd
-from scripts.twas_batches import batch_ranges as twas_batch_ranges
+from snakemake.utils import min_version
+
+min_version("9.12")
 
 
 configfile: "config.yml"
+
+
+# Output roots. A host workflow importing this one as a module can override them.
+pathvars:
+    pantry_output="output",
+    pantry_intermediate="intermediate",
+    pantry_resources="intermediate/resources",
+
+
+wildcard_constraints:
+    modality="[^/]+",
+    chrom="[^/]+",
+    batch="[^/]+",
+    batch_start=r"\d+",
+    batch_end=r"\d+",
 
 
 # This code validates and processes the configuration and sets global variables:
@@ -14,9 +31,10 @@ include: "steps/setup.smk"
 # These are the target files to be generated (or regenerated if outdated).
 # By default it includes all output files specified in the config file.
 rule all:
+    default_target: True
     input:
         outputs,
-        # expand(interm_dir / 'covar' / '{pheno}.covar.tsv', pheno=phenotypes.keys()),
+        # expand('<pantry_intermediate>/covar/{pheno}.covar.tsv', pheno=phenotypes.keys()),
 
 
 include: "steps/covariates.smk"

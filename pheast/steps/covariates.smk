@@ -1,7 +1,3 @@
-localrules:
-    plink_covariates,
-
-
 rule prune_for_covar:
     """Prune genotypes to compute covariate PCs.
     --indep-pairwise parameters are based on GTEx methods.
@@ -9,11 +5,11 @@ rule prune_for_covar:
     input:
         multiext(geno_prefix, ".bed", ".bim", ".fam"),
     output:
-        multiext(str(interm_dir / "covar" / "geno_pruned"), ".bed", ".bim", ".fam"),
+        multiext("<pantry_intermediate>/covar/geno_pruned", ".bed", ".bim", ".fam"),
     params:
         geno_prefix=geno_prefix,
-        pruned_dir=interm_dir / "covar",
-        pruned_prefix=interm_dir / "covar" / "geno_pruned",
+        pruned_dir=parent_dir,
+        pruned_prefix=lambda w, output: output[0].removesuffix(".bed"),
     shell:
         # --geno 0.05 filters variants with >5% missing values (the rest will be imputed).
         # Default is 0 so that samples with many more genotyped variants than others don't
@@ -37,19 +33,20 @@ rule prune_for_covar:
 rule covariates:
     """Compute genotype and expression PCs and combine."""
     input:
-        geno=multiext(str(interm_dir / "covar" / "geno_pruned"), ".bed", ".bim", ".fam"),
+        geno=multiext("<pantry_intermediate>/covar/geno_pruned", ".bed", ".bim", ".fam"),
         bed=pheno_dir / "{modality}.bed.gz",
     output:
-        interm_dir / "covar" / "{modality}.covar.tsv",
+        "<pantry_intermediate>/covar/{modality}.covar.tsv",
     resources:
         mem_mb=32000,
     params:
-        pruned_prefix=interm_dir / "covar" / "geno_pruned",
+        script=script("covariates.R"),
+        pruned_prefix=lambda w, input: input.geno[0].removesuffix(".bed"),
         n_geno_pcs=5,
         n_pheno_pcs=20,
     shell:
         """
-        Rscript scripts/covariates.R \
+        Rscript {params.script} \
             {params.pruned_prefix} \
             {input.bed} \
             {params.n_geno_pcs} \
@@ -61,10 +58,11 @@ rule covariates:
 rule plink_covariates:
     """Convert covariates to PLINK format."""
     input:
-        covar=interm_dir / "covar" / "{modality}.covar.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
         fam=f"{geno_prefix}.fam",
     output:
-        plink=interm_dir / "covar" / "{modality}.covar.plink.tsv",
+        plink="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
+    localrule: True
     run:
         covar = pd.read_csv(input.covar, sep="\t", index_col=0, dtype=str)
         covar.index.name = None

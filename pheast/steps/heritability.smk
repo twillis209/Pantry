@@ -8,21 +8,26 @@ rule calculate_heritability_chr_batch:
     input:
         bed=pheno_dir / "{modality}.bed.gz",
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
-        covar=interm_dir / "covar" / "{modality}.covar.plink.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
     output:
-        hsq=interm_dir / "heritability" / "{modality}.hsq.{chrom}.batch{batch}.tsv",
+        hsq="<pantry_intermediate>/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
     resources:
         mem_mb=8000,
         runtime="24h",
     params:
+        script=script("heritability.py"),
         geno_prefix=geno_prefix,
-        grm_dir=str(interm_dir / "heritability" / "grm_{modality}_{chrom}"),
-        tmp_dir=str(interm_dir / "heritability" / "tmp_{modality}_{chrom}"),
+        grm_dir=lambda w, output: str(
+            Path(output.hsq).parent / f"grm_{w.modality}_{w.chrom}"
+        ),
+        tmp_dir=lambda w, output: str(
+            Path(output.hsq).parent / f"tmp_{w.modality}_{w.chrom}"
+        ),
     shell:
         """
         mkdir -p {params.grm_dir}
         mkdir -p {params.tmp_dir}
-        python3 scripts/heritability.py \
+        python3 {params.script} \
             --bed {input.bed} \
             --geno {params.geno_prefix} \
             --covar {input.covar} \
@@ -38,15 +43,15 @@ rule combine_heritability_chr:
     """Combine per-chromosome heritability stats into one file"""
     input:
         lambda w: expand(
-            interm_dir / "heritability" / "{modality}.hsq.{chrom}.batch{batch}.tsv",
+            "<pantry_intermediate>/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
             modality=w.modality,
             chrom=config["modalities"][w.modality]["chroms"],
             batch=range(10),
         ),
     output:
-        hsq=output_dir / "heritability" / "{modality}.hsq.tsv",
+        hsq="<pantry_output>/heritability/{modality}.hsq.tsv",
     params:
-        hsq_dir=output_dir / "heritability",
+        hsq_dir=parent_dir,
     shell:
         """
         mkdir -p {params.hsq_dir}

@@ -27,15 +27,16 @@ rule qtl_genotype_qc:
     input:
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
     output:
-        output_dir / "qtl" / "genotype_qc.tsv",
+        "<pantry_output>/qtl/genotype_qc.tsv",
     params:
+        script=script("genotype_qc.py"),
         geno_prefix=geno_prefix,
-        qtl_dir=output_dir / "qtl",
+        qtl_dir=parent_dir,
         filter_args=qtl_filter_args,
     shell:
         """
         mkdir -p {params.qtl_dir}
-        python3 scripts/genotype_qc.py \
+        python3 {params.script} \
             {params.geno_prefix} \
             {output} \
             {params.filter_args}
@@ -50,16 +51,17 @@ rule tensorqtl_cis:
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
         bed=pheno_dir / "{modality}.bed.gz",
         bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar=interm_dir / "covar" / "{modality}.covar.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
         groups=groups_input,
     output:
-        output_dir / "qtl" / "{modality}.cis_qtl.txt.gz",
+        "<pantry_output>/qtl/{modality}.cis_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="12h",
     params:
+        script=script("run_tensorqtl.py"),
         geno_prefix=geno_prefix,
-        qtl_dir=output_dir / "qtl",
+        qtl_dir=parent_dir,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
     shell:
@@ -67,7 +69,7 @@ rule tensorqtl_cis:
         # module load cuda
         """
         mkdir -p {params.qtl_dir}
-        python3 scripts/run_tensorqtl.py \
+        python3 {params.script} \
             {params.geno_prefix} \
             {input.bed} \
             {output} \
@@ -84,15 +86,16 @@ rule tensorqtl_cis_independent:
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
         bed=pheno_dir / "{modality}.bed.gz",
         bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar=interm_dir / "covar" / "{modality}.covar.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
         groups=groups_input,
-        cis=output_dir / "qtl" / "{modality}.cis_qtl.txt.gz",
+        cis="<pantry_output>/qtl/{modality}.cis_qtl.txt.gz",
     output:
-        output_dir / "qtl" / "{modality}.cis_independent_qtl.txt.gz",
+        "<pantry_output>/qtl/{modality}.cis_independent_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="20h",
     params:
+        script=script("run_tensorqtl.py"),
         geno_prefix=geno_prefix,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
@@ -100,7 +103,7 @@ rule tensorqtl_cis_independent:
         ## Cluster environments may require cuda to be loaded, e.g.:
         # module load cuda
         """
-        python3 scripts/run_tensorqtl.py \
+        python3 {params.script} \
             {params.geno_prefix} \
             {input.bed} \
             {output} \
@@ -121,22 +124,23 @@ rule tensorqtl_trans:
         geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
         bed=pheno_dir / "{modality}.bed.gz",
         bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar=interm_dir / "covar" / "{modality}.covar.tsv",
+        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
     output:
-        output_dir / "qtl" / "{modality}.trans_qtl.txt.gz",
+        "<pantry_output>/qtl/{modality}.trans_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="12h",
     params:
+        script=script("run_tensorqtl.py"),
         geno_prefix=geno_prefix,
-        qtl_dir=output_dir / "qtl",
+        qtl_dir=parent_dir,
         filter_args=qtl_filter_args,
     shell:
         ## Cluster environments may require cuda to be loaded, e.g.:
         # module load cuda
         """
         mkdir -p {params.qtl_dir}
-        python3 scripts/run_tensorqtl.py \
+        python3 {params.script} \
             {params.geno_prefix} \
             {input.bed} \
             {output} \
