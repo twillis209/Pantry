@@ -1,7 +1,7 @@
 twas_geno_prefix = (
-    "<pantry_intermediate>/twas/geno" if "twas_snps" in config else geno_prefix
+    "<pantry_intermediate>/twas/geno" if "twas_snps" in DS else geno_prefix
 )
-twas_snps = Path(config["twas_snps"]) if "twas_snps" in config else ""
+twas_snps = Path(DS["twas_snps"]).expanduser() if "twas_snps" in DS else ""
 
 
 def twas_model_count(modality):
@@ -42,7 +42,7 @@ rule twas_compute_weights_batch:
         covar="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
     output:
         "<pantry_intermediate>/twas/status_{modality}/{batch_start}_{batch_end}.tsv",
-    threads: config["twas_threads"]
+    threads: DS["twas_threads"]
     resources:
         runtime="8h",
     params:
@@ -71,7 +71,7 @@ def twas_batch_status_input(wildcards):
     n_models = twas_model_count(wildcards.modality)
     if n_models < 1:
         raise ValueError(f"No TWAS models found for modality {wildcards.modality}")
-    for start, end in twas_batch_ranges(n_models, config["twas_models_per_job"]):
+    for start, end in twas_batch_ranges(n_models, DS["twas_models_per_job"]):
         yield f"<pantry_intermediate>/twas/status_{wildcards.modality}/{start}_{end}.tsv"
 
 

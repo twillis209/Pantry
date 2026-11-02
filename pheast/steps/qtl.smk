@@ -16,10 +16,12 @@ def groups_input(wildcards):
 
 def qtl_filter_args(wildcards):
     """Pass QTL genotype filter settings to tensorQTL wrapper scripts."""
-    args = f"--min_allele_count {qtl_min_allele_count}"
-    if qtl_maf_threshold is not None:
-        args += f" --maf_threshold {qtl_maf_threshold}"
-    return args
+    return pantry_config.qtl_filter_args(DS)
+
+
+def genotype_qc_filter_args(wildcards):
+    """The same filter settings for genotype_qc.py, which takes no --window."""
+    return pantry_config.qtl_filter_args(DS, window=False)
 
 
 rule qtl_genotype_qc:
@@ -32,7 +34,7 @@ rule qtl_genotype_qc:
         script=script("genotype_qc.py"),
         geno_prefix=geno_prefix,
         qtl_dir=parent_dir,
-        filter_args=qtl_filter_args,
+        filter_args=genotype_qc_filter_args,
     shell:
         """
         mkdir -p {params.qtl_dir}

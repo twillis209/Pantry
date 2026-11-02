@@ -1,0 +1,89 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+description: >-
+  Pantry Pheast config, after normalisation (legacy single-dataset configs are
+  wrapped as dataset 'default' before validation). Defaults are scalars only:
+  snakemake.utils.validate inserts the schema's own default object, which would
+  be shared between datasets if it were mutable.
+type: object
+required: [datasets]
+properties:
+  defaults:
+    type: object
+    description: Deep-merged under every dataset before validation.
+  datasets:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/dataset"}
+  legacy_pathvars:
+    type: object
+    description: Set by the shim from a legacy intermediate_dir.
+    additionalProperties: {type: string}
+  fusion_dir:
+    type: string
+    description: >-
+      Optional directory holding FUSION.compute_weights.R and
+      utils/FUSION.profile_wgt.R, overriding the bundled copy.
+  gcta:
+    type: string
+    description: Optional gcta binary for FUSION, overriding the bundled gcta_nr_robust.
+
+$defs:
+  dataset:
+    type: object
+    required: [phenotype_dir, geno_prefix, samples, modalities, analyses]
+    properties:
+      phenotype_dir:
+        type: string
+        description: Directory containing {modality}.bed.gz phenotype tables.
+      geno_prefix:
+        type: string
+        description: PLINK 1 genotype prefix (.bed/.bim/.fam).
+      samples:
+        description: >-
+          Sample IDs, or path to a one-column file. Used for the genotype check
+          and N in the TWAS .pos file; it does not subset the analysis.
+        oneOf:
+          - {type: array, items: {type: string}}
+          - {type: string}
+      modalities:
+        type: object
+        additionalProperties:
+          type: object
+          required: [grouped]
+          properties:
+            grouped:
+              type: boolean
+              description: Whether {modality}.phenotype_groups.txt exists and is used.
+      analyses:
+        type: object
+        propertyNames: {enum: [qtl, heritability, twas]}
+        additionalProperties:
+          type: object
+          required: [files]
+          properties:
+            files:
+              type: array
+              items: {type: string}
+              description: Output file patterns containing {modality}.
+      qtl_min_allele_count:
+        type: integer
+        default: 10
+      qtl_maf_threshold:
+        type: [number, "null"]
+        description: Fixed MAF threshold, overriding qtl_min_allele_count.
+      qtl_cis_window:
+        type: [integer, "null"]
+        description: >-
+          cis-window size passed to run_tensorqtl.py --window. No default here:
+          when unset, run_tensorqtl.py's own default (1000000) applies.
+      twas_snps:
+        type: string
+        description: SNP IDs to keep for TWAS weights (e.g. the LD reference panel's).
+      twas_models_per_job:
+        type: integer
+        minimum: 1
+        default: 200
+      twas_threads:
+        type: integer
+        minimum: 1
+        default: 4

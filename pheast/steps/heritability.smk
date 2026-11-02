@@ -45,7 +45,7 @@ rule combine_heritability_chr:
         lambda w: expand(
             "<pantry_intermediate>/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
             modality=w.modality,
-            chrom=config["modalities"][w.modality]["chroms"],
+            chrom=modality_chroms[w.modality],
             batch=range(10),
         ),
     output:
