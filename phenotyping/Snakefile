@@ -89,6 +89,7 @@ include: "steps/alt_TSS_polyA.smk"
 include: "steps/RNA_editing.smk"
 include: "steps/intron_retention.smk"
 include: "steps/laddr.smk"
+include: "steps/cross_modality.smk"
 
 
 ## Additional general rules
@@ -114,6 +115,9 @@ rule index_bed:
         "<pantry_output>/{dataset}/{pheno}.bed.gz",
     output:
         "<pantry_output>/{dataset}/{pheno}.bed.gz.tbi",
+    wildcard_constraints:
+        # cross_modality.bed.gz.tbi is written by combine_modalities.
+        pheno="(?!cross_modality\.bed)[^/]+",
     localrule: True
     shell:
         "tabix {input}"

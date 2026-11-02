@@ -3,6 +3,10 @@
 ## for special downstream analyses such as QTL mapping that reports
 ## conditionally independent QTLs per gene even across modalities.
 ##
+## The pipeline does this per dataset via the combine_modalities rule
+## (steps/cross_modality.smk) when a dataset sets cross_modality.modalities;
+## this script is the manual equivalent.
+##
 ## Usage: bash scripts/combine_modalities.sh alt_polyA alt_TSS expression intron_retention isoforms RNA_editing splicing stability
 ##
 ## Outputs: output/cross_modality.bed.gz, output/cross_modality.bed.gz.tbi, output/cross_modality.phenotype_groups.txt

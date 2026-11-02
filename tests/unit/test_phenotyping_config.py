@@ -283,6 +283,15 @@ def test_regress_modalities_validated_and_defaulted():
         cfg.normalise(new_config(laddr={"regress_modalities": "expression"}))
 
 
+def test_cross_modality_modalities_validated():
+    ok = cfg.normalise(new_config(cross_modality={"modalities": ["expression"]}))
+    assert ok["datasets"]["d1"]["cross_modality"]["modalities"] == ["expression"]
+    with pytest.raises(ValueError, match="cross_modality"):
+        cfg.normalise(new_config(cross_modality={"modalities": ["splicing"]}))
+    with pytest.raises(ValueError, match="cross_modality"):
+        cfg.normalise(new_config(cross_modality={"modalities": "expression"}))
+
+
 def test_existing_bins_require_dirs():
     with pytest.raises(ValueError, match="existing_info_dir"):
         cfg.normalise(new_config(laddr={"use_existing_bins": True}))

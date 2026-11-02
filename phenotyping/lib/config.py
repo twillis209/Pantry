@@ -129,6 +129,20 @@ def _check_dataset(name: str, ds: dict, references: dict):
             "needs edit_sites_bed"
         )
 
+    cross = ds.get("cross_modality")
+    if cross is not None:
+        mods = cross.get("modalities") if isinstance(cross, dict) else None
+        if not isinstance(mods, list) or any(not isinstance(x, str) for x in mods):
+            raise ValueError(
+                f"datasets.{name}.cross_modality.modalities must be a list of strings"
+            )
+        invalid = sorted(set(mods) - set(available_modalities(groups)))
+        if invalid:
+            raise ValueError(
+                f"datasets.{name}.cross_modality.modalities contains modalities "
+                "without a BED output: " + ", ".join(invalid)
+            )
+
     laddr = ds.get("laddr")
     if isinstance(laddr, dict):
         if "regress_modalities" not in laddr:

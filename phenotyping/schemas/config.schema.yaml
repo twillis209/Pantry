@@ -98,7 +98,7 @@ $defs:
         type: object
         required: [modalities]
         properties:
-          modalities: {type: array, items: {type: string}}
+          modalities: {type: array, items: {type: string}, minItems: 1}
       laddr: {$ref: "#/$defs/laddr"}
     if:
       properties:
