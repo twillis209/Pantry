@@ -97,14 +97,9 @@ def pheno_file(suffix: str):
 pheno_bed = pheno_file(".bed.gz")
 
 
-# Transitional: parse-time reads, which later become jobs.
-modality_chroms = {}
-for _name, _ds in CONFIG["datasets"].items():
-    for modality in _ds["modalities"]:
-        chroms = pd.read_csv(
-            Path(_ds["phenotype_dir"]).expanduser() / f"{modality}.bed.gz",
-            sep="\t",
-            usecols=[0],
-            dtype=str,
-        )
-        modality_chroms[(_name, modality)] = chroms.iloc[:, 0].unique().tolist()
+def phenotype_summary(w) -> tuple:
+    """(chroms, n_models) of the {dataset}'s {modality} BED, from the checkpoint."""
+    summary = checkpoints.phenotype_summary.get(
+        dataset=w.dataset, modality=w.modality
+    ).output[0]
+    return pantry_config.read_phenotype_summary(summary)

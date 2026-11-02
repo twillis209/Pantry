@@ -173,3 +173,37 @@ def check_genotype_samples(samples: list, fam_path) -> None:
     missing_samples = [s for s in samples if s not in geno_samples]
     if len(missing_samples) > 0:
         raise Exception(f"Samples missing from genotypes: {missing_samples}")
+
+
+def phenotype_summary(bed_path) -> tuple:
+    """Chromosomes (unique, in file order) and phenotype count of a BED.
+
+    The two reads are upstream's: the parse-time chromosome read for
+    heritability and twas_model_count for TWAS batches.
+    """
+    import gzip
+
+    import pandas as pd
+
+    chroms = pd.read_csv(bed_path, sep="\t", usecols=[0], dtype=str)
+    with gzip.open(bed_path, "rt") as handle:
+        n_models = sum(1 for _ in handle) - 1
+    return chroms.iloc[:, 0].unique().tolist(), n_models
+
+
+def write_phenotype_summary(bed_path, out_path) -> None:
+    """Write a BED's summary as a TSV with columns chroms (comma-joined), n_models."""
+    chroms, n_models = phenotype_summary(bed_path)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(f"chroms\tn_models\n{','.join(chroms)}\t{n_models}\n")
+
+
+def read_phenotype_summary(path) -> tuple:
+    """(chroms, n_models) from a file written by write_phenotype_summary."""
+    with open(path) as f:
+        header, row = f.read().splitlines()
+    if header != "chroms\tn_models":
+        raise ValueError(f"Unexpected phenotype summary header in {path}")
+    chroms, n_models = row.split("\t")
+    return (chroms.split(",") if chroms else []), int(n_models)

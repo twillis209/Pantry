@@ -1,8 +1,3 @@
-def twas_model_count(w) -> int:
-    with gzip.open(pheno_bed(w), "rt") as handle:
-        return sum(1 for _ in handle) - 1
-
-
 def twas_snps(w) -> str:
     """Input function: the {dataset}'s twas_snps file."""
     return str(Path(ds(w)["twas_snps"]).expanduser())
@@ -83,7 +78,7 @@ rule twas_compute_weights_batch:
 
 def twas_batch_status_input(wildcards):
     """Get the status files for all model-sized TWAS batches."""
-    n_models = twas_model_count(wildcards)
+    _, n_models = phenotype_summary(wildcards)
     if n_models < 1:
         raise ValueError(f"No TWAS models found for modality {wildcards.modality}")
     for start, end in twas_batch_ranges(n_models, ds(wildcards)["twas_models_per_job"]):

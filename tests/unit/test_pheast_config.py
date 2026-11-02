@@ -341,3 +341,49 @@ def test_check_genotype_samples_upstream_message(tmp_path):
     with pytest.raises(Exception) as e:
         cfg.check_genotype_samples(["a", "b", "007", "c"], fam)
     assert str(e.value) == "Samples missing from genotypes: ['b', 'c']"
+
+
+def write_bed_gz(path, rows):
+    import gzip
+
+    with gzip.open(path, "wt") as f:
+        f.write("#chr\tstart\tend\tphenotype_id\ts1\n")
+        for chrom, i in rows:
+            f.write(f"{chrom}\t{i}\t{i + 1}\tp{i}\t0.5\n")
+
+
+def test_phenotype_summary_round_trip(tmp_path):
+    bed = tmp_path / "m.bed.gz"
+    write_bed_gz(bed, [("chr2", 1), ("chr10", 2), ("chr2", 3), ("1", 4)])
+    out = tmp_path / "summary" / "m.tsv"
+    cfg.write_phenotype_summary(bed, out)
+    assert out.read_text() == "chroms\tn_models\nchr2,chr10,1\t4\n"
+    chroms, n_models = cfg.read_phenotype_summary(out)
+    assert chroms == ["chr2", "chr10", "1"]  # file order, strings
+    assert n_models == 4
+
+
+@pytest.mark.skipif(
+    not list((PHEAST / "input" / "phenotypes").glob("*.bed.gz")),
+    reason="pheast test data not downloaded",
+)
+def test_phenotype_summary_matches_upstream_reads():
+    """Oracle: upstream's parse-time chroms read and twas_model_count."""
+    import gzip
+
+    import pandas as pd
+
+    for bed in sorted((PHEAST / "input" / "phenotypes").glob("*.bed.gz")):
+        chroms, n_models = cfg.phenotype_summary(bed)
+        up = pd.read_csv(bed, sep="\t", usecols=[0], dtype=str)
+        assert chroms == up.iloc[:, 0].unique().tolist()
+        with gzip.open(bed, "rt") as handle:
+            assert n_models == sum(1 for _ in handle) - 1
+
+
+def test_phenotype_summary_empty_bed(tmp_path):
+    bed = tmp_path / "m.bed.gz"
+    write_bed_gz(bed, [])
+    out = tmp_path / "m.tsv"
+    cfg.write_phenotype_summary(bed, out)
+    assert cfg.read_phenotype_summary(out) == ([], 0)

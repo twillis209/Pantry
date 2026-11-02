@@ -1,4 +1,3 @@
-import gzip
 from pathlib import Path
 import pandas as pd
 from snakemake.utils import min_version
@@ -52,6 +51,21 @@ rule check_genotype_samples:
         samples=lambda w: dataset_samples(w.dataset),
     run:
         pantry_config.check_genotype_samples(params.samples, input.fam)
+
+
+checkpoint phenotype_summary:
+    """Chromosomes and phenotype count of a modality's BED.
+
+    Heritability batches by chromosome and TWAS batches by phenotype count
+    are known only once the BED exists, so their inputs read this.
+    """
+    input:
+        bed=pheno_bed,
+    output:
+        "<pantry_intermediate>/{dataset}/summary/{modality}.tsv",
+    localrule: True
+    run:
+        pantry_config.write_phenotype_summary(input.bed, output[0])
 
 
 # Every analysis's rules are loaded; each dataset's analyses decide its targets.

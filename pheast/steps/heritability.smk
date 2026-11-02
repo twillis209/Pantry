@@ -41,11 +41,12 @@ rule calculate_heritability_chr_batch:
 
 def heritability_batches(w) -> list:
     """Per-chromosome, per-batch heritability files of the {dataset}'s {modality}."""
+    chroms, _ = phenotype_summary(w)
     return expand(
         "<pantry_intermediate>/{dataset}/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
         dataset=w.dataset,
         modality=w.modality,
-        chrom=modality_chroms[(w.dataset, w.modality)],
+        chrom=chroms,
         batch=range(10),
     )
 
