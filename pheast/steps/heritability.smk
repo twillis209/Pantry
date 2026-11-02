@@ -6,17 +6,17 @@ rule calculate_heritability_chr_batch:
     so that phenotypes for the same gene are in the same batch.
     """
     input:
-        bed=pheno_dir / "{modality}.bed.gz",
-        geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
-        covar="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
+        bed=pheno_bed,
+        geno=geno_files,
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.plink.tsv",
     output:
-        hsq="<pantry_intermediate>/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
+        hsq="<pantry_intermediate>/{dataset}/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
     resources:
         mem_mb=8000,
         runtime="24h",
     params:
         script=script("heritability.py"),
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         grm_dir=lambda w, output: str(
             Path(output.hsq).parent / f"grm_{w.modality}_{w.chrom}"
         ),
@@ -39,17 +39,23 @@ rule calculate_heritability_chr_batch:
         """
 
 
+def heritability_batches(w) -> list:
+    """Per-chromosome, per-batch heritability files of the {dataset}'s {modality}."""
+    return expand(
+        "<pantry_intermediate>/{dataset}/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
+        dataset=w.dataset,
+        modality=w.modality,
+        chrom=modality_chroms[(w.dataset, w.modality)],
+        batch=range(10),
+    )
+
+
 rule combine_heritability_chr:
     """Combine per-chromosome heritability stats into one file"""
     input:
-        lambda w: expand(
-            "<pantry_intermediate>/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
-            modality=w.modality,
-            chrom=modality_chroms[w.modality],
-            batch=range(10),
-        ),
+        heritability_batches,
     output:
-        hsq="<pantry_output>/heritability/{modality}.hsq.tsv",
+        hsq="<pantry_output>/{dataset}/heritability/{modality}.hsq.tsv",
     params:
         hsq_dir=parent_dir,
     shell:

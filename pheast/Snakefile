@@ -17,6 +17,7 @@ pathvars:
 
 
 wildcard_constraints:
+    dataset="[^/]+",
     modality="[^/]+",
     chrom="[^/]+",
     batch="[^/]+",
@@ -29,17 +30,19 @@ include: "steps/setup.smk"
 
 
 # These are the target files to be generated (or regenerated if outdated).
-# By default it includes all output files specified in the config file.
+# By default it includes all output files of every dataset in the config file.
 rule all:
     default_target: True
     input:
-        outputs,
-        # expand('<pantry_intermediate>/covar/{pheno}.covar.tsv', pheno=phenotypes.keys()),
+        [
+            f"<pantry_output>/{name}/{f}"
+            for name, d in CONFIG["datasets"].items()
+            for f in pantry_config.dataset_targets(d)
+        ],
 
 
+# Every analysis's rules are loaded; each dataset's analyses decide its targets.
 include: "steps/covariates.smk"
-
-
-for analysis in analyses:
-
-    include: f"steps/{analysis}.smk"
+include: "steps/qtl.smk"
+include: "steps/heritability.smk"
+include: "steps/twas.smk"

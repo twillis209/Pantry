@@ -3,11 +3,13 @@ rule prune_for_covar:
     --indep-pairwise parameters are based on GTEx methods.
     """
     input:
-        multiext(geno_prefix, ".bed", ".bim", ".fam"),
+        geno=geno_files,
     output:
-        multiext("<pantry_intermediate>/covar/geno_pruned", ".bed", ".bim", ".fam"),
+        multiext(
+            "<pantry_intermediate>/{dataset}/covar/geno_pruned", ".bed", ".bim", ".fam"
+        ),
     params:
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         pruned_dir=parent_dir,
         pruned_prefix=lambda w, output: output[0].removesuffix(".bed"),
     shell:
@@ -33,10 +35,12 @@ rule prune_for_covar:
 rule covariates:
     """Compute genotype and expression PCs and combine."""
     input:
-        geno=multiext("<pantry_intermediate>/covar/geno_pruned", ".bed", ".bim", ".fam"),
-        bed=pheno_dir / "{modality}.bed.gz",
+        geno=multiext(
+            "<pantry_intermediate>/{dataset}/covar/geno_pruned", ".bed", ".bim", ".fam"
+        ),
+        bed=pheno_bed,
     output:
-        "<pantry_intermediate>/covar/{modality}.covar.tsv",
+        "<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
     resources:
         mem_mb=32000,
     params:
@@ -58,10 +62,10 @@ rule covariates:
 rule plink_covariates:
     """Convert covariates to PLINK format."""
     input:
-        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
-        fam=f"{geno_prefix}.fam",
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
+        fam=geno_fam,
     output:
-        plink="<pantry_intermediate>/covar/{modality}.covar.plink.tsv",
+        plink="<pantry_intermediate>/{dataset}/covar/{modality}.covar.plink.tsv",
     localrule: True
     run:
         covar = pd.read_csv(input.covar, sep="\t", index_col=0, dtype=str)

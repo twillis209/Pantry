@@ -37,8 +37,16 @@ def upstream_qtl_filter_args(config: dict) -> str:
 
 
 def legacy_config() -> dict:
-    with open(PHEAST / "config.yml") as f:
+    """The old-format pheast config (pheast/config.yml before conversion)."""
+    with open(REPO / "tests" / "configs" / "pheast_baseline.yml") as f:
         return yaml.safe_load(f)
+
+
+def test_converted_config_matches_legacy_config():
+    with open(PHEAST / "config.yml") as f:
+        converted = yaml.safe_load(f)
+    assert "datasets" in converted
+    assert cfg.normalise(converted) == cfg.normalise(legacy_config())
 
 
 def new_config(**dataset_over) -> dict:
@@ -290,3 +298,27 @@ def test_qtl_filter_args_without_window_for_genotype_qc():
         cfg.qtl_filter_args(ds, window=False)
         == "--min_allele_count 10 --maf_threshold 0.05"
     )
+
+
+def test_dataset_targets_match_upstream_outputs():
+    ds = cfg.normalise(legacy_config())["datasets"]["default"]
+    # Oracle: upstream setup.smk's outputs list (paths relative to output/).
+    upstream = []
+    for analysis, params in ds["analyses"].items():
+        if analysis == "qtl":
+            upstream.append(f"{analysis}/genotype_qc.tsv")
+        for f in params["files"]:
+            upstream.extend(f"{analysis}/{f}".format(modality=m) for m in ds["modalities"])
+    targets = cfg.dataset_targets(ds)
+    assert targets == upstream
+    assert "qtl/genotype_qc.tsv" in targets
+    assert "twas/expression.tar.bz2" in targets
+    assert len(targets) == 1 + 4 * 8
+
+
+def test_dataset_targets_without_qtl_has_no_genotype_qc():
+    ds = {
+        "modalities": {"expression": {"grouped": False}},
+        "analyses": {"heritability": {"files": ["{modality}.hsq.tsv"]}},
+    }
+    assert cfg.dataset_targets(ds) == ["heritability/expression.hsq.tsv"]

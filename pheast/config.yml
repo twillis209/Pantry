@@ -1,91 +1,104 @@
-# -----------------------------------------------------------------------------
-# Inputs
-# -----------------------------------------------------------------------------
-# Pantry phenotype output directory containing {modality}.bed.gz files.
+# Pantry Pheast config.
 #
-# This can point to the outputs of the phenotyping module, unless additional
-# processing is needed (see pheast/scripts/prepare_phenotypes.py).
-# phenotype_dir: ../phenotyping/output
-phenotype_dir: input/phenotypes
+# Each dataset writes to <pantry_output>/{dataset}/{analysis}/ and
+# <pantry_intermediate>/{dataset}/. The older single-dataset format (the keys
+# below at the top level, with samples_file instead of samples) is still
+# accepted; it is read as dataset 'default'.
 
-# PLINK 1 genotype prefix. The .bed, .bim, and .fam files must share this prefix.
-geno_prefix: input/GEUVADIS.445_samples.GRCh38.chr1_120Mb
+# Optional settings deep-merged under every dataset.
+# defaults: {}
 
-# One-column sample list. Samples must be present in both phenotypes and genotypes.
-samples_file: input/samples.txt
+datasets:
+  default:
+    # -----------------------------------------------------------------------------
+    # Inputs
+    # -----------------------------------------------------------------------------
+    # Pantry phenotype output directory containing {modality}.bed.gz files.
+    #
+    # This can point to the outputs of the phenotyping module, unless additional
+    # processing is needed (see pheast/scripts/prepare_phenotypes.py).
+    # phenotype_dir: ../phenotyping/output
+    phenotype_dir: input/phenotypes
 
-# -----------------------------------------------------------------------------
-# Shared Options
-# -----------------------------------------------------------------------------
-# Path to intermediate files. The directory is created if needed and will contain
-# generated files other than final analysis results.
-# intermediate_dir: intermediate
+    # PLINK 1 genotype prefix. The .bed, .bim, and .fam files must share this prefix.
+    geno_prefix: input/GEUVADIS.445_samples.GRCh38.chr1_120Mb
 
-# -----------------------------------------------------------------------------
-# QTL Options
-# -----------------------------------------------------------------------------
-# Variants with very low allele count can produce unstable tensorQTL results.
-# By default, QTL mapping uses MAF >= qtl_min_allele_count / (2 * n_samples),
-# where n_samples is the number of samples used in each tensorQTL run.
-qtl_min_allele_count: 10
+    # One-column sample list (or an inline list of IDs). Samples must be present
+    # in both phenotypes and genotypes.
+    samples: input/samples.txt
 
-# Optionally set a fixed MAF threshold instead of the count-derived threshold.
-# qtl_maf_threshold: 0.05
+    # -----------------------------------------------------------------------------
+    # Shared Options
+    # -----------------------------------------------------------------------------
+    # Intermediate files go under <pantry_intermediate>/{dataset}/ (default
+    # intermediate/). The legacy intermediate_dir key is honoured in the old
+    # single-dataset format only.
 
-# -----------------------------------------------------------------------------
-# TWAS Options
-# -----------------------------------------------------------------------------
-# SNP IDs to include when computing TWAS weights. It is recommended to include
-# only SNPs present in the LD reference used later for TWAS association testing.
-twas_snps: input/ld_snps_chr1.txt
+    # -----------------------------------------------------------------------------
+    # QTL Options
+    # -----------------------------------------------------------------------------
+    # Variants with very low allele count can produce unstable tensorQTL results.
+    # By default, QTL mapping uses MAF >= qtl_min_allele_count / (2 * n_samples),
+    # where n_samples is the number of samples used in each tensorQTL run.
+    qtl_min_allele_count: 10
 
-# Number of phenotype models assigned to each cluster job and number fitted
-# concurrently within that job.
-twas_models_per_job: 200
-twas_threads: 4
+    # Optionally set a fixed MAF threshold instead of the count-derived threshold.
+    # qtl_maf_threshold: 0.05
 
-# -----------------------------------------------------------------------------
-# Modalities
-# -----------------------------------------------------------------------------
-# Each modality must have a {modality}.bed.gz phenotype table in phenotype_dir.
-# Set grouped: true for modalities with {modality}.phenotype_groups.txt files.
-#
-# The cross_modality pseudo-modality is only for cross-modality cis-QTL mapping.
-# See phenotyping/scripts/combine_modalities.sh for how to build that input.
-modalities:
-  # cross_modality:
-  #   grouped: true
-  alt_polyA:
-    grouped: true
-  alt_TSS:
-    grouped: true
-  expression:
-    grouped: false
-  intron_retention:
-    grouped: true
-  isoforms:
-    grouped: true
-  RNA_editing:
-    grouped: true
-  splicing:
-    grouped: true
-  stability:
-    grouped: false
+    # -----------------------------------------------------------------------------
+    # TWAS Options
+    # -----------------------------------------------------------------------------
+    # SNP IDs to include when computing TWAS weights. It is recommended to include
+    # only SNPs present in the LD reference used later for TWAS association testing.
+    twas_snps: input/ld_snps_chr1.txt
 
-# -----------------------------------------------------------------------------
-# Analyses
-# -----------------------------------------------------------------------------
-# Each analysis loads steps/{analysis}.smk and writes to output/{analysis}/.
-# The {modality} placeholder is expanded for every modality listed above.
-analyses:
-  heritability:
-    files:
-      - "{modality}.hsq.tsv"
-  qtl:
-    files:
-      - "{modality}.cis_qtl.txt.gz"
-      - "{modality}.cis_independent_qtl.txt.gz"
-      # - '{modality}.trans_qtl.txt.gz'
-  twas:
-    files:
-      - "{modality}.tar.bz2"
+    # Number of phenotype models assigned to each cluster job and number fitted
+    # concurrently within that job.
+    twas_models_per_job: 200
+    twas_threads: 4
+
+    # -----------------------------------------------------------------------------
+    # Modalities
+    # -----------------------------------------------------------------------------
+    # Each modality must have a {modality}.bed.gz phenotype table in phenotype_dir.
+    # Set grouped: true for modalities with {modality}.phenotype_groups.txt files.
+    #
+    # The cross_modality pseudo-modality is only for cross-modality cis-QTL mapping.
+    # See phenotyping/scripts/combine_modalities.sh for how to build that input.
+    modalities:
+      # cross_modality:
+      #   grouped: true
+      alt_polyA:
+        grouped: true
+      alt_TSS:
+        grouped: true
+      expression:
+        grouped: false
+      intron_retention:
+        grouped: true
+      isoforms:
+        grouped: true
+      RNA_editing:
+        grouped: true
+      splicing:
+        grouped: true
+      stability:
+        grouped: false
+
+    # -----------------------------------------------------------------------------
+    # Analyses
+    # -----------------------------------------------------------------------------
+    # Each analysis writes to output/{dataset}/{analysis}/.
+    # The {modality} placeholder is expanded for every modality listed above.
+    analyses:
+      heritability:
+        files:
+          - "{modality}.hsq.tsv"
+      qtl:
+        files:
+          - "{modality}.cis_qtl.txt.gz"
+          - "{modality}.cis_independent_qtl.txt.gz"
+          # - '{modality}.trans_qtl.txt.gz'
+      twas:
+        files:
+          - "{modality}.tar.bz2"

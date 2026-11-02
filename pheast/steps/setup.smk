@@ -1,8 +1,9 @@
 """This script is loaded near the beginning of the main Pheast Snakefile.
 
-It normalises and validates the configuration and sets global variables.
+It normalises and validates the configuration and defines config helpers.
 """
 
+import functools
 import importlib.util
 
 from snakemake.utils import validate
@@ -53,39 +54,63 @@ if CONFIG["legacy_pathvars"]:
         pantry_resources=CONFIG["legacy_pathvars"]["pantry_resources"],
 
 
-# Transitional: rules do not take {dataset} yet, so they use dataset 'default'.
-if "default" not in CONFIG["datasets"]:
-    raise ValueError(
-        "Pheast rules do not yet run per dataset: the config needs a dataset "
-        "named 'default' (or use the legacy single-dataset format)."
-    )
-DS = CONFIG["datasets"]["default"]
+def ds(w) -> dict:
+    """Config of the dataset named by the {dataset} wildcard."""
+    return CONFIG["datasets"][w.dataset]
 
-pheno_dir = Path(DS["phenotype_dir"]).expanduser()
-geno_prefix = DS["geno_prefix"]
 
-samples = pantry_config.load_samples(DS["samples"])
-geno_samples = pd.read_csv(geno_prefix + ".fam", sep=r"\s+", header=None, dtype=str)[
-    1
-].tolist()
-missing_samples = [s for s in samples if s not in geno_samples]
-if len(missing_samples) > 0:
-    raise Exception(f"Samples missing from genotypes: {missing_samples}")
+@functools.cache
+def dataset_samples(dataset: str) -> list:
+    """Sample IDs of a dataset, read on first use."""
+    return pantry_config.load_samples(CONFIG["datasets"][dataset]["samples"])
 
-modalities = DS["modalities"]
+
+def geno_prefix(dataset: str) -> str:
+    """PLINK 1 genotype prefix of a dataset."""
+    return str(Path(CONFIG["datasets"][dataset]["geno_prefix"]).expanduser())
+
+
+def geno_files(w) -> list:
+    """Input function: the {dataset}'s PLINK .bed/.bim/.fam files."""
+    return [geno_prefix(w.dataset) + ext for ext in (".bed", ".bim", ".fam")]
+
+
+def geno_fam(w) -> str:
+    """Input function: the {dataset}'s PLINK .fam file."""
+    return geno_prefix(w.dataset) + ".fam"
+
+
+def geno_input_prefix(w, input) -> str:
+    """PLINK prefix of a rule's geno input, for params."""
+    return input.geno[0].removesuffix(".bed")
+
+
+def pheno_file(suffix: str):
+    """Input function: {modality}{suffix} in the {dataset}'s phenotype_dir."""
+
+    def path(w) -> str:
+        return str(Path(ds(w)["phenotype_dir"]).expanduser() / f"{w.modality}{suffix}")
+
+    return path
+
+
+pheno_bed = pheno_file(".bed.gz")
+
+
+# Transitional: parse-time reads, which later become jobs.
 modality_chroms = {}
-for modality in modalities:
-    chroms = pd.read_csv(
-        pheno_dir / f"{modality}.bed.gz", sep="\t", usecols=[0], dtype=str
-    )
-    modality_chroms[modality] = chroms.iloc[:, 0].unique().tolist()
-
-analyses = DS["analyses"]
-outputs = []
-for analysis, params in analyses.items():
-    if analysis == "qtl":
-        outputs.append(f"<pantry_output>/{analysis}/genotype_qc.tsv")
-    for f in params["files"]:
-        outputs.append(
-            expand(f"<pantry_output>/{analysis}/{f}", modality=modalities.keys())
+for _name, _ds in CONFIG["datasets"].items():
+    _geno_samples = pd.read_csv(
+        geno_prefix(_name) + ".fam", sep=r"\s+", header=None, dtype=str
+    )[1].tolist()
+    missing_samples = [s for s in dataset_samples(_name) if s not in _geno_samples]
+    if len(missing_samples) > 0:
+        raise Exception(f"Samples missing from genotypes: {missing_samples}")
+    for modality in _ds["modalities"]:
+        chroms = pd.read_csv(
+            Path(_ds["phenotype_dir"]).expanduser() / f"{modality}.bed.gz",
+            sep="\t",
+            usecols=[0],
+            dtype=str,
         )
+        modality_chroms[(_name, modality)] = chroms.iloc[:, 0].unique().tolist()

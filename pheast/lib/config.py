@@ -147,3 +147,17 @@ def qtl_filter_args(ds: dict, window: bool = True) -> str:
     if window and ds.get("qtl_cis_window") is not None:
         args += f" --window {int(ds['qtl_cis_window'])}"
     return args
+
+
+def dataset_targets(ds: dict) -> list:
+    """Output file names for a dataset, relative to <pantry_output>/{dataset}/."""
+    targets = []
+    for analysis, params in ds["analyses"].items():
+        if analysis == "qtl":
+            targets.append(f"{analysis}/genotype_qc.tsv")
+        for f in params["files"]:
+            targets.extend(
+                f"{analysis}/" + f.format(modality=modality)
+                for modality in ds["modalities"]
+            )
+    return targets

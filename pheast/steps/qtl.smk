@@ -1,6 +1,11 @@
+def grouped(wildcards) -> bool:
+    """Whether the {dataset}'s {modality} has a phenotype groups file."""
+    return ds(wildcards)["modalities"][wildcards.modality]["grouped"]
+
+
 def groups_arg(wildcards, input):
     """Pass the phenotype groups file as a Python arg if applicable"""
-    if modalities[wildcards.modality]["grouped"]:
+    if grouped(wildcards):
         return f"--groups {input.groups}"
     else:
         return ""
@@ -8,31 +13,31 @@ def groups_arg(wildcards, input):
 
 def groups_input(wildcards):
     """Include the phenotype groups file as an input if applicable"""
-    if modalities[wildcards.modality]["grouped"]:
-        return pheno_dir / f"{wildcards.modality}.phenotype_groups.txt"
+    if grouped(wildcards):
+        return pheno_file(".phenotype_groups.txt")(wildcards)
     else:
         return []
 
 
 def qtl_filter_args(wildcards):
-    """Pass QTL genotype filter settings to tensorQTL wrapper scripts."""
-    return pantry_config.qtl_filter_args(DS)
+    """Pass the {dataset}'s QTL genotype filter settings to tensorQTL wrapper scripts."""
+    return pantry_config.qtl_filter_args(ds(wildcards))
 
 
 def genotype_qc_filter_args(wildcards):
     """The same filter settings for genotype_qc.py, which takes no --window."""
-    return pantry_config.qtl_filter_args(DS, window=False)
+    return pantry_config.qtl_filter_args(ds(wildcards), window=False)
 
 
 rule qtl_genotype_qc:
     """Report genotype variants below the QTL allele-count/MAF threshold."""
     input:
-        geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
+        geno=geno_files,
     output:
-        "<pantry_output>/qtl/genotype_qc.tsv",
+        "<pantry_output>/{dataset}/qtl/genotype_qc.tsv",
     params:
         script=script("genotype_qc.py"),
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         qtl_dir=parent_dir,
         filter_args=genotype_qc_filter_args,
     shell:
@@ -50,19 +55,19 @@ rule tensorqtl_cis:
     Outputs the top association per phenotype.
     """
     input:
-        geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
-        bed=pheno_dir / "{modality}.bed.gz",
-        bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
+        geno=geno_files,
+        bed=pheno_bed,
+        bedi=pheno_file(".bed.gz.tbi"),
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
         groups=groups_input,
     output:
-        "<pantry_output>/qtl/{modality}.cis_qtl.txt.gz",
+        "<pantry_output>/{dataset}/qtl/{modality}.cis_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="12h",
     params:
         script=script("run_tensorqtl.py"),
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         qtl_dir=parent_dir,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
@@ -85,20 +90,20 @@ rule tensorqtl_cis:
 rule tensorqtl_cis_independent:
     """Use stepwise regression to identify multiple conditionally independent cis-QTLs per phenotype."""
     input:
-        geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
-        bed=pheno_dir / "{modality}.bed.gz",
-        bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
+        geno=geno_files,
+        bed=pheno_bed,
+        bedi=pheno_file(".bed.gz.tbi"),
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
         groups=groups_input,
-        cis="<pantry_output>/qtl/{modality}.cis_qtl.txt.gz",
+        cis="<pantry_output>/{dataset}/qtl/{modality}.cis_qtl.txt.gz",
     output:
-        "<pantry_output>/qtl/{modality}.cis_independent_qtl.txt.gz",
+        "<pantry_output>/{dataset}/qtl/{modality}.cis_independent_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="20h",
     params:
         script=script("run_tensorqtl.py"),
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
     shell:
@@ -123,18 +128,18 @@ rule tensorqtl_trans:
 
     """
     input:
-        geno=multiext(geno_prefix, ".bed", ".bim", ".fam"),
-        bed=pheno_dir / "{modality}.bed.gz",
-        bedi=pheno_dir / "{modality}.bed.gz.tbi",
-        covar="<pantry_intermediate>/covar/{modality}.covar.tsv",
+        geno=geno_files,
+        bed=pheno_bed,
+        bedi=pheno_file(".bed.gz.tbi"),
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
     output:
-        "<pantry_output>/qtl/{modality}.trans_qtl.txt.gz",
+        "<pantry_output>/{dataset}/qtl/{modality}.trans_qtl.txt.gz",
     resources:
         mem_mb=32000,
         runtime="12h",
     params:
         script=script("run_tensorqtl.py"),
-        geno_prefix=geno_prefix,
+        geno_prefix=geno_input_prefix,
         qtl_dir=parent_dir,
         filter_args=qtl_filter_args,
     shell:
