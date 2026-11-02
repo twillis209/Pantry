@@ -50,6 +50,9 @@ rule twas_compute_weights_batch:
         geno=twas_geno_input,
         bed=pheno_bed,
         covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.plink.tsv",
+        fusion_script=FUSION["compute_weights"],
+        fusion_utils=FUSION["plink_utils"],
+        gcta=FUSION["gcta"],
     output:
         "<pantry_intermediate>/{dataset}/twas/status_{modality}/{batch_start}_{batch_end}.tsv",
     threads: twas_threads
@@ -71,8 +74,8 @@ rule twas_compute_weights_batch:
             --output-dir {params.twas_interm_dir} \
             --status {output} \
             --threads {threads} \
-            --fusion-script scripts/fusion_twas/FUSION.compute_weights.R \
-            --gcta scripts/fusion_twas/gcta_nr_robust
+            --fusion-script {input.fusion_script} \
+            --gcta {input.gcta}
         """
 
 
@@ -93,6 +96,7 @@ rule twas_assemble_summary:
     """
     input:
         status=twas_batch_status_input,
+        profile_script=FUSION["profile_wgt"],
     output:
         file_list="<pantry_intermediate>/{dataset}/twas/{modality}.list",
         profile="<pantry_intermediate>/{dataset}/twas/{modality}.profile",
@@ -100,7 +104,7 @@ rule twas_assemble_summary:
     params:
         script=script("assemble_twas_weight_list.py"),
         # An absolute path, as the shell changes into the intermediate dir:
-        profile_script=script("fusion_twas/utils/FUSION.profile_wgt.R"),
+        profile_script=lambda w, input: os.path.abspath(input.profile_script),
         twas_interm_dir=lambda w, output: str(Path(output.file_list).parent),
     shell:
         """

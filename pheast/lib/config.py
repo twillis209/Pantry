@@ -207,3 +207,22 @@ def read_phenotype_summary(path) -> tuple:
         raise ValueError(f"Unexpected phenotype summary header in {path}")
     chroms, n_models = row.split("\t")
     return (chroms.split(",") if chroms else []), int(n_models)
+
+
+def fusion_paths(config: dict) -> dict:
+    """FUSION files used by TWAS: the install_fusion copy unless overridden.
+
+    A configured fusion_dir must hold FUSION.compute_weights.R and
+    utils/{plink_utils.R,FUSION.profile_wgt.R} (compute_weights sources
+    plink_utils.R relative to itself); a configured gcta is a binary path.
+    """
+    installed = "<pantry_resources>/fusion"
+    fusion_dir = config.get("fusion_dir")
+    base = str(Path(fusion_dir).expanduser()) if fusion_dir else installed
+    gcta = config.get("gcta")
+    return {
+        "compute_weights": f"{base}/FUSION.compute_weights.R",
+        "plink_utils": f"{base}/utils/plink_utils.R",
+        "profile_wgt": f"{base}/utils/FUSION.profile_wgt.R",
+        "gcta": str(Path(gcta).expanduser()) if gcta else f"{installed}/gcta_nr_robust",
+    }

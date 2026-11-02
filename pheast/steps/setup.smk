@@ -5,6 +5,7 @@ It normalises and validates the configuration and defines config helpers.
 
 import functools
 import importlib.util
+import os
 
 from snakemake.utils import validate
 
@@ -52,6 +53,10 @@ if CONFIG["legacy_pathvars"]:
     pathvars:
         pantry_intermediate=CONFIG["legacy_pathvars"]["pantry_intermediate"],
         pantry_resources=CONFIG["legacy_pathvars"]["pantry_resources"],
+
+
+# FUSION files for TWAS: installed by install_fusion unless configured.
+FUSION = pantry_config.fusion_paths(CONFIG)
 
 
 def ds(w) -> dict:

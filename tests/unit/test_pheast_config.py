@@ -387,3 +387,41 @@ def test_phenotype_summary_empty_bed(tmp_path):
     out = tmp_path / "m.tsv"
     cfg.write_phenotype_summary(bed, out)
     assert cfg.read_phenotype_summary(out) == ([], 0)
+
+
+def test_fusion_paths_default_to_installed_copy():
+    out = cfg.fusion_paths(cfg.normalise(new_config()))
+    assert out == {
+        "compute_weights": "<pantry_resources>/fusion/FUSION.compute_weights.R",
+        "plink_utils": "<pantry_resources>/fusion/utils/plink_utils.R",
+        "profile_wgt": "<pantry_resources>/fusion/utils/FUSION.profile_wgt.R",
+        "gcta": "<pantry_resources>/fusion/gcta_nr_robust",
+    }
+
+
+def test_fusion_paths_overrides():
+    c = new_config()
+    c["fusion_dir"] = "~/fusion"
+    out = cfg.fusion_paths(cfg.normalise(c))
+    home = str(Path("~").expanduser())
+    assert out["compute_weights"] == f"{home}/fusion/FUSION.compute_weights.R"
+    assert out["plink_utils"] == f"{home}/fusion/utils/plink_utils.R"
+    assert out["profile_wgt"] == f"{home}/fusion/utils/FUSION.profile_wgt.R"
+    assert out["gcta"] == "<pantry_resources>/fusion/gcta_nr_robust"
+    c["gcta"] = "/opt/gcta64"
+    assert cfg.fusion_paths(cfg.normalise(c))["gcta"] == "/opt/gcta64"
+    c["fusion_dir"] = None
+    assert cfg.fusion_paths(cfg.normalise(c))["compute_weights"].startswith(
+        "<pantry_resources>/"
+    )
+
+
+def test_schema_accepts_fusion_overrides(validate):
+    c = new_config()
+    c["fusion_dir"], c["gcta"] = None, None
+    validate(cfg.normalise(c))
+    c["fusion_dir"], c["gcta"] = "/opt/fusion", "/opt/gcta64"
+    validate(cfg.normalise(c))
+    c["gcta"] = 5
+    with pytest.raises(Exception):
+        validate(cfg.normalise(c))

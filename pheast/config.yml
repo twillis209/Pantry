@@ -5,6 +5,14 @@
 # below at the top level, with samples_file instead of samples) is still
 # accepted; it is read as dataset 'default'.
 
+# Optional FUSION overrides, shared by all datasets. By default the bundled
+# FUSION scripts and gcta_nr_robust binary are installed under
+# <pantry_resources>/fusion/ (default intermediate/resources/fusion/).
+# fusion_dir must contain FUSION.compute_weights.R, utils/plink_utils.R and
+# utils/FUSION.profile_wgt.R; gcta is the path to a gcta binary.
+# fusion_dir: /path/to/fusion
+# gcta: /path/to/gcta64
+
 # Optional settings deep-merged under every dataset.
 # defaults: {}
 
