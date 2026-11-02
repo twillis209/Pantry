@@ -41,6 +41,19 @@ rule all:
         ],
 
 
+rule check_genotype_samples:
+    """Check that the dataset's samples are all in its genotypes."""
+    input:
+        fam=geno_fam,
+    output:
+        touch("<pantry_intermediate>/{dataset}/genotype_samples.ok"),
+    localrule: True
+    params:
+        samples=lambda w: dataset_samples(w.dataset),
+    run:
+        pantry_config.check_genotype_samples(params.samples, input.fam)
+
+
 # Every analysis's rules are loaded; each dataset's analyses decide its targets.
 include: "steps/covariates.smk"
 include: "steps/qtl.smk"

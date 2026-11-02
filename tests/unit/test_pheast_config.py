@@ -322,3 +322,22 @@ def test_dataset_targets_without_qtl_has_no_genotype_qc():
         "analyses": {"heritability": {"files": ["{modality}.hsq.tsv"]}},
     }
     assert cfg.dataset_targets(ds) == ["heritability/expression.hsq.tsv"]
+
+
+def write_fam(path, ids):
+    path.write_text("".join(f"0 {i} 0 0 0 -9\n" for i in ids))
+
+
+def test_check_genotype_samples_passes_when_all_present(tmp_path):
+    fam = tmp_path / "g.fam"
+    write_fam(fam, ["a", "b", "c"])
+    cfg.check_genotype_samples(["a", "c"], fam)
+
+
+def test_check_genotype_samples_upstream_message(tmp_path):
+    fam = tmp_path / "g.fam"
+    # Tab-separated, as in the test data .fam.
+    fam.write_text("0\ta\t0\t0\t0\t-9\n0\t007\t0\t0\t0\t-9\n")
+    with pytest.raises(Exception) as e:
+        cfg.check_genotype_samples(["a", "b", "007", "c"], fam)
+    assert str(e.value) == "Samples missing from genotypes: ['b', 'c']"

@@ -33,6 +33,7 @@ rule qtl_genotype_qc:
     """Report genotype variants below the QTL allele-count/MAF threshold."""
     input:
         geno=geno_files,
+        samples_ok="<pantry_intermediate>/{dataset}/genotype_samples.ok",
     output:
         "<pantry_output>/{dataset}/qtl/genotype_qc.tsv",
     params:

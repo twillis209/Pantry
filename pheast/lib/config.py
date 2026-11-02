@@ -161,3 +161,15 @@ def dataset_targets(ds: dict) -> list:
                 for modality in ds["modalities"]
             )
     return targets
+
+
+def check_genotype_samples(samples: list, fam_path) -> None:
+    """Raise if any sample is absent from the PLINK .fam file (upstream message)."""
+    import pandas as pd
+
+    geno_samples = pd.read_csv(fam_path, sep=r"\s+", header=None, dtype=str)[
+        1
+    ].tolist()
+    missing_samples = [s for s in samples if s not in geno_samples]
+    if len(missing_samples) > 0:
+        raise Exception(f"Samples missing from genotypes: {missing_samples}")

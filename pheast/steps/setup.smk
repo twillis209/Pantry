@@ -100,12 +100,6 @@ pheno_bed = pheno_file(".bed.gz")
 # Transitional: parse-time reads, which later become jobs.
 modality_chroms = {}
 for _name, _ds in CONFIG["datasets"].items():
-    _geno_samples = pd.read_csv(
-        geno_prefix(_name) + ".fam", sep=r"\s+", header=None, dtype=str
-    )[1].tolist()
-    missing_samples = [s for s in dataset_samples(_name) if s not in _geno_samples]
-    if len(missing_samples) > 0:
-        raise Exception(f"Samples missing from genotypes: {missing_samples}")
     for modality in _ds["modalities"]:
         chroms = pd.read_csv(
             Path(_ds["phenotype_dir"]).expanduser() / f"{modality}.bed.gz",

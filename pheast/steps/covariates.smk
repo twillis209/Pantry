@@ -4,6 +4,7 @@ rule prune_for_covar:
     """
     input:
         geno=geno_files,
+        samples_ok="<pantry_intermediate>/{dataset}/genotype_samples.ok",
     output:
         multiext(
             "<pantry_intermediate>/{dataset}/covar/geno_pruned", ".bed", ".bim", ".fam"
