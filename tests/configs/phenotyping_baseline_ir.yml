@@ -1,0 +1,148 @@
+# Upstream 8da7787 phenotyping/config.yml verbatim (intron_retention kept, LaDDR disabled), for Task 17.
+# -----------------------------------------------------------------------------
+# Raw RNA-Seq Data
+# -----------------------------------------------------------------------------
+# FASTQ sample layout. If paired_end is omitted, each sample's endedness is
+# inferred from the number of FASTQ paths per row in fastq_map.
+paired_end: True
+read_length: 75
+fastq_dir: input/fastq
+fastq_map: input/fastq_map.txt
+
+# Single-end kallisto parameters. These are fragment, not read, length estimates.
+# fragment_length_mean: 200
+# fragment_length_sd: 50
+
+# -----------------------------------------------------------------------------
+# Reference Files
+# -----------------------------------------------------------------------------
+# Reference genome FASTA. Download and unzip before running, e.g.:
+# http://ftp.ensembl.org/pub/release-106/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+ref_genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+
+# Gene annotation GTF. Download and unzip before running, e.g.:
+# http://ftp.ensembl.org/pub/release-106/gtf/homo_sapiens/Homo_sapiens.GRCh38.106.gtf.gz
+ref_anno: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+
+# One-column sample list. Samples in the FASTQ map but not listed here are ignored.
+samples_file: input/samples.txt
+
+# -----------------------------------------------------------------------------
+# Shared Options
+# -----------------------------------------------------------------------------
+# Path to intermediate files. The directory is created if needed and will contain
+# generated files other than final phenotype outputs.
+# intermediate_dir: intermediate
+
+# Path to generated intermediate reference files. By default this is inside
+# intermediate_dir, but it can be shared across dataset runs with the same
+# reference and parameters.
+# intermediate_ref_dir: intermediate/reference
+
+# -----------------------------------------------------------------------------
+# Modality Groups
+# -----------------------------------------------------------------------------
+# Each group loads steps/{groupname}.smk and lists the expected normalized output
+# files. A group can produce one or more related modalities from the same tool.
+modality_groups:
+  alt_TSS_polyA:
+    files:
+      - alt_TSS.bed.gz
+      - alt_TSS.bed.gz.tbi
+      - alt_TSS.phenotype_groups.txt
+      - alt_polyA.bed.gz
+      - alt_polyA.bed.gz.tbi
+      - alt_polyA.phenotype_groups.txt
+  expression:
+    files:
+      - expression.bed.gz
+      - expression.bed.gz.tbi
+      - isoforms.bed.gz
+      - isoforms.bed.gz.tbi
+      - isoforms.phenotype_groups.txt
+  RNA_editing:
+    # Edit sites reference BED. Chromosome names must match the reference genome.
+    edit_sites_bed: input/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+    # A site is retained if it has at least this coverage in at least
+    # max(edit_sites_min_samples, ceil(edit_sites_min_samples_fraction * n_samples))
+    # samples. The effective sample threshold is capped at n_samples.
+    edit_sites_min_coverage: 20
+    edit_sites_min_samples: 10
+    edit_sites_min_samples_fraction: 0.1
+    # If true, correlated edit sites within the same gene are clustered to
+    # reduce the number of RNA editing phenotypes tested per gene. If false,
+    # each mapped edit site is retained as its own phenotype.
+    edit_sites_cluster: false
+    # Minimum Pearson correlation used when edit_sites_cluster is true.
+    edit_sites_correlation_threshold: 0.9
+    files:
+      - RNA_editing.bed.gz
+      - RNA_editing.bed.gz.tbi
+      - RNA_editing.phenotype_groups.txt
+      - RNA_editing.site_to_phenotype.tsv
+  splicing:
+    files:
+      - splicing.bed.gz
+      - splicing.bed.gz.tbi
+      - splicing.phenotype_groups.txt
+  intron_retention:
+    # MAJIQ requires a GFF3 annotation and an academic/commercial license file.
+    # If annotation_gff3 is omitted, Pantry converts ref_anno from GTF to GFF3.
+    # annotation_gff3: input/ref/gencode.v47.annotation.gff3.gz
+    # license: input/ref/majiq_license_academic_official.lic
+    psicov_batch_size: 25
+    min_experiments: 0.01
+    files:
+      - intron_retention.bed.gz
+      - intron_retention.bed.gz.tbi
+      - intron_retention.phenotype_groups.txt
+  stability:
+    files:
+      - stability.bed.gz
+      - stability.bed.gz.tbi
+
+# -----------------------------------------------------------------------------
+# Latent Residual Phenotypes
+# -----------------------------------------------------------------------------
+# Optional LaDDR integration for latent residual phenotypes.
+laddr:
+  enabled: false
+
+  # Name used as dataset ID in LaDDR outputs/manifest.
+  dataset_name: pantry
+
+  # Intermediate LaDDR working directory.
+  project_dir: intermediate/laddr
+
+  # If true, link existing LaDDR info/ and gene_bins/ instead of running setup
+  # and binning.
+  use_existing_bins: false
+  # existing_info_dir: /path/to/laddr/info
+  # existing_bins_dir: /path/to/laddr/gene_bins
+
+  # Pantry normalized phenotypes to regress out during laddr coverage. Defaults
+  # to all normalized BED modalities defined above.
+  regress_modalities:
+    - alt_TSS
+    - alt_polyA
+    - expression
+    - intron_retention
+    - isoforms
+    - RNA_editing
+    - splicing
+    - stability
+  # bamCoverage parameters.
+  bam_coverage_threads: 4
+  bam_coverage_bin_size: 1
+
+  # LaDDR settings.
+  min_samples_expressed: 0.5
+  binning_method: adaptive_diffvar
+  batch_size: 40
+  max_bin_width: 1024
+  adaptive_max_samples: 256
+  adaptive_bins_per_gene: 256
+  adaptive_min_mean_total_covg: 128
+  adaptive_max_corr: 0.8
+  model_var_explained_max: 0.8
+  model_n_pcs_max: 16
