@@ -1,0 +1,24 @@
+# Build env for MAJIQ v3 (Biociphers, academic build); the conda part only.
+# MAJIQ itself is pip-installed from source by majiq3-install.sh, which
+# points the build at this env's htslib (the yml's pip: section cannot).
+name: majiq3
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - setuptools
+  - git
+  - cmake
+  - make
+  - cxx-compiler
+  - htslib
+  - zstd
+  # Compression libraries of the bundled bxzstr (headers too: the
+  # system liblzma has none).
+  - xz
+  - liblzma-devel
+  - bzip2
+  - zlib

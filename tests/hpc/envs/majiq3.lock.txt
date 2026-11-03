@@ -1,0 +1,146 @@
+# majiq3 env, job 8399463: mamba list --explicit + pip list (majiq_academic v3.0.22, commit d841baad8a3498251e0113fe5f7c41783c4eb55f)
+List of packages in environment: "/data/hps/assoc/private/gdml/user/twil15/opt/miniforge3/envs/majiq3"
+
+https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
+https://conda.anaconda.org/conda-forge/linux-64/binutils_impl_linux-64-2.46.1-default_hfdba357_103.conda
+https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_10.conda
+https://conda.anaconda.org/conda-forge/linux-64/c-ares-1.34.9-hebe6cf0_0.conda
+https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-hbd8a1cb_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/cmake-4.4.5-hff7ac6b_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/conda-gcc-specs-15.3.0-h8846f6e_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/cxx-compiler-2.0.0-hdab9b82_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/gcc-15.3.0-hc6a0c74_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/gcc_impl_linux-64-15.3.0-h6ad849d_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/git-2.56.0-pl5440h3795e67_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/gxx-15.3.0-hc6a0c74_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/gxx_impl_linux-64-15.3.0-h90d9265_7.conda
+https://conda.anaconda.org/bioconda/linux-64/htslib-1.25-ha79157c_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/icu-79.1-py314hb486520_0.conda
+
+https://conda.anaconda.org/conda-forge/noarch/kernel-headers_linux-64-5.14.0-he073ed8_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/keyutils-1.6.3-h7cc23a3_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/krb5-1.22.2-hbc21106_2.conda
+https://conda.anaconda.org/conda-forge/linux-64/ld_impl_linux-64-2.46.1-default_hbd61a6d_103.conda
+https://conda.anaconda.org/conda-forge/linux-64/libcurl-8.23.0-ha042cf0_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libdeflate-1.25-hd45a770_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libedit-3.1.20260512-pl5321h373387f_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libev-4.33-h280c20c_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/libexpat-2.9.0-hd2095e1_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libffi-3.7.0-h81df57d_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libgcc-16.2.0-ha9f2e26_7.conda
+https://conda.anaconda.org/conda-forge/noarch/libgcc-devel_linux-64-15.3.0-h2b852eb_107.conda
+https://conda.anaconda.org/conda-forge/linux-64/libgomp-16.2.0-he0feb66_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/libiconv-1.18-h0cb94f2_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.3-hb03c661_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/liblzma-devel-5.8.3-hb03c661_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libnghttp2-1.71.0-hc5e5977_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libnsl-2.0.1-hb9d3cd8_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libpsl-0.23.1-h7fe8442_2.conda
+https://conda.anaconda.org/conda-forge/linux-64/libpython-3.12.16-ha57cdbe_0_cpython.conda
+https://conda.anaconda.org/conda-forge/linux-64/libsanitizer-15.3.0-h54950a5_7.conda
+https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.54.1-hf739112_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libssh2-1.11.1-h6154650_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-16.2.0-h934c35e_7.conda
+https://conda.anaconda.org/conda-forge/noarch/libstdcxx-devel_linux-64-15.3.0-hb2c5482_107.conda
+https://conda.anaconda.org/conda-forge/linux-64/libuuid-2.42.4-hcfc3c73_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libuv-1.52.1-h280c20c_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/libxcrypt-4.4.38-h280c20c_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.2-h25fd6f3_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/make-4.4.1-h1114479_4.conda
+https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.6-hdb14827_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.5-h781a0a9_0.conda
+https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/pcre2-10.47-h8b3dc9c_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/perl-5.44.0-1_h7cc23a3_perl5.conda
+https://conda.anaconda.org/conda-forge/noarch/pip-26.2.2-pyh8b19718_2.conda
+https://conda.anaconda.org/conda-forge/linux-64/python-3.12.16-h5f976f7_0_cpython.conda
+https://conda.anaconda.org/conda-forge/linux-64/readline-8.3-hd6e31c0_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/rhash-1.4.6-hb03c661_2.conda
+
+https://conda.anaconda.org/conda-forge/noarch/setuptools-84.2.1-pyhe730653_0.conda
+https://conda.anaconda.org/conda-forge/noarch/sysroot_linux-64-2.34-h087de78_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_h1df4ec4_4.conda
+https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
+https://conda.anaconda.org/conda-forge/noarch/wheel-0.48.0-pyhd8ed1ab_0.conda
+https://conda.anaconda.org/conda-forge/linux-64/xz-5.8.3-ha02ee65_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/xz-gpl-tools-5.8.3-ha02ee65_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/xz-tools-5.8.3-hb03c661_1.conda
+https://conda.anaconda.org/conda-forge/linux-64/zlib-1.3.2-h25fd6f3_3.conda
+https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.conda
+# pip: asciitree==1.0.0
+# pip: blinker==1.9.0
+# pip: bokeh==3.10.1
+# pip: Bottleneck==1.4.0
+# pip: cachelib==0.17.0
+# pip: certifi==2026.10.23
+# pip: cffi==2.1.1
+# pip: charset-normalizer==3.5.2
+# pip: click==8.1.7
+# pip: cloudpickle==3.1.2
+# pip: cryptography==43.0.0
+# pip: dask==2024.7.1
+# pip: dask-expr==1.1.9
+# pip: distributed==2024.7.1
+# pip: fasteners==0.20
+# pip: Flask==3.0.3
+# pip: Flask-Session==0.8.0
+# pip: Flask-WTF==1.2.1
+# pip: fsspec==2026.9.0
+# pip: gitdb==4.0.12
+# pip: gitdb2==4.0.2
+# pip: GitPython==3.1.43
+# pip: gtfparse==1.3.0
+# pip: gunicorn==23.0.0
+# pip: h5py==3.11.0
+# pip: idna==3.20
+# pip: imgcat==0.6.0
+# pip: intervaltree==3.1.0
+# pip: itsdangerous==2.2.0
+# pip: Jinja2==3.1.4
+# pip: locket==1.0.0
+# pip: lz4==4.4.5
+# pip: MarkupSafe==2.1.5
+# pip: msgpack==1.2.4
+# pip: msgspec==0.22.0
+# pip: narwhals==2.28.0
+# pip: networkx==3.3
+# pip: numcodecs==0.13.1
+# pip: numpy==2.0.1
+# pip: packaging==26.3
+# pip: pandas==2.2.2
+# pip: partd==1.4.2
+# pip: pillow==13.0.0
+# pip: pip==26.2.2
+# pip: polars==1.2.1
+# pip: psutil==6.0.0
+# pip: pyarrow==16.1.0
+# pip: pyarrow-hotfix==0.7
+# pip: pycparser==3.12
+# pip: python-dateutil==4.0.0
+# pip: pytz==2026.6
+# pip: PyYAML==6.0.3
+# pip: requests==2.32.3
+# pip: rna_majiq==3.0.22
+# pip: rna_majiq_meta==3.0.0
+# pip: rna_moccasin==3.0.22
+# pip: rna_voila==3.0.22
+# pip: scipy==1.14.0
+# pip: setuptools==84.2.1
+# pip: six==1.16.0
+# pip: smmap==5.0.3
+# pip: smmap2==3.0.1
+# pip: sortedcontainers==2.4.0
+# pip: tblib==3.2.2
+# pip: toolz==1.2.0
+# pip: tornado==6.6
+# pip: tqdm==4.66.4
+# pip: tzdata==2026.6
+# pip: urllib3==2.8.0
+# pip: waitress==3.0.0
+# pip: Werkzeug==3.0.3
+# pip: wheel==0.48.0
+# pip: WTForms==3.1.2
+# pip: xarray==2024.6.0
+# pip: xyzservices==2026.9.1
+# pip: zarr==2.18.3
+# pip: zict==3.0.0
