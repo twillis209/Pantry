@@ -98,3 +98,41 @@ header and row count identical, first 4 columns identical row by row, NaN patter
 - Job 8393447: `archive/phenotyping` vs gate1-pheno `output` with `--noise archive/phenotyping archive/phenotyping_run2` -> exit 0, MATCH
   (max |diff| / allowed: alt_polyA 0.171/0.328, expression 0.366/0.732, isoforms 0.0835/0.167, unnorm alt_polyA 8.4e-4/2.8e-3, unnorm expression 338/676, unnorm isoforms 3.0e-3/6.1e-3).
   Report: `$H/pantry-runs/gate1-pheno/compare_noise.md`.
+
+## Task 12: per-rule conda envs, tensorQTL in a GPU container
+Envs in `phenotyping/envs/` and `pheast/envs/` pin every tool/library to its version in the baseline lock files; the tensorQTL rules
+use `container: docker://francois4/tensorqtl@sha256:f6efb9e592eb32c46cb75070be2769b34381d60cbb2709d2885771324abfe32a`
+(genex's `:latest`, last pushed 2024-01-06, resolved via the Docker Hub API). The test profile sets `software-deployment-method: [conda, apptainer]`,
+`apptainer-args: "--bind=/data/hps/assoc/private/gdml --nv"`, shared `conda-prefix: $H/pantry-runs/conda-envs` and
+`apptainer-prefix: $H/pantry-runs/apptainer` (so every run dir reuses the envs and image), and `set-resources` for
+tensorqtl_cis/_cis_independent/_trans: `slurm_partition: gpu-core`, `slurm_account: gdml`, `gpu: 1`. genex's `slurm_extra: "'--gpus=1'"` is rejected
+by the current slurm executor plugin ("The --GPU-allocation option is not allowed in the 'slurm_extra' parameter").
+`sjob` has no GPU option; for a manual GPU job use `SBATCH_GPUS=1 sjob -p gpu-core -a gdml ...` (sbatch reads `SBATCH_GPUS`).
+
+- Image contents (job 8394915, A100 node, driver 610.43.02): Ubuntu 22.04, Python 3.10.12, tensorqtl 1.0.9, torch 2.1.2+cu121, pandas 2.1.4,
+  numpy 1.26.3, scipy 1.11.4, pandas_plink 2.2.9, rpy2 3.5.15 (R qvalue loads), dask 2023.12.1; `torch.cuda.is_available()` True.
+  Baseline env: tensorqtl 1.0.10, torch 2.3.1, pandas 2.3.3, Python 3.12. Local copy: `$H/pantry-runs/containers/tensorqtl_f6efb9e5.sif`.
+- Env builds (`--conda-create-envs-only` via the profile): 8394943 pheno 7m (9 envs), 8394944 pheast 6m (5 envs, MaxRSS 11 GB with `-c 4`).
+  Built envs vs baseline lock (`t12_envdiff.sh`, job 8394950): all tools and pinned libs identical; only transitive/system libs differ.
+- Gate 2 conda (`$H/pantry-runs/gate2-pheno-conda`, job 8394948, 17m52s, 343/343): compare job 8395584
+  `--noise archive/phenotyping archive/phenotyping_run2` -> exit 0, MATCH (same notes as gate 1/2: kallisto files within the noise envelope).
+- Gate 3 conda+GPU (`$H/pantry-runs/gate3-pheast-conda`): 8394949 ran everything but tensorQTL (GPU submission rejected, see above), resumed
+  as 8395487 (4m25s) after the profile fix. tensorqtl_cis jobs 1m15-1m37 and cis_independent 26-55 s on A100s (whole tensorQTL step ~4 min vs
+  ~2 h on CPU in the baseline); a manual run of the image (job 8395587) logs `* using GPU (NVIDIA A100-SXM4-80GB)` and computes q-values.
+  Compare (job 8395585): heritability x8, TWAS x8, genotype_qc identical (all blocking files pass); 85 mismatches, all in
+  `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking per R22). R22(a): covar inputs (8 covar.tsv, 8 covar.plink.tsv,
+  geno_pruned.{bed,bim,fam,prune.in,prune.out}) byte-identical to the baseline intermediates; the 17 run_tensorqtl.py/genotype_qc.py command
+  lines identical to the baseline's (`cmds_gate3.norm` vs `gate3-pheast/cmds_baseline.norm`).
+- How far GPU tensorQTL is from the CPU baseline (compare.md, `--noise run1 run2`):
+  - cis_qtl (8 files): same top variant in most rows, with float-level differences: pval_nominal differs in ~120-130 rows/file (max rel
+    ~1e-4), slope/slope_se in the 6th-7th significant digit; 4-18 rows/file pick a different top variant with a different pval_nominal
+    (so start/end_distance, and af once, change), besides 4-10 rows/file of equal-pval tie-breaks (also in the noise pair). Permutation
+    columns stay within the run1-run2 noise, except intron_retention qval (77 rows above the 0.0134 noise, e.g. 0.286 vs 0.313).
+  - cis_independent (8 files): median same-variant rel diff of pval_nominal 3-5e-6 (noise 0); row-set changes of 1 key (RNA_editing,
+    alt_TSS, splicing) and 7 rows / 5 phenotypes (intron_retention; noise 2 / 1); expression and intron_retention show the large
+    pval/slope/num_var changes of phenotypes whose signal set changed, as in the CPU noise pair (Task 2).
+  - Version vs GPU (expression cis only, job 8395593: the image on CPU, `* WARNING: using CPU!`, 1.7 min; `containers/cmp3.py`, job 8395594):
+    baseline run1 vs run2: pval_nominal/slope/slope_se/af identical where the variant agrees (19/200 variant_id differences = ties);
+    image-on-CPU vs baseline: pval_nominal differs in 104 rows (max rel 4.4e-5), slope 11, slope_se 4; image-on-GPU vs baseline: 116 / 18 / 6
+    rows (max rel 5.9e-5); GPU vs image-on-CPU: 102 rows (8.2e-5). So the image's software stack (tensorqtl 1.0.9 / torch 2.1.2 / pandas 2.1.4)
+    already moves results at float level on CPU, and the GPU adds a comparable float-level difference; neither changes af or the analysis.
