@@ -99,6 +99,27 @@ header and row count identical, first 4 columns identical row by row, NaN patter
   (max |diff| / allowed: alt_polyA 0.171/0.328, expression 0.366/0.732, isoforms 0.0835/0.167, unnorm alt_polyA 8.4e-4/2.8e-3, unnorm expression 338/676, unnorm isoforms 3.0e-3/6.1e-3).
   Report: `$H/pantry-runs/gate1-pheno/compare_noise.md`.
 
+## Gates 1-3 (CPU, controller env, standalone, old-format config)
+Run records from the Task 5/7/11 reports, so every result cited in `docs/module-status.md` is traceable here. All in `$H/pantry-runs/<dir>`,
+`config.yml` = `tests/configs/{phenotyping,pheast}_baseline.yml` (old format), `input` -> the test data, no `--sdm` (every rule in the
+controller env, as the baseline), `sjob -c 2 -m 7500M -t 0-12:00:00 -n <name> -e <env> snakemake -s $H/Pantry/<stage>/Snakefile --profile $H/Pantry/tests/profile`.
+- Gate 1, `gate1-pheno` (Task 5, `$H/Pantry` at 8aba4e6; pathvars, outputs still at `output/`), env pantry-baseline-pheno: dry run 8392776 (341 jobs),
+  run 8392777 (341/341, ~16 min). Compare 8393107 (no `--noise`): exit 1, 15/21 byte-identical, the 6 kallisto-derived files differ (`compare.md`).
+  Substitution check (copy `gate1-pheno-subst`, since removed): the baseline's kallisto outputs for the 5 divergent samples swapped in, run 8393112
+  reran only the 11 downstream jobs, compare 8393118 -> MATCH (accepted under R11). With `--noise`: job 8393447 (Task 2b above) -> MATCH (`compare_noise.md`).
+- Gate 2, `gate2-pheno` (Task 7, `$H/Pantry` at eb9862e; `{dataset}` layout, outputs under `output/default/`), env pantry-baseline-pheno: run 8393449
+  (343/343, 12m25s). Compare 8393775 (`compare.sh`: `compare_outputs.py archive/phenotyping output/default --noise archive/phenotyping
+  archive/phenotyping_run2`) -> exit 0, MATCH (kallisto files within the noise envelope: expression 0.366/0.732, isoforms 0.0835/0.167,
+  unnorm alt_polyA 7e-4/2.8e-3, unnorm expression 338/676, unnorm isoforms 3.0e-3/6.1e-3; all other files identical). Report `compare.md`.
+- Gate 3, `gate3-pheast` (Task 11, `$H/Pantry` at 0d21fc6; `{dataset}`, checkpoints, `install_fusion`), env pantry-baseline-pheast: run 8394390
+  (195/195, 1h55m59s; cold dry run 69 jobs, 195 = upstream's 185 + check_genotype_samples, 8 phenotype_summary, install_fusion).
+  Rerun check 8394625 (`rerun_check.sh`, all rerun triggers): nothing to be done. Compare 8394624 (`compare.sh`, `archive/pheast_run1` vs
+  `output/default`, `--noise run1 run2`): exit 1, 10 mismatches, all in `*.cis_qtl`/`*.cis_independent_qtl`; heritability x8, TWAS x8
+  (`.wgt.RDat` equal via Rscript), genotype_qc identical (`compare.md`; raw `compare_raw.md`; vs run2 8394627 `compare_vs_run2.md`: 17, again
+  tensorQTL only). Attribution (R21): covar inputs byte-identical to `$H/pantry-baseline/pheast/intermediate/covar` (only `geno_pruned.log`
+  differs); job 8394629 (`cmds.sh`, `-n -p --forcerun tensorqtl_cis tensorqtl_cis_independent qtl_genotype_qc` in both dirs): the 17
+  run_tensorqtl.py/genotype_qc.py command lines identical after normalising paths (`cmds_baseline.norm` vs `cmds_gate3.norm`).
+
 ## Task 12: per-rule conda envs, tensorQTL in a GPU container
 (The francois4 image below was replaced in Task 16 by `ghcr.io/twillis209/pantry-tensorqtl`, tensorqtl 1.0.10.)
 Envs in `phenotyping/envs/` and `pheast/envs/` pin every tool/library to its version in the baseline lock files; the tensorQTL rules
