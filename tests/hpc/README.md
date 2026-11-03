@@ -100,6 +100,7 @@ header and row count identical, first 4 columns identical row by row, NaN patter
   Report: `$H/pantry-runs/gate1-pheno/compare_noise.md`.
 
 ## Task 12: per-rule conda envs, tensorQTL in a GPU container
+(The francois4 image below was replaced in Task 16 by `ghcr.io/twillis209/pantry-tensorqtl`, tensorqtl 1.0.10.)
 Envs in `phenotyping/envs/` and `pheast/envs/` pin every tool/library to its version in the baseline lock files; the tensorQTL rules
 use `container: docker://francois4/tensorqtl@sha256:f6efb9e592eb32c46cb75070be2769b34381d60cbb2709d2885771324abfe32a`
 (genex's `:latest`, last pushed 2024-01-06, resolved via the Docker Hub API). The test profile sets `software-deployment-method: [conda, apptainer]`,
@@ -136,6 +137,8 @@ by the current slurm executor plugin ("The --GPU-allocation option is not allowe
     image-on-CPU vs baseline: pval_nominal differs in 104 rows (max rel 4.4e-5), slope 11, slope_se 4; image-on-GPU vs baseline: 116 / 18 / 6
     rows (max rel 5.9e-5); GPU vs image-on-CPU: 102 rows (8.2e-5). So the image's software stack (tensorqtl 1.0.9 / torch 2.1.2 / pandas 2.1.4)
     already moves results at float level on CPU, and the GPU adds a comparable float-level difference; neither changes af or the analysis.
+    (Task 16 correction: that CPU check ran on 4 cores; the baseline's tensorQTL jobs had 1. With 1 core the 1.0.10 image matches the
+    baseline exactly, and 8 cores give differences like these, so thread count, not the version, likely explains them.)
 
 ## Task 13: multi-dataset acceptance (criterion 2)
 Configs `tests/configs/{phenotyping,pheast}_multi.yml`; derived inputs from `tests/fixtures/make_multi_inputs.py`, run on the HPC
@@ -202,3 +205,27 @@ GitPython returns the blob as str (decoded with surrogateescape, trailing newlin
    (any `workflow.source_path` on a binary in a github()/gitlab() module);
 2. text files lose their final newline (FUSION R scripts installed from github() are 1 byte shorter).
 Likely fix: `git.show(..., stdout_as_string=False, strip_newline_in_stdout=False)` and no `.encode()`.
+
+## Task 16: tensorQTL 1.0.10 image on GHCR
+`containers/tensorqtl/` (Dockerfile on `mambaorg/micromamba` 2.10.0 by digest; `environment.yml` conda pins and `constraints.txt` = `pip list
+--format=freeze` of `pantry-baseline-pheast`; `check_image.py`) is built by `.github/workflows/tensorqtl-image.yml` (linux/amd64, on push to
+`containers/tensorqtl/**`) and pushed to `ghcr.io/twillis209/pantry-tensorqtl` (`:1.0.10`, `:sha-<short>`; public).
+Digest `sha256:65a42f9fd74a4bc5f0f6a1a2a88a19e1140b62bbef5b3f2e6fc9de4330bde9b8` (run 41716028853, from 206c892), pinned in `pheast/steps/qtl.smk`.
+As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 wheel and adds scipy 1.18.1. Only pyarrow differs
+(25.0.1 vs 26.0.0: the lock's pyarrow 26 needs numpy>=2, dask 2024.1.1 numpy<2; used only by cis_nominal).
+- Pull: this account's stored ghcr.io credentials (`~/.apptainer/remote.yaml`, `~/.docker/config.json`) make apptainer get 403 on the
+  bearer token even though the image is public (jobs 8399091, 8399106). `$H/pantry-runs/t16/pull.sh` (job 8399094) pulls anonymously with a
+  clean HOME/DOCKER_CONFIG into the profile's apptainer-prefix as `7b93bcb6ac4e77c33b84b5d040ff650a.simg` (= md5 of the URI, Snakemake's
+  cache name), so runs never pull. Fix for fresh pulls: `apptainer registry logout docker://ghcr.io` and drop ghcr.io from `~/.docker/config.json`.
+- `check_image.py` on an A100 (`SBATCH_GPUS=1 sjob -p gpu-core -a gdml`, `--nv`; job 8399095): Python 3.12.16, tensorqtl 1.0.10,
+  torch 2.3.1+cu121, pandas 2.3.3, numpy 2.5.4, scipy 1.18.1; rpy2 + qvalue load; `torch.cuda.is_available()` True.
+- Gate 3 GPU (`$H/pantry-runs/gate3-pheast-gpu1010`, job 8399104, 17m15s, 195/195; tensorQTL jobs 28-55 s on A100s). Compare 8399295:
+  81 mismatches, all in `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking, R22); heritability x8, TWAS x8, genotype_qc pass; check_targets
+  33/33. R22(a): covar inputs byte-identical to the baseline's (only `geno_pruned.log` differs); 17 command lines identical. Same pattern
+  as with the old image: pval_nominal differs in 103-117 rows/cis file (max rel ~1e-4).
+- Image on CPU vs baseline CPU (`$H/pantry-runs/t16/cpucis*.sh`, `cmp16.py`; same command lines and covar inputs; nominal stats on
+  same-variant rows):
+  - 1 core, as the baseline's tensorQTL jobs (AllocCPUS 1; jobs 8399314, 8399317-8399323; compare 8399443): pval_nominal, slope, slope_se,
+    af identical in all 8 modalities (0 rows differ). Top-variant ties and permutation columns vary as between baseline run1 and run2.
+  - 8 cores (job 8399105): pval_nominal differs in 35-90 rows/file (max rel 1e-5..1e-4), about as much as on the GPU.
+  - So the remaining GPU-vs-baseline differences come from parallel reduction order (GPU or multithreaded CPU), not the software stack.

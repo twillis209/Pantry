@@ -10,7 +10,8 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
   - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
   - the full local-path host run (job 8396531) ran at `56c8c22`;
   - the R24 re-verification (job 8398071: local-path host dry run, `install_fusion`, and the `github()` host dry run plus two jobs) ran at `a140598` = `module-rc1`;
-  - R24 changed only how `install_fusion` resolves gcta.
+  - R24 changed only how `install_fusion` resolves gcta;
+  - the tensorqtl 1.0.10 image (Task 16) came after `module-v0.1.0`: gate 3 GPU (job 8399104) and the CPU checks ran at `f709952`.
 - `module-v0.1.0` adds no-rerun changes on top of `module-rc1`, checked locally by unit tests and dry runs. None of them can change any output:
   - a 300 s download timeout for gcta;
   - two validations: legacy top-level keys beside `datasets:` are rejected, and duplicate `cross_modality` modalities are rejected;
@@ -128,6 +129,7 @@ Everything ran on the GDML HPC (SLURM, `sjob`, profile `tests/profile` or `tests
 | Gate 3 (1, 5) | pheast `{dataset}`, checkpoints, FUSION install, old-format config, CPU (job 8394390, 195/195) | `gate3-pheast` | heritability ×8, TWAS ×8, genotype_qc identical. 10 mismatches, all tensorQTL; inputs and commands identical → accepted (R21) | `gate3-pheast/compare.md`, `cmds_{baseline,gate3}.norm` |
 | Gate 2 conda (1) | per-rule conda envs (job 8394948) | `gate2-pheno-conda` | MATCH | `gate2-pheno-conda/compare.md` |
 | Gate 3 conda+GPU (1) | conda envs + tensorQTL container on A100 (jobs 8394949, 8395487) | `gate3-pheast-conda` | all non-tensorQTL files identical. 85 tensorQTL mismatches (non-blocking, R22); inputs and commands identical | `gate3-pheast-conda/compare.md` |
+| Gate 3 GPU, tensorqtl 1.0.10 image (1) | `ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9f…` on A100 (job 8399104, 195/195); image on 1 CPU for all 8 cis runs (jobs 8399314, 8399317–8399323) | `gate3-pheast-gpu1010`, `t16` | non-tensorQTL files pass; 81 tensorQTL mismatches (non-blocking, R22); inputs and commands identical. On 1 CPU, cis nominal stats identical to the baseline | `gate3-pheast-gpu1010/compare.md`, `tests/hpc/README.md` (Task 16) |
 | Multi-dataset (2) | phenotyping `full` + `half_se` (8 samples, R1 as single-end) on one reference (job 8395741, 468/468) | `multi-pheno` | `full` MATCH vs baseline; 1 STAR index, 1 kallisto index shared; `half_se` 20/20 targets | `multi-pheno/compare.md` |
 | Multi-dataset (2) | pheast `full` + `subset` (300 samples, MAC 20) (job 8395742, 388/388, GPU) | `multi-pheast` | `full`: heritability/TWAS/genotype_qc pass, 76 tensorQTL mismatches (non-blocking); `subset` 33/33 targets | `multi-pheast/compare.md` |
 | Host, local path (3) | `tests/host/Snakefile`: dry run of `all` (472 jobs, incl. pheast `chained` on phenotyping output in the same DAG); full run of phenotyping `full` + pheast `geuvadis` (job 8396531, 539/539, tensorQTL on GPU with prefixed set-resources) | `host` | phenotyping MATCH; `cross_modality` byte-identical to upstream `combine_modalities.sh`; pheast: blocking files pass, 79 tensorQTL mismatches (non-blocking) | `host/compare_pheno.md`, `host/compare_pheast.md` |
@@ -138,7 +140,7 @@ How far the tensorQTL results are from upstream's:
 - On the cis_qtl files, the GPU + container results match the baseline at float level. `pval_nominal` max relative difference is ~1e-4; 4–18 rows per file pick a different top variant, besides equal-p tie-breaks.
 - Permutation columns are within the run-to-run noise, except `intron_retention` qval.
 - `cis_independent` row sets change by about as much as between the two baseline runs.
-- The container's tensorqtl 1.0.9 (vs upstream's 1.0.10) on CPU alone shifts `pval_nominal` by up to 4.4e-5 relative (R23).
+- The tensorQTL image now has upstream's versions (tensorqtl 1.0.10, torch 2.3.1, pandas 2.3.3, Python 3.12; Task 16, superseding R23). On 1 CPU, as the baseline ran, it reproduces the baseline's nominal statistics exactly in all 8 modalities. The GPU, or several CPU threads, shift `pval_nominal` by up to ~1e-4 relative.
 
 **MAJIQ (`intron_retention`) and LaDDR** were restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. They are excluded from every run above.
 
@@ -149,13 +151,13 @@ How far the tensorQTL results are from upstream's:
 - **Item 1**: each stage is its own module with its own config section and prefix (`config["pantry"]["phenotyping"]`, `config["pantry"]["pheast"]`), not one `config["pantry"]` with prefix `pantry_*`. Both define `all`.
 - **Item 8**: FUSION is vendored upstream with modifications, and `install_fusion` installs it rather than fetching a FUSION commit. gcta is downloaded from a pinned URL with a sha256 check only for remote modules. gemma comes from conda.
 - **Item 11**: standalone works, with the old config format too, but outputs gain a `default/` level (`output/default/…`).
-- **Criterion 1**: kallisto- and tensorQTL-derived files are judged within measured noise or by attribution (R11, R12, R21, R22). The tensorQTL container is 1.0.9, not 1.0.10 (R23).
+- **Criterion 1**: kallisto- and tensorQTL-derived files are judged within measured noise or by attribution (R11, R12, R21, R22).
 - Also: `index_fasta` removed (R15). LaDDR `dataset_name` defaults to the dataset key (R16). Validation is stricter on quoted numbers (R14, R18).
 
 ## Follow-ups
 
 1. Runtime verification of MAJIQ and LaDDR.
-2. Env pinning: a tensorQTL image with tensorqtl 1.0.10; the txrevise python; LaDDR from a release instead of GitHub HEAD; MAJIQ's named env.
+2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD; MAJIQ's named env.
 3. Report the Snakemake source-cache bugs upstream: binary files fail, and text files lose their final newline under `github()`.
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".

@@ -136,8 +136,10 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
   - `pheast/envs/`: `plink`, `covariates`, `python`, `gcta`, `fusion`.
 
   Built envs match the baseline env for every tool and pinned library (Task 12). MAJIQ keeps a named env (`majiq_env`, default `majiq3`). The monolithic `environment.yml` files stay for users not using `--sdm conda`.
-- **tensorQTL rules** (`tensorqtl_cis`, `tensorqtl_cis_independent`, `tensorqtl_trans`) have **no `conda:`**, only `container: docker://francois4/tensorqtl@sha256:f6efb9e5…` (R20). This is genex's image pinned by digest; Snakemake runs conda inside a container when a rule has both.
-  - **With `--sdm apptainer`**, they run tensorqtl **1.0.9** / torch 2.1.2 / pandas 2.1.4 / Python 3.10. Upstream's pip env had **1.0.10** / 2.3.1 / 2.3.3 / 3.12 (R23). On CPU, the image alone moves `pval_nominal` by up to ~4e-5 relative; the GPU adds a similar float-level difference.
+- **tensorQTL rules** (`tensorqtl_cis`, `tensorqtl_cis_independent`, `tensorqtl_trans`) have **no `conda:`**, only `container: docker://ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9f…` (R20), pinned by digest. Snakemake runs conda inside a container when a rule has both.
+  - The image is built from `containers/tensorqtl/` by `.github/workflows/tensorqtl-image.yml` (public, tag `1.0.10`). It has upstream's pip env versions: tensorqtl **1.0.10**, torch 2.3.1+cu121, pandas 2.3.3, Python 3.12, numpy 2.5.4, scipy 1.18.1, rpy2 + R qvalue (Task 16; supersedes R23, genex's 1.0.9 image). Only pyarrow differs (25.0.1 vs 26.0.0), used only by `cis_nominal`.
+  - The image is public; apptainer pulls it anonymously. Stale stored ghcr.io credentials (`apptainer registry login`, `~/.docker/config.json`) make the pull fail with 403; log out of ghcr.io or refresh them.
+  - **With `--sdm apptainer`** on 1 CPU, as upstream's jobs ran, cis results match upstream's nominal statistics exactly. On a GPU, or on several CPU threads, `pval_nominal` moves by up to ~1e-4 relative (reduction order).
   - **Without apptainer**, these rules run the host `python3`, which must have tensorqtl (e.g. the `pheast/environment.yml` env), as upstream did.
 - GPU:
   - The profile must give the tensorQTL rules a GPU partition and `gpu: 1` (the slurm executor plugin rejects `--gpus`/`--gres` in `slurm_extra`), plus `apptainer-args: "--nv --bind=<dirs>"`. `--nv` exposes the GPU. The bind must cover the data, including symlink targets, and for a local-path module the module checkout.
@@ -200,7 +202,7 @@ Remaining warnings, each justified:
    - pheast: put everything under `datasets: {<name>: {…}}` and rename `samples_file` → `samples`.
    - Both: replace `intermediate_dir` / `intermediate_ref_dir` with top-level `pathvars: {pantry_intermediate: …, pantry_reference: …}` (pheast: `pantry_intermediate`, `pantry_resources`).
    - Integer knobs must be unquoted integers.
-4. **tensorQTL**: run with `--sdm conda apptainer` to use the pinned container (tensorqtl 1.0.9). Otherwise these three rules use your `python3`'s tensorqtl, as upstream did. GPU profiles: see [Environments](#environments-containers-gpu).
+4. **tensorQTL**: run with `--sdm conda apptainer` to use the pinned container (tensorqtl 1.0.10). Otherwise these three rules use your `python3`'s tensorqtl, as upstream did. GPU profiles: see [Environments](#environments-containers-gpu).
 5. Snakemake ≥ 9.12.
 
 ## Deviations from the handover contract and the spec
@@ -208,7 +210,7 @@ Remaining warnings, each justified:
 - **Contract 1 (one `config["pantry"]`)**: the stages are two modules, each with its own config section (`config["pantry"]["phenotyping"]`, `config["pantry"]["pheast"]`) and distinct prefixes (`pantry_pheno_*`, `pantry_pheast_*`). Both define `all`, so one shared prefix would clash.
 - **Contract 8 (fetch a pinned FUSION commit and GCTA/GEMMA)**: FUSION is vendored with Pantry's modifications and installed from the module. gcta is copied, or downloaded from a pinned URL with a sha256 check for remote modules (R24). gemma comes from the `fusion` conda env.
 - **Contract 11 / criterion 11 (standalone)**: works, but standalone outputs gain the `default/` level.
-- **Acceptance criterion 1 for tensorQTL**: tensorQTL is unseeded and nondeterministic upstream, and the container's tensorqtl is 1.0.9, so `*.cis_qtl`/`*.cis_independent_qtl` were judged by attribution rather than equality (R21, R22): identical inputs and command lines, comparison reported but not blocking. kallisto outputs were judged within the run-to-run noise envelope (R11, R12). See `docs/module-status.md`.
+- **Acceptance criterion 1 for tensorQTL**: tensorQTL is unseeded and nondeterministic upstream, so `*.cis_qtl`/`*.cis_independent_qtl` were judged by attribution rather than equality (R21, R22): identical inputs and command lines, comparison reported but not blocking. kallisto outputs were judged within the run-to-run noise envelope (R11, R12). See `docs/module-status.md`.
 - **MAJIQ (`intron_retention`) and LaDDR** were restructured and checked by dry run only (design decision); runtime verification is a follow-up.
 - Spec Corrections 5: `index_fasta` removed, not kept (R15).
 - Spec §2 constraints: some wildcards are narrower enumerations (R4).
@@ -219,7 +221,7 @@ Remaining warnings, each justified:
 ## Known limitations and follow-ups
 
 - **Runtime verification of MAJIQ and LaDDR** (dry run only). Not covered by any run: the nested directory outputs of `majiq_build`, the `.sj` derivation, and the LaDDR `mv` to a stable name.
-- **Env pinning**: the tensorQTL image with tensorqtl 1.0.10 to match upstream (R23 follow-up); the txrevise python; LaDDR from GitHub HEAD; MAJIQ's named env.
+- **Env pinning**: the txrevise python; LaDDR from GitHub HEAD; MAJIQ's named env.
 - **Snakemake source-cache bugs** (9.27.x, `sourcecache.py` `HostingProviderFile.open` / `LocalGitFile._open`; to report upstream, not filed). `git show` output is decoded as text, so (1) `source_path` on a binary file in a `github()` module fails with `UnicodeEncodeError` (worked around by R24), and (2) text files lose their final newline: FUSION R scripts installed from `github()` are 1 byte shorter. This is harmless. See `tests/hpc/README.md`, Task 14.
 - **Nondeterminism**: kallisto 0.48.0 quant varies run to run (node/load dependent; not thread count). tensorQTL permutations and tie-breaks are unseeded. The noise envelopes come from a single pair of baseline runs, and the isoforms kallisto margin in Task 13 was close (max |diff| 0.149 vs allowed 0.167).
 - **Legacy pathvars vs host pathvars**: a legacy `intermediate_dir`/`intermediate_ref_dir` in a module's config overrides the host's module pathvars, because it registers later. Hosts should pass new-format configs only.
