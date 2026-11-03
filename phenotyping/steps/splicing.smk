@@ -5,6 +5,8 @@ rule regtools_junctions:
         bai="<pantry_intermediate>/{dataset}/bam/{sample_id}.bam.bai",
     output:
         "<pantry_intermediate>/{dataset}/splicing/{sample_id}.junc",
+    conda:
+        "../envs/regtools.yaml"
     params:
         splice_dir=parent_dir,
         min_anchor_len=8,
@@ -30,6 +32,8 @@ rule cluster_junctions:
         per_sample("<pantry_intermediate>/{dataset}/splicing/{sample_id}.junc"),
     output:
         "<pantry_intermediate>/{dataset}/splicing/leafcutter_perind_numers.counts.gz",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("leafcutter_cluster_regtools_py3.py"),
         juncfile_list=lambda w, output: str(Path(output[0]).parent / "juncfiles.txt"),
@@ -56,6 +60,8 @@ rule assemble_splicing_bed:
         ref_anno=ref_file("annotation"),
     output:
         bed="<pantry_output>/{dataset}/unnorm/splicing.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -78,6 +84,8 @@ rule normalize_splicing:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/splicing.bed.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -102,6 +110,8 @@ rule pheno_groups_splicing:
     output:
         "<pantry_output>/{dataset}/splicing.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

@@ -5,6 +5,8 @@ rule query_editing_level:
         bam="<pantry_intermediate>/{dataset}/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
         levels="<pantry_intermediate>/{dataset}/RNA_editing/edit_levels/{sample_id}.rnaeditlevel.tsv.gz",
+    conda:
+        "../envs/rna_editing.yaml"
     resources:
         runtime="8h",
     params:
@@ -29,6 +31,8 @@ rule shared_sample_sites:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         matrix="<pantry_intermediate>/{dataset}/RNA_editing/edit_site_matrix.tsv",
+    conda:
+        "../envs/rna_editing.yaml"
     params:
         script=script("RNA_editing/shared_samples_sites_matrix.py"),
         edit_levels_dir=lambda w, input: str(Path(input.levels[0]).parent),
@@ -53,6 +57,8 @@ rule map_edit_sites_to_genes:
     output:
         tsv="<pantry_reference>/{reference}/edit_sites_to_genes.tsv",
     localrule: True
+    conda:
+        "../envs/rna_editing.yaml"
     params:
         script=script("RNA_editing/map_edit_sites_to_genes.py"),
     shell:
@@ -69,6 +75,8 @@ rule prepare_RNA_editing_phenotypes:
         matrix="<pantry_intermediate>/{dataset}/RNA_editing/phenotype_matrix.tsv",
         site_map="<pantry_output>/{dataset}/RNA_editing.site_to_phenotype.tsv",
     localrule: True
+    conda:
+        "../envs/rna_editing.yaml"
     params:
         script=script("RNA_editing/prepare_rna_editing_phenotypes.py"),
         cluster=lambda w: "--cluster" if rna_editing(w)["edit_sites_cluster"] else "",
@@ -96,6 +104,8 @@ rule assemble_RNA_editing_bed:
         ref_anno=ref_file("annotation"),
     output:
         bed="<pantry_output>/{dataset}/unnorm/RNA_editing.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -118,6 +128,8 @@ rule normalize_RNA_editing:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/RNA_editing.bed.gz",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("normalize_phenotypes.py"),
         bed=bgzip_source,
@@ -140,6 +152,8 @@ rule pheno_groups_RNA_editing:
     output:
         "<pantry_output>/{dataset}/RNA_editing.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

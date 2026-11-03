@@ -13,6 +13,8 @@ rule combine_modalities:
         tbi="<pantry_output>/{dataset}/cross_modality.bed.gz.tbi",
         tmp=temp("<pantry_intermediate>/{dataset}/cross_modality_tmp.bed"),
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     params:
         modalities=lambda w: ds(w)["cross_modality"]["modalities"],
         bed=lambda w, output: output.bed.removesuffix(".gz"),
@@ -49,6 +51,8 @@ rule pheno_groups_cross_modality:
     output:
         "<pantry_output>/{dataset}/cross_modality.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

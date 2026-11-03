@@ -11,6 +11,8 @@ rule exonic_intronic_from_GTF:
     output:
         exon_gtf="<pantry_reference>/{reference}/exonic.gtf",
         intron_gtf="<pantry_reference>/{reference}/intronic.gtf",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("exonic_intronic_from_gtf.py"),
     shell:
@@ -35,6 +37,8 @@ rule run_featureCounts:
         gtf=feature_gtf,
     output:
         "<pantry_intermediate>/{dataset}/stability/{sample_id}.{feature_type}.counts.txt",
+    conda:
+        "../envs/subread.yaml"
     threads: 8
     resources:
         runtime="16h",
@@ -71,6 +75,8 @@ rule assemble_stability_bed:
         ref_anno=ref_file("annotation"),
     output:
         bed="<pantry_output>/{dataset}/unnorm/stability.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -95,6 +101,8 @@ rule normalize_stability:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/stability.bed.gz",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("normalize_phenotypes.py"),
         bed=bgzip_source,

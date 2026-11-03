@@ -89,6 +89,8 @@ rule majiq_gff3_from_gtf:
         anno_ok="<pantry_reference>/{reference}/annotation.ok",
     output:
         "<pantry_reference>/{reference}/majiq/annotation.gff3",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -228,6 +230,8 @@ rule extract_retained_introns:
         "<pantry_intermediate>/{dataset}/intron_retention/majiq.psi.tsv",
     output:
         "<pantry_intermediate>/{dataset}/intron_retention/retained_intron_psi.tsv.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -247,6 +251,8 @@ rule assemble_intron_retention_bed:
         ref_anno=ref_file("annotation"),
     output:
         bed="<pantry_output>/{dataset}/unnorm/intron_retention.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -269,6 +275,8 @@ rule normalize_intron_retention:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/intron_retention.bed.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -291,6 +299,8 @@ rule pheno_groups_intron_retention:
     output:
         "<pantry_output>/{dataset}/intron_retention.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

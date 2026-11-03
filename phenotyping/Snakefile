@@ -101,6 +101,8 @@ rule index_bam:
         "<pantry_intermediate>/{dataset}/bam/{sample_id}.bam",
     output:
         "<pantry_intermediate>/{dataset}/bam/{sample_id}.bam.bai",
+    conda:
+        "envs/samtools.yaml"
     threads: 8
     params:
         add_threads=lambda w, threads: threads - 1,
@@ -119,6 +121,8 @@ rule index_bed:
         # cross_modality.bed.gz.tbi is written by combine_modalities.
         pheno="(?!cross_modality\.bed)[^/]+",
     localrule: True
+    conda:
+        "envs/samtools.yaml"
     shell:
         "tabix {input}"
 
@@ -161,6 +165,8 @@ rule extract_cdna:
     output:
         "<pantry_reference>/{reference}/cDNA.fa.gz",
     localrule: True
+    conda:
+        "envs/gffread.yaml"
     shell:
         """
         sed '/transcript_id "";/d' {input.ref_anno} \

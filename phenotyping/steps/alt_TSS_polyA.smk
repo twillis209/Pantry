@@ -8,6 +8,8 @@ rule preprocess_gtf_for_txrevise:
         anno_ok="<pantry_reference>/{reference}/annotation.ok",
     output:
         "<pantry_reference>/{reference}/txrevise/gene_annotations.gtf",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -30,6 +32,8 @@ rule txrevise_extract_tags:
         "<pantry_reference>/{reference}/txrevise/gene_annotations.gtf",
     output:
         tags="<pantry_reference>/{reference}/txrevise/transcript_tags.txt",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("txrevise/extractTranscriptTags.py"),
     shell:
@@ -47,6 +51,8 @@ rule txrevise_prepare_annotations:
         tags="<pantry_reference>/{reference}/txrevise/transcript_tags.txt",
     output:
         "<pantry_reference>/{reference}/txrevise/txrevise_annotations.rds",
+    conda:
+        "../envs/txrevise.yaml"
     params:
         script=script("txrevise/prepareAnnotations.R"),
     shell:
@@ -69,6 +75,8 @@ rule txrevise_construct_events:
         "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_2.contained.{batch}_{n_batches}.gff3",
         "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_1.downstream.{batch}_{n_batches}.gff3",
         "<pantry_reference>/{reference}/txrevise/batch/txrevise.grp_2.downstream.{batch}_{n_batches}.gff3",
+    conda:
+        "../envs/txrevise.yaml"
     resources:
         runtime="16h",
     params:
@@ -94,6 +102,8 @@ rule txrevise_merge_gff_files:
         ),
     output:
         gff="<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.gff3",
+    conda:
+        "../envs/txrevise.yaml"
     shell:
         'cat {input.gff} | grep -v "^#" > {output.gff}'
 
@@ -109,6 +119,8 @@ rule txrevise_make_one:
         # metadata = 'processed/{annotation}_{kind}/txrevise_{kind}_phenotype_metadata.tsv.gz'
     output:
         "<pantry_reference>/{reference}/txrevise/completed.txt",
+    conda:
+        "../envs/txrevise.yaml"
     shell:
         "echo 'Done!' > {output}"
 
@@ -120,6 +132,8 @@ rule alt_TSS_polyA_transcript_seqs:
         gff3="<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.gff3",
     output:
         "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.fa.gz",
+    conda:
+        "../envs/gffread.yaml"
     shell:
         "gffread {input.gff3} -g {input.ref_genome} -w - | bgzip -c > {output}"
 
@@ -130,6 +144,8 @@ rule alt_TSS_polyA_kallisto_index:
         "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.fa.gz",
     output:
         "<pantry_reference>/{reference}/txrevise/txrevise.{group}.{position}.idx",
+    conda:
+        "../envs/kallisto.yaml"
     resources:
         mem_mb=32000,
     shell:
@@ -150,6 +166,8 @@ rule alt_TSS_polyA_kallisto:
         h5="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.h5",
         tsv="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/abundance.tsv",
         json="<pantry_intermediate>/{dataset}/alt_TSS_polyA/{group}.{position}/{sample_id}/run_info.json",
+    conda:
+        "../envs/kallisto.yaml"
     threads: 16
     resources:
         runtime="16h",
@@ -184,6 +202,8 @@ rule assemble_alt_TSS_polyA_bed:
         ref_anno=ref_file("annotation"),
     output:
         "<pantry_output>/{dataset}/unnorm/alt_{type}.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -211,6 +231,8 @@ rule normalize_alt_TSS_polyA:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/alt_{type}.bed.gz",
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("normalize_phenotypes.py"),
         bed=bgzip_source,
@@ -233,6 +255,8 @@ rule pheno_groups_alt_TSS_polyA:
     output:
         "<pantry_output>/{dataset}/alt_{type}.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

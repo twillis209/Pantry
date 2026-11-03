@@ -1,0 +1,16 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheno.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12.3
+  - numpy=1.26.4
+  - pandas=2.3.3
+  - scipy=1.17.1
+  - scikit-learn=1.9.1
+  - gtfparse=2.5.0
+  - polars=0.20.31
+  - pyarrow=16.1.0
+  - pyyaml=6.0.3
+  - htslib=1.21

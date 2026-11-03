@@ -20,6 +20,8 @@ rule star_index:
         # Among other generated files:
         "<pantry_reference>/{reference}/star_index_{read_length}/SAindex",
         "<pantry_reference>/{reference}/star_index_{read_length}/chrNameLength.txt",
+    conda:
+        "../envs/star.yaml"
     threads: 16
     resources:
         mem_mb=60000,
@@ -64,6 +66,8 @@ rule star_align:
         index=star_index_path,
     output:
         "<pantry_intermediate>/{dataset}/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
+    conda:
+        "../envs/star.yaml"
     threads: 16
     resources:
         mem_mb=60000,
@@ -94,6 +98,8 @@ rule shrink_bam:
         "<pantry_intermediate>/{dataset}/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
     output:
         "<pantry_intermediate>/{dataset}/bam/{sample_id}.bam",
+    conda:
+        "../envs/samtools.yaml"
     params:
         bam_dir=parent_dir,
     shell:

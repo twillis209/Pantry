@@ -1,0 +1,8 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheno.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - gffread=0.12.7
+  - htslib=1.21

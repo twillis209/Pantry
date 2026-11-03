@@ -69,6 +69,8 @@ rule bam_to_bigwig:
         bai="<pantry_intermediate>/{dataset}/bam/{sample_id}.bam.bai",
     output:
         bw="<pantry_intermediate>/{dataset}/laddr/covg_bigwig/{laddr_name}/{sample_id}.bw",
+    conda:
+        "../envs/deeptools.yaml"
     threads: laddr_setting("bam_coverage_threads")
     params:
         outdir=parent_dir,
@@ -113,6 +115,8 @@ rule laddr_config:
     output:
         config="<pantry_intermediate>/{dataset}/laddr/config.yaml",
     localrule: True
+    conda:
+        "../envs/python.yaml"
     params:
         script=script("write_laddr_config.py"),
         project_dir=parent_dir,
@@ -157,6 +161,8 @@ rule laddr_prepare_existing_bins:
         config=rules.laddr_config.output.config,
     output:
         ready="<pantry_intermediate>/{dataset}/laddr/bins_ready.existing",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
         info_dir=laddr_existing_dir("existing_info_dir"),
@@ -183,6 +189,8 @@ rule laddr_setup:
         exons="<pantry_intermediate>/{dataset}/laddr/info/exons.tsv.gz",
         n_batches="<pantry_intermediate>/{dataset}/laddr/info/n_batches.txt",
         median_covg="<pantry_intermediate>/{dataset}/laddr/info/median_coverage.txt",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
     shell:
@@ -201,6 +209,8 @@ rule laddr_binning:
         bw=laddr_bigwigs,
     output:
         ready="<pantry_intermediate>/{dataset}/laddr/bins_ready.built",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
     shell:
@@ -221,6 +231,8 @@ rule laddr_coverage:
         phenos=laddr_pheno_inputs,
     output:
         done="<pantry_intermediate>/{dataset}/laddr/covg_norm/{laddr_name}/.coverage_done",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
         dataset=laddr_dataset_name,
@@ -238,6 +250,8 @@ rule laddr_fit:
         coverage_done=laddr_coverage_done,
     output:
         done="<pantry_intermediate>/{dataset}/laddr/models/.fit_done",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
     shell:
@@ -259,6 +273,8 @@ rule laddr_transform:
         fit_done=rules.laddr_fit.output.done,
     output:
         phenos="<pantry_intermediate>/{dataset}/laddr/latent_phenos.tsv.gz",
+    conda:
+        "../envs/laddr.yaml"
     params:
         project_dir=laddr_project_dir,
         dataset=laddr_dataset_name,
@@ -276,6 +292,8 @@ rule assemble_latent_bed:
         ref_anno=ref_file("annotation"),
     output:
         bed="<pantry_output>/{dataset}/unnorm/latent_residual.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -298,6 +316,8 @@ rule normalize_latent:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/latent_residual.bed.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -322,6 +342,8 @@ rule pheno_groups_latent:
     output:
         "<pantry_output>/{dataset}/latent_residual.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \

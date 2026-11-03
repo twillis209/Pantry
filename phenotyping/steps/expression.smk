@@ -4,6 +4,8 @@ rule kallisto_index:
         "<pantry_reference>/{reference}/cDNA.fa.gz",
     output:
         "<pantry_reference>/{reference}/kallisto.idx",
+    conda:
+        "../envs/kallisto.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -24,6 +26,8 @@ rule kallisto:
         h5="<pantry_intermediate>/{dataset}/expression/{sample_id}/abundance.h5",
         tsv="<pantry_intermediate>/{dataset}/expression/{sample_id}/abundance.tsv",
         json="<pantry_intermediate>/{dataset}/expression/{sample_id}/run_info.json",
+    conda:
+        "../envs/kallisto.yaml"
     threads: 16
     resources:
         runtime="16h",
@@ -58,6 +62,8 @@ rule assemble_expression_bed:
     output:
         iso="<pantry_output>/{dataset}/unnorm/isoforms.bed",
         gene="<pantry_output>/{dataset}/unnorm/expression.bed",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -83,6 +89,8 @@ rule normalize_expression:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/expression.bed.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -105,6 +113,8 @@ rule normalize_isoforms:
         samples="<pantry_intermediate>/{dataset}/samples.txt",
     output:
         "<pantry_output>/{dataset}/isoforms.bed.gz",
+    conda:
+        "../envs/python.yaml"
     resources:
         mem_mb=32000,
     params:
@@ -129,6 +139,8 @@ rule pheno_groups_isoforms:
     output:
         "<pantry_output>/{dataset}/isoforms.phenotype_groups.txt",
     localrule: True
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         zcat <{input} \
