@@ -438,7 +438,8 @@ def test_schema_accepts_fusion_overrides(validate):
 
 
 GCTA_URL = (
-    "https://raw.githubusercontent.com/PejLab/Pantry/8da7787/pheast/scripts/"
+    "https://raw.githubusercontent.com/PejLab/Pantry/8da77879ba7a6c12c5f7a2e95954ae144f68130c/"
+    "pheast/scripts/"
     "fusion_twas/gcta_nr_robust"
 )
 GCTA_SHA256 = "7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9"

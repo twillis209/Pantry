@@ -19,7 +19,7 @@
 # source cache cannot fetch binary files) and checks its sha256, so it needs
 # network access; offline sites set gcta instead.
 # The defaults are upstream Pantry 8da7787's binary:
-# gcta_url: https://raw.githubusercontent.com/PejLab/Pantry/8da7787/pheast/scripts/fusion_twas/gcta_nr_robust
+# gcta_url: https://raw.githubusercontent.com/PejLab/Pantry/8da77879ba7a6c12c5f7a2e95954ae144f68130c/pheast/scripts/fusion_twas/gcta_nr_robust
 # gcta_sha256: 7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9
 
 # Optional settings deep-merged under every dataset.
