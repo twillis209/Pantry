@@ -162,7 +162,7 @@ def _check_dataset(name: str, ds: dict, references: dict):
             # LaDDR always works in <pantry_intermediate>/{dataset}/laddr now.
             if laddr.get("enabled"):
                 print(
-                    f"Note: datasets.{name}.laddr.project_dir is ignored; LaDDR "
+                    f"Note: laddr.project_dir (dataset {name!r}) is ignored; LaDDR "
                     f"uses <pantry_intermediate>/{name}/laddr."
                 )
             del laddr["project_dir"]
