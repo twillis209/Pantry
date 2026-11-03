@@ -166,10 +166,10 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
   - Exact for text files and decompressed `.gz`.
   - With `--noise A B`: BED-like files are compared numerically within 2× the noise pair's max |diff| (R12); `cis_qtl` permutation columns and tie-breaks are judged against the noise pair; `cis_independent` is judged on summary statistics (R8, R9).
   - Writes a markdown report.
-- `tests/configs/`: baseline (old-format) configs for both stages, multi-dataset configs, and dry-run-only configs (`dryrun_multi.yml` with a dotted dataset name; `dryrun_majiq_laddr.yml` for MAJIQ and LaDDR).
+- `tests/configs/`: baseline (old-format) configs for both stages, multi-dataset configs, and dry-run-only configs (`dryrun_multi.yml` with a dotted dataset name; `dryrun_majiq_laddr.yml` for MAJIQ and LaDDR), and `phenotyping_baseline_ir.yml` (upstream's config with intron_retention, for the MAJIQ run).
 - `tests/fixtures/`: `make_multi_inputs.py` (derives the single-end and 300-sample test datasets), `check_targets.py`.
 - `tests/host/`: a host workflow that imports both stages by local path (`Snakefile`) or with `github()` at `module-rc1` (`Snakefile.github`), plus its profile.
-- `tests/profile/` (SLURM test profile), `tests/hpc/` (run records, baseline envs).
+- `tests/profile/` (SLURM test profile), `tests/hpc/` (run records, baseline envs, the `majiq3` env).
 
 ## Lint and formatting
 
@@ -211,7 +211,7 @@ Remaining warnings, each justified:
 - **Contract 8 (fetch a pinned FUSION commit and GCTA/GEMMA)**: FUSION is vendored with Pantry's modifications and installed from the module. gcta is copied, or downloaded from a pinned URL with a sha256 check for remote modules (R24). gemma comes from the `fusion` conda env.
 - **Contract 11 / criterion 11 (standalone)**: works, but standalone outputs gain the `default/` level.
 - **Acceptance criterion 1 for tensorQTL**: tensorQTL is unseeded and nondeterministic upstream, so `*.cis_qtl`/`*.cis_independent_qtl` were judged by attribution rather than equality (R21, R22): identical inputs and command lines, comparison reported but not blocking. kallisto outputs were judged within the run-to-run noise envelope (R11, R12). See `docs/module-status.md`.
-- **MAJIQ (`intron_retention`) and LaDDR** were restructured and checked by dry run only (design decision); runtime verification is a follow-up.
+- **LaDDR** was restructured and checked by dry run only (design decision); runtime verification is a follow-up. MAJIQ (`intron_retention`) was first checked the same way and is now verified at run time (Task 17, below).
 - Spec Corrections 5: `index_fasta` removed, not kept (R15).
 - Spec §2 constraints: some wildcards are narrower enumerations (R4).
 - Spec §6: LaDDR `dataset_name` defaults to the dataset key, so legacy configs that omit it get `default`, not upstream's `pantry` (R16). This affects only LaDDR's internal manifest names.
@@ -220,8 +220,9 @@ Remaining warnings, each justified:
 
 ## Known limitations and follow-ups
 
-- **Runtime verification of MAJIQ and LaDDR** (dry run only). Not covered by any run: the nested directory outputs of `majiq_build`, the `.sj` derivation, and the LaDDR `mv` to a stable name.
-- **Env pinning**: the txrevise python; LaDDR from GitHub HEAD; MAJIQ's named env.
+- **Runtime verification of LaDDR** (dry run only). Not covered by any run: the LaDDR `mv` to a stable name.
+- **MAJIQ verified at run time** (Task 17): MAJIQ 3.0.22 (public academic build, which does not check the licence file) in a named env `majiq3` (`tests/hpc/envs/majiq3.yml`, `majiq3-install.sh`, lock). The intron_retention outputs of the module are byte-identical to upstream 8da7787's, including the nested `majiq_build` outputs and the `.sj` derivation; with symlinked, renamed BAMs the `.sj` files follow the targets and outputs are unchanged. `majiq.psi.tsv` bootstrap columns vary run to run; the extracted `raw_psi_mean` does not.
+- **Env pinning**: the txrevise python; LaDDR from GitHub HEAD; MAJIQ's named env (now reproducible from `tests/hpc/envs/majiq3*`, but named, not pinned, by the rules).
 - **Snakemake source-cache bugs** (9.27.x, `sourcecache.py` `HostingProviderFile.open` / `LocalGitFile._open`; to report upstream, not filed). `git show` output is decoded as text, so (1) `source_path` on a binary file in a `github()` module fails with `UnicodeEncodeError` (worked around by R24), and (2) text files lose their final newline: FUSION R scripts installed from `github()` are 1 byte shorter. This is harmless. See `tests/hpc/README.md`, Task 14.
 - **Nondeterminism**: kallisto 0.48.0 quant varies run to run (node/load dependent; not thread count). tensorQTL permutations and tie-breaks are unseeded. The noise envelopes come from a single pair of baseline runs, and the isoforms kallisto margin in Task 13 was close (max |diff| 0.149 vs allowed 0.167).
 - **Legacy pathvars vs host pathvars**: a legacy `intermediate_dir`/`intermediate_ref_dir` in a module's config overrides the host's module pathvars, because it registers later. Hosts should pass new-format configs only.

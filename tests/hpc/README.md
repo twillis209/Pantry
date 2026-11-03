@@ -229,3 +229,28 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
     af identical in all 8 modalities (0 rows differ). Top-variant ties and permutation columns vary as between baseline run1 and run2.
   - 8 cores (job 8399105): pval_nominal differs in 35-90 rows/file (max rel 1e-5..1e-4), about as much as on the GPU.
   - So the remaining GPU-vs-baseline differences come from parallel reduction order (GPU or multithreaded CPU), not the software stack.
+
+## Task 17: MAJIQ (intron_retention) at run time
+- Env `majiq3` (named, as `majiq_env` defaults): `tests/hpc/envs/majiq3.yml` (conda part: python 3.12, htslib, zstd, xz/liblzma-devel,
+  bzip2, zlib, cmake, compilers) + `tests/hpc/envs/majiq3-install.sh` (clones the public https://bitbucket.org/biociphers/majiq_academic at
+  tag v3.0.22, commit d841baad, sets `HTSLIB_*` and `CMAKE_PREFIX_PATH` to the env, `pip install .` as in its README). No credentials needed.
+  Run in `$H/pantry-runs/t17`: `sjob -c 4 -m 7500M -t 0-02:00:00 -e base "bash majiq3-install.sh $PWD/build"` (job 8399463, 5 min; 8399456
+  failed: without the conda xz headers CMake picked the system liblzma, which has no `lzma.h`). Lock: `tests/hpc/envs/majiq3.lock.txt`
+  (pip packages as trailing comments: rna_majiq/rna_voila/rna_moccasin 3.0.22, numpy 2.0.1, zarr 2.18.3, xarray 2024.6.0, dask 2024.7.1).
+- Licence: the public build sets `LICENSE_CHECKING_TYPE = "None"` (`voila/rna_voila/api_static/licensing.py`), so `--license` is accepted
+  but not read. The bundled `majiq_license_academic_official.lic` decodes to an academic licence without expiry.
+- Config `tests/configs/phenotyping_baseline_ir.yml` = upstream `phenotyping/config.yml` (intron_retention kept, LaDDR off). Targets only
+  `intron_retention.bed.gz{,.tbi}` and `intron_retention.phenotype_groups.txt` (refactor: under `output/default/`).
+- Baselines `$H/pantry-baseline/phenotyping_ir{,_run2}` (`git archive 8da7787 phenotyping`, `input` link), env pantry-baseline-pheno,
+  `--profile tests/profile` unchanged: upstream has `conda:` only on the MAJIQ rules, so the named env is activated for them alone and every
+  other rule runs in the controller env, as in the first baseline. `$H/pantry-runs/t17/run.sh <rundir> <Snakefile> [targets]`.
+  Dry runs 8399457 (59 jobs) / 8399458 (gate-ir: same + validate_annotation, write_samples; MAJIQ command lines equal up to path prefixes).
+  STAR/BAM steps 8399464-6, IR steps 8399661 / 8399662 (baselines), 8399663 (gate-ir, module 9464ad2): all EXIT=0, MAJIQ at 8 threads.
+  Archived to `archive/phenotyping_ir{,_run2}` (bed.gz, .tbi, phenotype_groups.txt, unnorm/intron_retention.bed).
+- MAJIQ noise: `majiq.psi.tsv` differs run to run in the bootstrap columns only (`bootstrap_psi_std`, `psi_quantile_*`; up to ~0.1),
+  in run1 vs run2 and in gate-ir vs run1 alike. `extract_ir_psi.py` uses `raw_psi_mean`, which is identical, so every final file is
+  byte-identical across the two baselines and gate-ir.
+- Compare 8399692 (`gate-ir/compare.sh`): run1 vs run2 MATCH; gate-ir vs run1 byte-exact (no `--noise`) MATCH; with `--noise` MATCH.
+- Symlinked BAMs (fix 21ec32d): `$H/pantry-runs/gate-ir-symlink` = `cp -a` of gate-ir with `bam/{s}.bam{,.bai}` -> `../bam_real/{s}.renamed.bam{,.bai}`
+  and the IR outputs removed. Dry run 8399693: 9 IR jobs, `.sj` paths `build/{s}.renamed.sj`. Run 8399696 (9/9, EXIT=0): MAJIQ wrote
+  `build/{s}.renamed.sj`, psi-coverage read them, and the 3 final files are byte-identical to gate-ir's.

@@ -142,7 +142,9 @@ How far the tensorQTL results are from upstream's:
 - `cis_independent` row sets change by about as much as between the two baseline runs.
 - The tensorQTL image now has upstream's versions (tensorqtl 1.0.10, torch 2.3.1, pandas 2.3.3, Python 3.12; Task 16, superseding R23). On 1 CPU, as the baseline ran, it reproduces the baseline's nominal statistics exactly in all 8 modalities. The GPU, or several CPU threads, shift `pval_nominal` by up to ~1e-4 relative.
 
-**MAJIQ (`intron_retention`) and LaDDR** were restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. They are excluded from every run above.
+**MAJIQ (`intron_retention`)** is now verified at run time (Task 17): with MAJIQ 3.0.22 in the named env `majiq3`, the refactored rules reproduce upstream 8da7787 byte for byte on the test data (`intron_retention.bed.gz`, `.phenotype_groups.txt`, `unnorm/intron_retention.bed`), as do two upstream runs of each other. A run with renamed, symlinked BAMs names the `.sj` files after the targets and gives the same outputs. See `tests/hpc/README.md`, Task 17.
+
+**LaDDR** was restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. It is excluded from every run above.
 
 **Margin to watch.** The isoforms kallisto margin in the multi-dataset run was close: max |diff| 0.149 vs allowed 0.167. The envelope comes from a single baseline pair.
 
@@ -156,8 +158,8 @@ How far the tensorQTL results are from upstream's:
 
 ## Follow-ups
 
-1. Runtime verification of MAJIQ and LaDDR.
-2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD; MAJIQ's named env.
+1. Runtime verification of LaDDR (MAJIQ done, Task 17).
+2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD. MAJIQ's named env is built from `tests/hpc/envs/majiq3.yml` + `majiq3-install.sh` (v3.0.22), but the rules still name it rather than pin it.
 3. Report the Snakemake source-cache bugs upstream: binary files fail, and text files lose their final newline under `github()`.
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".
