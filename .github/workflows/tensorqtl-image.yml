@@ -2,6 +2,8 @@ name: tensorqtl-image
 
 on:
   push:
+    branches:
+      - module
     paths:
       - "containers/tensorqtl/**"
       - ".github/workflows/tensorqtl-image.yml"
