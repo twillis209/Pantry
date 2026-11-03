@@ -12,6 +12,15 @@
 # utils/FUSION.profile_wgt.R; gcta is the path to a gcta binary.
 # fusion_dir: /path/to/fusion
 # gcta: /path/to/gcta64
+#
+# When this workflow is loaded from a local path, the bundled gcta_nr_robust is
+# copied. When it is loaded remotely (e.g. github() in a host's module), the
+# install_fusion job downloads gcta_nr_robust from gcta_url instead (Snakemake's
+# source cache cannot fetch binary files) and checks its sha256, so it needs
+# network access; offline sites set gcta instead.
+# The defaults are upstream Pantry 8da7787's binary:
+# gcta_url: https://raw.githubusercontent.com/PejLab/Pantry/8da7787/pheast/scripts/fusion_twas/gcta_nr_robust
+# gcta_sha256: 7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9
 
 # Optional settings deep-merged under every dataset.
 # defaults: {}
