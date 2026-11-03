@@ -1,7 +1,9 @@
 # tensorQTL rules run in this container (under --sdm apptainer) rather than a
-# conda env; it is pinned by digest (docker://francois4/tensorqtl:latest as of
-# 2026-11-02). GPU use needs apptainer's --nv (see tests/profile).
-TENSORQTL_CONTAINER = "docker://francois4/tensorqtl@sha256:f6efb9e592eb32c46cb75070be2769b34381d60cbb2709d2885771324abfe32a"
+# conda env: containers/tensorqtl (tensorqtl 1.0.10, torch 2.3.1+cu121, pandas
+# 2.3.3, Python 3.12, as in the baseline env), built by
+# .github/workflows/tensorqtl-image.yml and pinned by digest (tag 1.0.10).
+# GPU use needs apptainer's --nv (see tests/profile).
+TENSORQTL_CONTAINER = "docker://ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9fd74a4bc5f0f6a1a2a88a19e1140b62bbef5b3f2e6fc9de4330bde9b8"
 
 
 def grouped(wildcards) -> bool:
