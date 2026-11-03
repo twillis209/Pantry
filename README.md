@@ -4,6 +4,8 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
+> **Module branch.** This fork's `module` branch (release `module-v0.1.0`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
 ## Setup
@@ -46,22 +48,25 @@ set-resources:
   tensorqtl_cis:
     slurm_partition: "our-gpu-partition"
     slurm_account: "our-gpu-account"
-    slurm_extra: "'--gres=gpu:1'"
+    gpu: 1
   tensorqtl_cis_independent:
     slurm_partition: "our-gpu-partition"
     slurm_account: "our-gpu-account"
-    slurm_extra: "'--gres=gpu:1'"
+    gpu: 1
   tensorqtl_trans:
     slurm_partition: "our-gpu-partition"
     slurm_account: "our-gpu-account"
-    slurm_extra: "'--gres=gpu:1'"
-use-conda: true
+    gpu: 1
+software-deployment-method:
+  - conda
+  - apptainer
+apptainer-args: "--nv --bind=/path/to/your/data"
 latency-wait: 60
 max-jobs-per-timespan: "1/1s"
 max-status-checks-per-second: 5
 ```
 
-This uses snakemake v8 or higher and the `snakemake-executor-plugin-slurm` plugin. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
+This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules, which run in a pinned container under apptainer. `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment). The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
 
 ## Run on test data
 
@@ -119,18 +124,30 @@ Pantry also includes an optional LaDDR add-on in `steps/laddr.smk` to generate l
 
 ### Config file
 
-The config file is a file in YAML format specifying general parameters, input files, and modalities to generate. `phenotyping/` includes a default config, which is for the above example dataset above, and must be customized for your data:
+The config file is a file in YAML format specifying general parameters, input files, and modalities to generate. `phenotyping/` includes a default config, which is for the above example dataset above, and must be customized for your data. Named reference sets are listed under `references:`, and each dataset under `datasets:`. Outputs go to `output/<dataset>/`, and the files generated from a reference set are built once, under `intermediate/reference/<reference>/`:
 
 ```yaml
-## Raw RNA-Seq data
-paired_end: True
-read_length: 75
-fastq_dir: input/fastq
-fastq_map: input/fastq_map.txt
-...
+references:
+  default:
+    genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+    annotation: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+    edit_sites_bed: input/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+datasets:
+  default:
+    reference: default
+    ## Raw RNA-Seq data
+    paired_end: True
+    read_length: 75
+    fastq_dir: input/fastq
+    fastq_map: input/fastq_map.txt   # or an inline {sample: [[R1 files], [R2 files]]}
+    samples: input/samples.txt       # or an inline list
+    modality_groups:
+      ...
 ```
 
-An optional top-level `laddr:` section enables latent residual phenotypes. Key options include:
+The older single-dataset format (`ref_genome`, `ref_anno`, `samples_file`, ... at the top level) is still accepted, as reference and dataset `default`. `CHANGES-module.md` has the table of old and new keys. If you run with `--configfile`, note that Snakemake merges it with the directory's `config.yml`. Either edit `config.yml`, or run from another directory with `-s <path>/Snakefile --directory <dir>`.
+
+An optional per-dataset `laddr:` section enables latent residual phenotypes. Key options include:
 
 - `enabled`: turn LaDDR integration on/off.
 - `regress_modalities`: normalized Pantry modalities to regress out during `laddr coverage`.
@@ -183,14 +200,14 @@ This file, whose path is specified in the config file, is the list of samples to
 
 ### Phenotype files
 
-The phenotyping stage will result in phenotype tables (RNA phenotypes x samples) in `output/unnorm/`, and normalized versions directly in `output/`.
+The phenotyping stage will result in phenotype tables (RNA phenotypes x samples) in `output/<dataset>/unnorm/`, and normalized versions directly in `output/<dataset>/` (`output/default/` for the default config).
 
 If LaDDR is enabled, additional files are produced:
 
-- `output/unnorm/latent_residual.bed`
-- `output/latent_residual.bed.gz`
-- `output/latent_residual.bed.gz.tbi`
-- `output/latent_residual.phenotype_groups.txt`
+- `output/<dataset>/unnorm/latent_residual.bed`
+- `output/<dataset>/latent_residual.bed.gz`
+- `output/<dataset>/latent_residual.bed.gz.tbi`
+- `output/<dataset>/latent_residual.phenotype_groups.txt`
 
 The [BED](https://genome.ucsc.edu/FAQ/FAQformat.html#format1) files include four annotation columns, `chr`, `start`, `end`, and `phenotype_id`, followed by one column per sample containing the phenotype values. There may be one phenotype per gene (e.g. expression) or multiple (e.g. splicing), but in either case the coordinates indicate the transcription start site of the phenotype's gene. This ensures that the same cis-window variants are tested for all phenotypes of the same gene.
 
@@ -228,7 +245,7 @@ The second stage of Pantry, Pheast, runs downstream genetic analyses such as map
 
 #### Combined-modality cis-QTL mapping
 
-`tensorqtl` has a mode to find conditionally independent cis-QTLs per gene. This can handle data with multiple phenotypes per gene, preventing redundant cis-sQTLs, for example. By combining phenotypes across all modalities into one table and one phenotype groups file, conditionally independent cis-QTL mapping will avoid redundant cis-QTLs across modalities too. A script, `combine_modalities.sh`, is provided to combine phenotype tables into a 'cross_modality' modality. Add (or uncomment) 'cross_modality' to the modality list in the Pheast config, and run `tensorqtl` in the same way as for other grouped phenotype data.
+`tensorqtl` has a mode to find conditionally independent cis-QTLs per gene. This can handle data with multiple phenotypes per gene, preventing redundant cis-sQTLs, for example. By combining phenotypes across all modalities into one table and one phenotype groups file, conditionally independent cis-QTL mapping will avoid redundant cis-QTLs across modalities too. Set `cross_modality: {modalities: [...]}` on a phenotyping dataset to have the pipeline combine those phenotype tables into a 'cross_modality' modality (`output/<dataset>/cross_modality.bed.gz` and its phenotype groups file); the script `combine_modalities.sh` does the same manually. Add (or uncomment) 'cross_modality' to the modality list in the Pheast config, and run `tensorqtl` in the same way as for other grouped phenotype data.
 
 #### Matching phenotypes to genotypes
 
@@ -252,11 +269,50 @@ cd pheast
 
 It is recommended to run the script before executing the Pheast snakemake workflow to prepare your phenotype files and save to `input/phenotypes/`. The script is not necessary for the example data, since different inputs for phenotyping and Pheast are provided.
 
+#### Pheast config
+
+The Pheast config also lists datasets under `datasets:` (each with `phenotype_dir`, `geno_prefix`, `samples`, `modalities`, `analyses` and the QTL/TWAS settings), with an optional `defaults:` block shared by all of them; see `pheast/config.yml`. The old single-dataset format is still accepted. Outputs go to `output/<dataset>/`. FUSION, bundled in `scripts/fusion_twas/`, is installed into `intermediate/resources/fusion/`; `fusion_dir` and `gcta` override it.
+
 #### Pheast output files
 
 TWAS batch workers automatically limit OpenBLAS, OpenMP, MKL, BLIS, and Accelerate to one thread per subprocess; `twas_threads` controls the number of phenotypes fitted concurrently. No shell environment settings are needed. Each phenotype's wall time, including input preparation and cleanup but excluding time queued for a worker, is recorded in `elapsed_seconds` in the batch status table. A sibling `<batch_start>_<batch_end>.timings.tsv` table is updated atomically after every completed phenotype, including scientific skips and failures, so completed timings remain available when a batch fails or is interrupted. An interrupted phenotype has no completed timing.
 
 Pheast will generate, in its own `output/` directory, results in their typical formats, including cis-QTL files directly from `tensorqtl` and TWAS transcriptomic models in the same compressed archive format as the [models provided in the FUSION documentation](http://gusevlab.org/projects/fusion/#download-pre-computed-predictive-models).
+
+## Using Pantry as a module
+
+A host Snakemake workflow (Snakemake ≥ 9.12) can import each stage once and run all its datasets in one DAG. It sets the output locations with pathvars:
+
+```python
+module pantry_pheno:
+    pathvars:
+        pantry_output="<results>/pantry/phenotypes",
+        pantry_intermediate="<results>/pantry/intermediate/phenotyping",
+        pantry_reference="<resources>/pantry/reference",
+    snakefile:
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.0")
+    config:
+        config["pantry"]["phenotyping"]
+
+use rule * from pantry_pheno as pantry_pheno_*
+
+module pantry_pheast:
+    pathvars:
+        pantry_output="<results>/pantry/pheast",
+        pantry_intermediate="<results>/pantry/intermediate/pheast",
+        pantry_resources="<resources>/pantry",
+    snakefile:
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.0")
+    config:
+        config["pantry"]["pheast"]
+
+use rule * from pantry_pheast as pantry_pheast_*
+```
+
+- **Linking the stages.** Point a Pheast dataset's `phenotype_dir` at the phenotyping output (`results/pantry/phenotypes/<dataset>`) to chain the two stages in one DAG.
+- **Profile settings.** In the profile, `set-resources` keys use the prefixed rule names (e.g. `pantry_pheast_tensorqtl_cis`).
+- **gcta under `github()`.** Under `github()`, the FUSION install job downloads the `gcta_nr_robust` binary from a pinned URL and checks its sha256. Offline sites set `gcta` in the Pheast config instead.
+- **Examples and details.** `tests/host/` holds a working example (`Snakefile`, `config.yaml`, `profile/`). Details are in `docs/module-status.md` and `CHANGES-module.md`.
 
 ## Citing
 
