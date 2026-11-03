@@ -1,5 +1,5 @@
 # majiq3 env, job 8399463: mamba list --explicit + pip list (majiq_academic v3.0.22, commit d841baad8a3498251e0113fe5f7c41783c4eb55f)
-List of packages in environment: "/data/hps/assoc/private/gdml/user/twil15/opt/miniforge3/envs/majiq3"
+# List of packages in environment: "/data/hps/assoc/private/gdml/user/twil15/opt/miniforge3/envs/majiq3"
 
 https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
 https://conda.anaconda.org/conda-forge/linux-64/binutils_impl_linux-64-2.46.1-default_hfdba357_103.conda
