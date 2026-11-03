@@ -8,7 +8,7 @@ Test commands and HPC run records: `tests/hpc/README.md`.
 
 **What it does not change.** Analysis logic, default parameters and output file formats are unchanged. Rule bodies changed only where a path or parameter now comes from somewhere else. `git diff 8da7787 -- pheast/scripts` is empty. In `phenotyping/scripts`, only a usage comment was added to `combine_modalities.sh`. The one exception to "same software" is tensorQTL's runtime: under apptainer it runs in a pinned container (see [Environments](#environments-containers-gpu)).
 
-Requires **Snakemake ≥ 9.12** (pathvars). Both Snakefiles set `min_version("9.12")`. Tested with 9.26–9.27.1.
+Requires **Snakemake ≥ 9.12** (pathvars). Both Snakefiles set `min_version("9.12")`. Tested with 9.27.1 (HPC runs and local dry runs) and 9.27.0 (local spike).
 
 ## Contents
 - [Layout and pathvars](#layout-and-pathvars)

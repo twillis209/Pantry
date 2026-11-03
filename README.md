@@ -57,7 +57,7 @@ set-resources:
     slurm_partition: "our-gpu-partition"
     slurm_account: "our-gpu-account"
     gpu: 1
-software-deployment-method:
+software-deployment-method:  # drop apptainer if you don't have it; tensorqtl then runs in your env
   - conda
   - apptainer
 apptainer-args: "--nv --bind=/path/to/your/data"

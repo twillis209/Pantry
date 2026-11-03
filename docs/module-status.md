@@ -6,7 +6,11 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 ## Branch and tag
 
 - Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.0`**. Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
-- `module-rc1` (`a140598`) is the commit that the last HPC runs (Task 14) used.
+- What ran at which commit:
+  - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
+  - the full local-path host run (job 8396531) ran at `56c8c22`;
+  - the R24 re-verification (job 8398071: local-path host dry run, `install_fusion`, and the `github()` host dry run plus two jobs) ran at `a140598` = `module-rc1`;
+  - R24 changed only how `install_fusion` resolves gcta.
 - `module-v0.1.0` adds no-rerun changes on top of `module-rc1`, checked locally by unit tests and dry runs. None of them can change any output:
   - a 300 s download timeout for gcta;
   - two validations: legacy top-level keys beside `datasets:` are rejected, and duplicate `cross_modality` modalities are rejected;
