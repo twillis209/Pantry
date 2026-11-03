@@ -1,0 +1,61 @@
+# Host workflow test (criterion 3): imports both Pantry stages as modules by
+# local path, with the host layout of the design spec (section 1). Run from a
+# run directory holding config.yaml (a copy of tests/host/config.yaml) and the
+# input/ links it describes, with the host profile:
+#   snakemake -s <repo>/tests/host/Snakefile --profile <repo>/tests/host/profile
+# Targets: 'all' (every dataset of both stages) or 'tested' (phenotyping 'full'
+# and pheast 'geuvadis', the run-time test; 'chained' is dry-run only).
+from snakemake.utils import min_version
+
+min_version("9.12")
+
+
+configfile: "config.yaml"
+
+
+pathvars:
+    results="results",
+    resources="resources",
+
+
+module pantry_pheno:
+    pathvars:
+        pantry_output="<results>/pantry/phenotypes",
+        pantry_intermediate="<results>/pantry/intermediate/phenotyping",
+        pantry_reference="<resources>/pantry/reference",
+    snakefile:
+        "../../phenotyping/Snakefile"
+    config:
+        config["pantry"]["phenotyping"]
+
+
+use rule * from pantry_pheno as pantry_pheno_*
+
+
+module pantry_pheast:
+    pathvars:
+        pantry_output="<results>/pantry/pheast",
+        pantry_intermediate="<results>/pantry/intermediate/pheast",
+        pantry_resources="<resources>/pantry",
+    snakefile:
+        "../../pheast/Snakefile"
+    config:
+        config["pantry"]["pheast"]
+
+
+use rule * from pantry_pheast as pantry_pheast_*
+
+
+# Both modules' 'all' rules are default targets too; this one is defined last.
+rule all:
+    default_target: True
+    input:
+        rules.pantry_pheno_all.input,
+        rules.pantry_pheast_all.input,
+
+
+rule tested:
+    """Datasets run in full by the host test: phenotyping 'full', pheast 'geuvadis'."""
+    input:
+        rules.pantry_pheno_all.input,
+        [f for f in rules.pantry_pheast_all.input if "/geuvadis/" in f],

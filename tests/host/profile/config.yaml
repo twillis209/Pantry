@@ -1,0 +1,42 @@
+executor: slurm
+jobs: 100
+default-resources:
+  slurm_account: "gdml"
+  slurm_partition: "cpu-core"
+  runtime: 60
+  mem_mb: threads * 7500
+# Per-rule conda envs; the tensorQTL rules run in a container instead.
+software-deployment-method:
+  - conda
+  - apptainer
+# --nv exposes the GPU to the tensorQTL container (a warning only on CPU
+# nodes; Snakemake has no per-rule apptainer-args). The bind is the group
+# share: a container otherwise sees only $PWD, not the targets of symlinks
+# such as input/ -> the test data.
+apptainer-args: "--bind=/data/hps/assoc/private/gdml --nv"
+# Shared across run dirs so gate runs reuse the built envs and pulled image.
+conda-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/conda-envs"
+apptainer-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/apptainer"
+# Host test profile: tests/profile with the set-resources keys renamed to the
+# host's rule names (pantry_pheast_ prefix from 'use rule * ... as pantry_pheast_*').
+# Flat form (a nested threads: mapping is rejected at submission). The GPU is
+# requested with the slurm plugin's gpu resource: the plugin rejects --gpus in
+# slurm_extra (genex's form).
+set-resources:
+  pantry_pheast_tensorqtl_cis:
+    slurm_partition: "gpu-core"
+    slurm_account: "gdml"
+    gpu: 1
+  pantry_pheast_tensorqtl_cis_independent:
+    slurm_partition: "gpu-core"
+    slurm_account: "gdml"
+    gpu: 1
+  pantry_pheast_tensorqtl_trans:
+    slurm_partition: "gpu-core"
+    slurm_account: "gdml"
+    gpu: 1
+rerun-triggers: mtime
+keep-going: True
+rerun-incomplete: True
+nolock: True
+max-status-checks-per-second: 1

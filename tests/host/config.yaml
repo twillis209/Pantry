@@ -1,0 +1,115 @@
+# Host workflow test (criterion 3): both stages imported as modules by
+# tests/host/Snakefile, each with its section under 'pantry'.
+# Paths are relative to the run directory, which needs links to the test data:
+#   mkdir input
+#   ln -s <test data>/phenotyping/input input/phenotyping
+#   ln -s <test data>/pheast/input input/pheast
+pantry:
+  phenotyping:
+    references:
+      grch38_chr1:
+        genome: input/phenotyping/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+        annotation: input/phenotyping/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+        edit_sites_bed: input/phenotyping/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+    datasets:
+      # 16 paired-end samples, baseline settings, plus the cross-modality BED.
+      full:
+        reference: grch38_chr1
+        samples: input/phenotyping/samples.txt
+        fastq_map: input/phenotyping/fastq_map.txt
+        fastq_dir: input/phenotyping/fastq
+        paired_end: true
+        read_length: 75
+        modality_groups:
+          alt_TSS_polyA:
+            files:
+              - alt_TSS.bed.gz
+              - alt_TSS.bed.gz.tbi
+              - alt_TSS.phenotype_groups.txt
+              - alt_polyA.bed.gz
+              - alt_polyA.bed.gz.tbi
+              - alt_polyA.phenotype_groups.txt
+          expression:
+            files:
+              - expression.bed.gz
+              - expression.bed.gz.tbi
+              - isoforms.bed.gz
+              - isoforms.bed.gz.tbi
+              - isoforms.phenotype_groups.txt
+          RNA_editing:
+            edit_sites_min_coverage: 20
+            edit_sites_min_samples: 10
+            edit_sites_min_samples_fraction: 0.1
+            edit_sites_cluster: false
+            edit_sites_correlation_threshold: 0.9
+            files:
+              - RNA_editing.bed.gz
+              - RNA_editing.bed.gz.tbi
+              - RNA_editing.phenotype_groups.txt
+              - RNA_editing.site_to_phenotype.tsv
+          splicing:
+            files:
+              - splicing.bed.gz
+              - splicing.bed.gz.tbi
+              - splicing.phenotype_groups.txt
+          stability:
+            files:
+              - stability.bed.gz
+              - stability.bed.gz.tbi
+        cross_modality:
+          modalities:
+            - alt_polyA
+            - alt_TSS
+            - expression
+            - isoforms
+            - RNA_editing
+            - splicing
+            - stability
+
+  pheast:
+    defaults:
+      geno_prefix: input/pheast/GEUVADIS.445_samples.GRCh38.chr1_120Mb
+      qtl_min_allele_count: 10
+      twas_snps: input/pheast/ld_snps_chr1.txt
+      twas_models_per_job: 200
+      twas_threads: 4
+      modalities:
+        alt_polyA:
+          grouped: true
+        alt_TSS:
+          grouped: true
+        expression:
+          grouped: false
+        isoforms:
+          grouped: true
+        RNA_editing:
+          grouped: true
+        splicing:
+          grouped: true
+        stability:
+          grouped: false
+      analyses:
+        heritability:
+          files:
+            - "{modality}.hsq.tsv"
+        qtl:
+          files:
+            - "{modality}.cis_qtl.txt.gz"
+            - "{modality}.cis_independent_qtl.txt.gz"
+        twas:
+          files:
+            - "{modality}.tar.bz2"
+    datasets:
+      # The pheast test data (445 samples), baseline settings; run in full.
+      geuvadis:
+        phenotype_dir: input/pheast/phenotypes
+        samples: input/pheast/samples.txt
+        modalities:
+          intron_retention:
+            grouped: true
+      # Chained to this host's phenotyping output for 'full', so its jobs wait
+      # on the phenotyping rules. Dry run only: 16 samples are too few for
+      # pheast's 20 phenotype PCs.
+      chained:
+        phenotype_dir: results/pantry/phenotypes/full
+        samples: input/phenotyping/samples.txt
