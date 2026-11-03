@@ -272,7 +272,10 @@ def install_gcta(dest, src=None, url=None, sha256=None) -> None:
             raise ValueError("install_gcta needs src, or url and sha256")
         part = dest.with_name(dest.name + ".part")
         try:
-            with urllib.request.urlopen(url) as response, open(part, "wb") as out:
+            # timeout bounds a stalled connection (seconds per blocking read).
+            with urllib.request.urlopen(url, timeout=300) as response, open(
+                part, "wb"
+            ) as out:
                 shutil.copyfileobj(response, out)
             actual = _sha256(part)
             if actual != sha256.lower():
