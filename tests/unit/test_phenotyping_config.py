@@ -266,6 +266,22 @@ def test_single_end_requires_fragment_length():
         cfg.normalise(raw)
 
 
+def test_single_end_detected_from_map_requires_fragment_length(tmp_path):
+    # paired_end omitted: endedness comes from the FASTQ map.
+    single = tmp_path / "map.txt"
+    single.write_text("S1_R1.fq.gz\tS1\n")
+    paths = cfg.load_fastq_map(str(single), "fq", None)
+    with pytest.raises(ValueError, match=r"datasets\.d1: fragment_length_mean and "):
+        cfg.check_fragment_length("d1", {}, paths)
+    with pytest.raises(ValueError, match=r"datasets\.d1: fragment_length_sd required"):
+        cfg.check_fragment_length("d1", {"fragment_length_mean": 200}, paths)
+    cfg.check_fragment_length(
+        "d1", {"fragment_length_mean": 200, "fragment_length_sd": 50}, paths
+    )
+    paired = cfg.load_fastq_map({"S1": [["a_1"], ["a_2"]]}, None, None)
+    cfg.check_fragment_length("d1", {}, paired)
+
+
 def test_rna_editing_requires_edit_sites_bed():
     c = new_config()
     c["datasets"]["d1"]["modality_groups"]["RNA_editing"] = {"files": []}

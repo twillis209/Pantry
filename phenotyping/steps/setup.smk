@@ -77,9 +77,11 @@ def dataset_samples(dataset: str) -> list:
 def fastq(dataset: str) -> dict:
     """FASTQ map of a dataset ({sample: (paths, is_paired)}), read on first use."""
     d = CONFIG["datasets"][dataset]
-    return pantry_config.load_fastq_map(
+    paths = pantry_config.load_fastq_map(
         d["fastq_map"], d.get("fastq_dir"), d.get("paired_end")
     )
+    pantry_config.check_fragment_length(dataset, d, paths)
+    return paths
 
 
 def ref_file(key: str):

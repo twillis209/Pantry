@@ -273,6 +273,23 @@ def _check_endedness(paths: dict, paired_end):
                 )
 
 
+def check_fragment_length(dataset: str, ds: dict, paths: dict) -> None:
+    """Require fragment_length_mean/_sd if any sample of the dataset is single-end.
+
+    _check_dataset covers paired_end: false; this covers an omitted paired_end,
+    where endedness is known only once the FASTQ map is loaded.
+    """
+    single = [sample_id for sample_id, (_, is_paired) in paths.items() if not is_paired]
+    if not single:
+        return
+    missing = [k for k in ("fragment_length_mean", "fragment_length_sd") if k not in ds]
+    if missing:
+        raise ValueError(
+            f"datasets.{dataset}: {' and '.join(missing)} required for single-end "
+            f"data (sample {single[0]} has single-end reads)"
+        )
+
+
 def load_fastq_map(spec, fastq_dir, paired_end) -> dict:
     """Load the FASTQ file paths for each sample.
 
