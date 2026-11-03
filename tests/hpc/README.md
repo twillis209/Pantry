@@ -178,12 +178,27 @@ $H/pantry-runs/t14_run.sh <rundir> <host Snakefile> [targets/args]`.
   `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking, R22); heritability x8, TWAS x8, genotype_qc pass; check_targets 33/33. R22(a): covar
   inputs byte-identical to the baseline's (only `geno_pruned.log` differs); the 17 run_tensorqtl.py/genotype_qc.py command lines identical
   to the baseline's (`-p` prints each command twice in this log, so `sort -u` first).
-- github() (tag `module-rc1` = 56c8c22, `tests/host/Snakefile.github`, run dir `$H/pantry-runs/host-github`): dry run 8398062 fails at
-  parse: `UnicodeEncodeError in file ".../module-rc1/pheast/steps/setup.smk", line 36: 'utf-8' codec can't encode character '\udc87'
-  in position 42: surrogates not allowed` (from `pheast/steps/fusion.smk` line 20, `script("fusion_twas/gcta_nr_robust")`). Cause:
-  Snakemake's `HostingProviderFile.open` (sourcecache.py line 595 in 9.27.1) caches `repo.git.show(f"{ref}:{path}").encode()`; GitPython
-  returns the blob as str decoded with surrogateescape, and strict UTF-8 `.encode()` fails on any binary file. So no github() host can load
-  pheast while the binary is fetched via source_path (eagerly at parse, so the `fusion_dir`/`gcta` overrides don't help).
-  Phenotyping alone via github() works (scratch `host-github/Snakefile.pheno_only`, job 8398063): dry run 345 jobs EXIT=0, and
-  `preprocess_gtf_for_txrevise` (script via source_path, SLURM job 8398064, new conda env from the remote env file) -> EXIT=0, output
-  byte-identical to the local-path host's.
+- github(), first attempt (tag `module-rc1` then 56c8c22): dry run 8398062 failed at parse with the Snakemake bug below (pheast's
+  install_fusion called `source_path` on `gcta_nr_robust` at parse time). Phenotyping alone via github() worked (scratch
+  `host-github/Snakefile.pheno_only`, job 8398063: dry run 345 jobs; `preprocess_gtf_for_txrevise`, SLURM job 8398064, EXIT=0, output
+  byte-identical to the local-path host's).
+- Fix (ruling R24, a140598): gcta is resolved only in install_fusion's run block: configured `gcta` -> nothing installed for it; module
+  loaded from a local path (its source dir exists on disk) -> bundled file copied; else downloaded from `gcta_url` (default: upstream
+  8da7787's file on raw.githubusercontent.com) and checked against `gcta_sha256` (7b51e51d...93e9); then chmod +x.
+  Tag `module-rc1` moved to a140598 (force-pushed). Stale fork entries removed from `~/.cache/snakemake/snakemake/source-cache/`
+  ({https/raw.githubusercontent.com,hosted-git/githubfile/github.com,snakemake-git-cache/github.com}/twillis209): the cache is keyed by tag.
+- Re-verification, job 8398071 (`$H/pantry-runs/t14_r24.sh`): local-path host dry run of `all` EXIT=0, 60 jobs, all `chained` (nothing of
+  `full`/`geuvadis` reruns); `pantry_pheast_install_fusion` in a fresh dir (`host-fusion-local`) EXIT=0, 4 files byte-identical to the
+  host run's, gcta executable. github() host (`Snakefile.github`): dry run of `all` EXIT=0 (470 jobs); run of `pantry_pheast_install_fusion`
+  + `resources/pantry/reference/grch38_chr1/exonic.gtf` (`exonic_intronic_from_GTF`, script via source_path) EXIT=0: gcta_nr_robust
+  downloaded (absent from the source cache), sha256 7b51e51d...93e9, executable, identical to the bundled one; exonic.gtf identical to the
+  local host's. The 3 FUSION R scripts differ from the local copies only by the missing final newline (second bug below).
+
+### Snakemake source-cache bugs (to report upstream; not filed)
+Snakemake 9.27.1 (HPC env pantry-baseline-pheno; same code in 9.27.0 locally), `snakemake/sourcecache.py`, `HostingProviderFile.open`
+(line 595; `_open` for `LocalGitFile` at line 883 has the same pattern): `io.BytesIO(self.hosted_repo.repo.git.show(f"{ref}:{path}").encode())`.
+GitPython returns the blob as str (decoded with surrogateescape, trailing newline stripped), so
+1. binary files fail: `UnicodeEncodeError: 'utf-8' codec can't encode character '\udc87' in position 42: surrogates not allowed`
+   (any `workflow.source_path` on a binary in a github()/gitlab() module);
+2. text files lose their final newline (FUSION R scripts installed from github() are 1 byte shorter).
+Likely fix: `git.show(..., stdout_as_string=False, strip_newline_in_stdout=False)` and no `.encode()`.

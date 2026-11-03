@@ -1,8 +1,8 @@
 # Host workflow test (criterion 3), remote variant: as tests/host/Snakefile,
 # but both stages are fetched from GitHub at tag module-rc1 with github().
-# Currently fails to load with Snakemake 9.27: caching the binary
-# pheast/scripts/fusion_twas/gcta_nr_robust raises UnicodeEncodeError (the
-# source cache decodes git blobs as text); see tests/hpc/README.md, Task 14.
+# Snakemake's git source cache cannot fetch binary files, so pheast's
+# install_fusion downloads gcta from gcta_url (sha256-checked) here instead of
+# copying the bundled one; see tests/hpc/README.md, Task 14.
 # Run from a run directory holding config.yaml (a copy of
 # tests/host/config.yaml) and the input/ links it describes, with the host
 # profile:
