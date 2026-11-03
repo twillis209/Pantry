@@ -156,3 +156,34 @@ controller envs as Task 12: `sjob -c 2 -m 7500M -t 0-12:00:00 -e <env> bash t13_
   R22(a): `intermediate/full/covar` (covar.tsv x8, covar.plink.tsv x8, geno_pruned.{bed,bim,fam,prune.in,prune.out}) byte-identical to the
   baseline's; the 17 `full` run_tensorqtl.py/genotype_qc.py command lines identical to `gate3-pheast/cmds_baseline.norm`.
   check_targets: full 33/33, subset 33/33 (subset covariates have 300 samples; genotype_qc threshold 20).
+
+## Task 14: host workflow test (criterion 3)
+`tests/host/Snakefile` imports both stages by local path (spec §1 pathvars under `results/`, `resources/`); `tests/host/config.yaml`
+has phenotyping `full` (+ cross_modality over the 7 modalities) and pheast `geuvadis` (test data) and `chained`
+(`phenotype_dir: results/pantry/phenotypes/full`, 16 phenotyping samples, 7 modalities, all analyses; dry run only). `chained` has no
+cross_modality: pheast allows that modality only with `qtl` alone, and the checkpoint is used only by heritability/TWAS.
+`tests/host/profile` = `tests/profile` with set-resources keyed by the host rule names (`pantry_pheast_tensorqtl_*`).
+Run dir `$H/pantry-runs/host` (`input/{phenotyping,pheast}` links, config.yaml copied), controller env `pantry-baseline-pheno`
+(Snakemake 9.27.1; the phenotyping module needs gtfparse at parse time): `sjob -c 2 -m 7500M -t 0-12:00:00 -e pantry-baseline-pheno
+$H/pantry-runs/t14_run.sh <rundir> <host Snakefile> [targets/args]`.
+- Dry run of `all` (8396530): 472 jobs, EXIT=0. `pantry_pheast_covariates` for `chained` takes `results/pantry/phenotypes/full/expression.bed.gz`
+  produced by `pantry_pheno_normalize_expression` in the same DAG; 7 `chained` `phenotype_summary` checkpoints pending; heritability/TWAS
+  batch jobs deferred on them.
+- Run of `tested` (= phenotyping `full` + pheast `geuvadis`) 8396531: 17m44s, 539/539, EXIT=0; 16 tensorQTL jobs on `gpu-core` with
+  `gres/gpu:a100=1` (the prefixed set-resources keys apply).
+- Compare 8398057 (`$H/pantry-runs/host/compare.sh`): phenotyping `full` (symlink view without `cross_modality.*`, absent from the baseline)
+  vs `archive/phenotyping` `--noise archive/phenotyping archive/phenotyping_run2` -> exit 0, MATCH; check_targets 23/23.
+  `cross_modality.bed.gz` (decompressed) and `.phenotype_groups.txt` byte-identical to upstream `scripts/combine_modalities.sh` (8da7787)
+  run on the same 7 BEDs (771 phenotypes). Pheast `geuvadis` vs `archive/pheast_run1` `--noise run1 run2`: 79 mismatches, all in
+  `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking, R22); heritability x8, TWAS x8, genotype_qc pass; check_targets 33/33. R22(a): covar
+  inputs byte-identical to the baseline's (only `geno_pruned.log` differs); the 17 run_tensorqtl.py/genotype_qc.py command lines identical
+  to the baseline's (`-p` prints each command twice in this log, so `sort -u` first).
+- github() (tag `module-rc1` = 56c8c22, `tests/host/Snakefile.github`, run dir `$H/pantry-runs/host-github`): dry run 8398062 fails at
+  parse: `UnicodeEncodeError in file ".../module-rc1/pheast/steps/setup.smk", line 36: 'utf-8' codec can't encode character '\udc87'
+  in position 42: surrogates not allowed` (from `pheast/steps/fusion.smk` line 20, `script("fusion_twas/gcta_nr_robust")`). Cause:
+  Snakemake's `HostingProviderFile.open` (sourcecache.py line 595 in 9.27.1) caches `repo.git.show(f"{ref}:{path}").encode()`; GitPython
+  returns the blob as str decoded with surrogateescape, and strict UTF-8 `.encode()` fails on any binary file. So no github() host can load
+  pheast while the binary is fetched via source_path (eagerly at parse, so the `fusion_dir`/`gcta` overrides don't help).
+  Phenotyping alone via github() works (scratch `host-github/Snakefile.pheno_only`, job 8398063): dry run 345 jobs EXIT=0, and
+  `preprocess_gtf_for_txrevise` (script via source_path, SLURM job 8398064, new conda env from the remote env file) -> EXIT=0, output
+  byte-identical to the local-path host's.
