@@ -33,7 +33,10 @@ references:
 # all datasets.
 # majiq_env: majiq3
 
-# Optional settings deep-merged under every dataset, e.g. shared modality_groups.
+# Optional settings deep-merged under every dataset (dataset values win, lists
+# replace). A dataset can add or override keys but not remove them, so a
+# modality group put here runs for every dataset: keep modality_groups that
+# vary between datasets out of defaults.
 # defaults: {}
 
 datasets:

@@ -22,7 +22,10 @@
 # gcta_url: https://raw.githubusercontent.com/PejLab/Pantry/8da77879ba7a6c12c5f7a2e95954ae144f68130c/pheast/scripts/fusion_twas/gcta_nr_robust
 # gcta_sha256: 7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9
 
-# Optional settings deep-merged under every dataset.
+# Optional settings deep-merged under every dataset (dataset values win, lists
+# replace). A dataset can add or override keys but not remove them, so a
+# modality or analysis put here runs for every dataset: keep modalities and
+# analyses that vary between datasets out of defaults.
 # defaults: {}
 
 datasets:
@@ -34,7 +37,11 @@ datasets:
     #
     # This can point to the outputs of the phenotyping module, unless additional
     # processing is needed (see pheast/scripts/prepare_phenotypes.py).
-    # phenotype_dir: ../phenotyping/output
+    # In a host that imports both stages, set it to the phenotyping output
+    # path <pantry_output>/{dataset} exactly as the host spells it (e.g.
+    # results/pantry/phenotypes/<dataset>; relative vs absolute matters), so
+    # the two stages link in one DAG; otherwise pheast reports missing inputs.
+    # phenotype_dir: ../phenotyping/output/default
     phenotype_dir: input/phenotypes
 
     # PLINK 1 genotype prefix. The .bed, .bim, and .fam files must share this prefix.
