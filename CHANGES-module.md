@@ -1,6 +1,6 @@
 # Pantry as a reusable, multi-dataset Snakemake module: changes
 
-Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.0`.
+Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.1` (earlier: `module-v0.1.0`, `module-rc1`).
 Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Status and acceptance results: `docs/module-status.md`.
 Test commands and HPC run records: `tests/hpc/README.md`.
 
@@ -47,11 +47,11 @@ Requires **Snakemake ≥ 9.12** (pathvars). Both Snakefiles set `min_version("9.
 - All `localrules:` blocks were replaced by per-rule `localrule: True`. The module's `localrules:` names are unprefixed, so they no longer match after `use rule * … as prefix_*`. pheast's empty `localrules:` block was removed (R10).
 - `rule all` has `default_target: True` in both stages.
 - Scripts and bundled files are referenced only through `workflow.source_path(...)`. This works for local-path and `github()` modules. `pheast/Snakefile`'s `from scripts.twas_batches import …` became a load by path. `twas_assemble_summary`'s `realpath scripts/fusion_twas` now uses the installed FUSION path. Script paths sit in callable params, so the per-process source-cache path doesn't trigger params reruns.
-- Nothing depends on the CWD except the standalone `configfile: "config.yml"`, which Snakemake skips inside a module.
+- Nothing depends on the CWD except the standalone `configfile: "config.yml"`. Snakemake skips it inside a module only when the host's `module` directive passes `config:` (`snakemake/modules.py`: `skip_configfile = config is not None`). **Hosts must pass `config:`**; without it, the module's `configfile:` would load a `config.yml` from the host's working directory, if there is one.
 
 ## Config format
 
-Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an optional `defaults:` block that is deep-merged under every dataset (dataset values win; lists replace). The old single-dataset format is still accepted. A config without `datasets` is wrapped as dataset `default` (and, for phenotyping, reference `default`) by `normalise()` in `{phenotyping,pheast}/lib/config.py`, then validated. The repo's `phenotyping/config.yml` and `pheast/config.yml` are in the new format. Their `normalise()` output equals that of the old files (unit tests). The examples are `phenotyping/config.yml`, `pheast/config.yml`, `tests/host/config.yaml` (host), and `tests/configs/*_multi.yml`.
+Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an optional `defaults:` block that is deep-merged under every dataset (dataset values win; lists replace). A dataset can add keys to `defaults` or override them, but cannot remove one: a modality group (phenotyping `modality_groups`) or modality/analysis (pheast `modalities`, `analyses`) in `defaults` is run for every dataset. Keep modality sets that vary between datasets out of `defaults` and list them per dataset. (Removal support is deferred.) The old single-dataset format is still accepted. A config without `datasets` is wrapped as dataset `default` (and, for phenotyping, reference `default`) by `normalise()` in `{phenotyping,pheast}/lib/config.py`, then validated. The repo's `phenotyping/config.yml` and `pheast/config.yml` are in the new format. Their `normalise()` output equals that of the old files (unit tests). The examples are `phenotyping/config.yml`, `pheast/config.yml`, `tests/host/config.yaml` (host), and `tests/configs/*_multi.yml`.
 
 ### Phenotyping: old key → new key
 
@@ -82,16 +82,16 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 | (FUSION assumed at `scripts/fusion_twas/`) | top-level `fusion_dir`, `gcta` (overrides), `gcta_url`, `gcta_sha256` (see [FUSION](#fusion)) |
 | `modalities.<m>.chroms` (set internally at parse time) | gone; read from the `phenotype_summary` checkpoint |
 
-`phenotype_dir` is read through input functions. A host that points it at the phenotyping module's output therefore links the two stages in one DAG.
+`phenotype_dir` is read through input functions. A host that points it at the phenotyping module's output therefore links the two stages in one DAG. The link is by path text: `phenotype_dir` must equal the phenotyping output path `<pantry_output>/{dataset}` as the host resolves it (e.g. `results/pantry/phenotypes/full`). A relative and an absolute spelling of the same directory do not match, and pheast then fails with missing input files instead of waiting on the phenotyping rules.
 
 ## Validation
 
 - JSON schemas `phenotyping/schemas/config.schema.yaml` and `pheast/schemas/config.schema.yaml` are applied with `snakemake.utils.validate()` after `normalise()`. Defaults that upstream set with `setdefault` (LaDDR knobs, RNA-editing knobs, MAJIQ knobs, `qtl_min_allele_count` 10, `twas_models_per_job` 200, `twas_threads` 4, `majiq_env`) moved into the schemas with the same values.
 - Cross-field checks a schema can't express stay in Python and run on the config only:
-  - fragment lengths are required for single-end data;
+  - fragment lengths are required for single-end data: with `paired_end: false` at config time, and with `paired_end` omitted when the loaded FASTQ map has a single-end sample (an error naming the dataset, raised when the map is read; before, a `KeyError` in a params function);
   - RNA_editing needs `edit_sites_bed` on the dataset's reference;
   - the reference must exist;
-  - `cross_modality.modalities` must be a list of modalities with BED outputs, without duplicates;
+  - `cross_modality.modalities` must be a list of modalities with BED outputs from `modality_groups`, without duplicates. LaDDR's `latent_residual` is not accepted (upstream's manual script would take any BED in `output/`);
   - `laddr.regress_modalities` must be a subset of the available modalities (its default is all of them);
   - existing LaDDR bins need both dirs;
   - pheast `cross_modality` is allowed only with `qtl` and without trans-QTL (upstream's message);
@@ -100,6 +100,16 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
   - Integer knobs reject quoted numbers (`"10"`) and non-integral floats. Upstream `int()`-coerced some of them, e.g. `qtl_min_allele_count`. Integral floats such as `40.0` are accepted (JSON Schema treats them as integers).
   - TWAS knobs (`twas_models_per_job`, `twas_threads`) are checked by the schema, so jsonschema's message replaces upstream's "must be at least 1".
 - **New:** a config with `datasets:` and also legacy top-level keys (e.g. `read_length`, `samples_file`, `geno_prefix`) is rejected instead of silently ignoring them. Snakemake merges `--configfile` with the workflow's `config.yml`, so an old-format `--configfile` used inside `phenotyping/` or `pheast/` would otherwise have run the example `default` dataset of `config.yml`.
+  The same applies to `--config key=value` with a legacy key (e.g. `--config read_length=100`) inside a stage directory: it is now an error. The new-format equivalent is a `--configfile` holding just the override, which Snakemake deep-merges into `config.yml`:
+
+  ```yaml
+  # override.yml, used as: snakemake --configfile override.yml
+  datasets:
+    default:
+      read_length: 100
+  ```
+
+  Or edit `config.yml`, or run an old-format config from another directory (`-s <path>/Snakefile --directory <dir>`, with `<dir>/config.yml` yours). `--config 'datasets={default: {read_length: 100}}'` works only for string values: Snakemake parses nested `--config` values as strings, so `100` arrives as `'100'` and fails the integer check.
 - The phenotyping annotation check (transcript rows present) is now a job, `validate_annotation`. The pheast genotype-vs-samples check is now a job, `check_genotype_samples`, with the same message as upstream. See below.
 
 ## References
@@ -119,7 +129,7 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 
 - Phenotyping, new:
   - `write_samples`, `validate_annotation` (above);
-  - `combine_modalities` and `pheno_groups_cross_modality`: the cross-modality BED/`.tbi`/groups per dataset. The body reproduces `scripts/combine_modalities.sh`, and the outputs are byte-identical to the script's on the same BEDs (Task 14). The script stays for manual use;
+  - `combine_modalities` and `pheno_groups_cross_modality`: the cross-modality BED/`.tbi`/groups per dataset. The body reproduces `scripts/combine_modalities.sh`, and the outputs are byte-identical to the script's on the same BEDs (Task 14). One difference: if the BED headers (sample columns) differ, the job fails, as its shell runs with `set -e`; the script printed the `diff` and went on. The script stays for manual use;
   - static versions of rules that upstream defined conditionally at parse time: `majiq_gff3_from_gtf` (used only when no `annotation_gff3` is configured), `laddr_setup`/`laddr_binning` vs `laddr_prepare_existing_bins` (distinct `bins_ready.built` / `bins_ready.existing` outputs; the consumer picks one).
 - Phenotyping, changed:
   - `majiq_build` outputs `directory(build)` and the nested `splicegraph.zarr`. `majiq_psi_coverage` derives the per-sample `.sj` paths in params, resolving BAM symlinks at job time (keeps fix `21ec32d`);
@@ -139,7 +149,7 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 - **tensorQTL rules** (`tensorqtl_cis`, `tensorqtl_cis_independent`, `tensorqtl_trans`) have **no `conda:`**, only `container: docker://ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9f…` (R20), pinned by digest. Snakemake runs conda inside a container when a rule has both.
   - The image is built from `containers/tensorqtl/` by `.github/workflows/tensorqtl-image.yml` (public, tag `1.0.10`). It has upstream's pip env versions: tensorqtl **1.0.10**, torch 2.3.1+cu121, pandas 2.3.3, Python 3.12, numpy 2.5.4, scipy 1.18.1, rpy2 + R qvalue (Task 16; supersedes R23, genex's 1.0.9 image). Only pyarrow differs (25.0.1 vs 26.0.0), used only by `cis_nominal`.
   - The image is public; apptainer pulls it anonymously. Stale stored ghcr.io credentials (`apptainer registry login`, `~/.docker/config.json`) make the pull fail with 403; log out of ghcr.io or refresh them.
-  - **With `--sdm apptainer`** on 1 CPU, as upstream's jobs ran, cis results match upstream's nominal statistics exactly. On a GPU, or on several CPU threads, `pval_nominal` moves by up to ~1e-4 relative (reduction order).
+  - **With `--sdm apptainer`** on 1 CPU core, as upstream's jobs ran, cis nominal statistics (`pval_nominal`, `slope`, `slope_se`, `af`) are identical to upstream's on rows with the same top variant, at written precision (Task 16). On a GPU, or on several CPU cores, `pval_nominal` differs by up to ~1e-4 relative (reduction order).
   - **Without apptainer**, these rules run the host `python3`, which must have tensorqtl (e.g. the `pheast/environment.yml` env), as upstream did.
 - GPU:
   - The profile must give the tensorQTL rules a GPU partition and `gpu: 1` (the slurm executor plugin rejects `--gpus`/`--gres` in `slurm_extra`), plus `apptainer-args: "--nv --bind=<dirs>"`. `--nv` exposes the GPU. The bind must cover the data, including symlink targets, and for a local-path module the module checkout.
@@ -154,21 +164,21 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 - **R24 (Task 14):** Snakemake's git source cache can't serve binary files. gcta is therefore resolved only in `install_fusion`'s job:
   - configured `gcta` → nothing installed for it;
   - module loaded from a local path → bundled file copied;
-  - otherwise (e.g. `github()`) → downloaded from `gcta_url` (default: upstream `8da7787`'s file on raw.githubusercontent.com), with a 300 s timeout, and checked against `gcta_sha256` (default `7b51e51d…93e9`).
+  - otherwise (e.g. `github()`) → downloaded from `gcta_url` (default: upstream `8da7787`'s file on raw.githubusercontent.com, by its full commit SHA `8da77879ba7a6c12c5f7a2e95954ae144f68130c`), with a 300 s timeout, and checked against `gcta_sha256` (default `7b51e51d…93e9`).
 
   **Remote modules need network access in that job. Offline sites set `gcta`.** The spec's §7 FUSION bullet carries a dated amendment for this.
 - `install_fusion` and the FUSION files are inputs of the TWAS rules, so FUSION can now run from any working directory.
 
 ## Tests
 
-- `tests/unit/` (pytest, 146 tests): config shim/normalise/validation, the FASTQ-map loader against an oracle copy of upstream's (R5), samples, targets, phenotype summaries against upstream's reads, FUSION paths, gcta install, and the comparison tool.
+- `tests/unit/` (pytest, 148 tests): config shim/normalise/validation, the FASTQ-map loader against an oracle copy of upstream's (R5), samples, targets, phenotype summaries against upstream's reads, FUSION paths, gcta install, and the comparison tool.
 - `tests/compare_outputs.py`: compares an output tree against a baseline.
   - Exact for text files and decompressed `.gz`.
   - With `--noise A B`: BED-like files are compared numerically within 2× the noise pair's max |diff| (R12); `cis_qtl` permutation columns and tie-breaks are judged against the noise pair; `cis_independent` is judged on summary statistics (R8, R9).
   - Writes a markdown report.
 - `tests/configs/`: baseline (old-format) configs for both stages, multi-dataset configs, and dry-run-only configs (`dryrun_multi.yml` with a dotted dataset name; `dryrun_majiq_laddr.yml` for MAJIQ and LaDDR), and `phenotyping_baseline_ir.yml` (upstream's config with intron_retention, for the MAJIQ run).
-- `tests/fixtures/`: `make_multi_inputs.py` (derives the single-end and 300-sample test datasets), `check_targets.py`.
-- `tests/host/`: a host workflow that imports both stages by local path (`Snakefile`) or with `github()` at `module-rc1` (`Snakefile.github`), plus its profile.
+- `tests/fixtures/`: `make_multi_inputs.py` (derives the single-end and 300-sample test datasets), `check_targets.py`, `make_scaling_config.py` (synthetic many-dataset configs for dry-run timing, Task 18).
+- `tests/host/`: a host workflow that imports both stages by local path (`Snakefile`) or with `github()` at `module-v0.1.1` (`Snakefile.github`), plus its profile.
 - `tests/profile/` (SLURM test profile), `tests/hpc/` (run records, baseline envs, the `majiq3` env).
 
 ## Lint and formatting
@@ -232,5 +242,8 @@ Remaining warnings, each justified:
 - LaDDR: if the final `mv` in `laddr_transform` fails, a stale latent file from an earlier run can remain in the LaDDR project dir.
 - The R scripts in `install_fusion` are copied without a temp file. This is harmless: the job output is removed on failure.
 - Test tooling: the comparison tool's floors (1 row; 1e-6 relative) tolerate a single variant-changed key or NaN mismatch in `cis_independent`, and RDat pairs after an OSError are not compared. The fixture/checker scripts are not unit-tested; `.tbi` files are checked by size only. The setup.smk injection of `annotation_gff3` is covered by dry run only. Intermediate commits `ad85347..c5c3ab2` don't dry-run on their own (bisect across them with care).
+- **`defaults` cannot remove keys**: a dataset can add to or override `defaults` but not drop a modality group, modality or analysis from it. Keep varying modality sets out of `defaults` (see [Config format](#config-format)). Removal support is deferred.
+- **Stage linking is by path text**: pheast `phenotype_dir` must spell the phenotyping `<pantry_output>/{dataset}` path exactly as the host resolves it (relative vs absolute matters); otherwise pheast reports missing input files.
+- **Hosts must pass `config:`** in each `module` directive; otherwise the module's standalone `configfile: config.yml` can load a `config.yml` from the host's working directory.
 - pheast `samples` still doesn't subset the analysis (upstream semantics): to analyse fewer samples, supply BEDs with those samples.
 - Ideas not taken: the standard `workflow/` layout; wrapping `prepare_phenotypes.py` in a rule.
