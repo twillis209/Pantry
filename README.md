@@ -4,7 +4,7 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
-> **Module branch.** This fork's `module` branch (release `module-v0.1.0`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+> **Module branch.** This fork's `module` branch (release `module-v0.1.1`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
 
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
@@ -145,7 +145,9 @@ datasets:
       ...
 ```
 
-The older single-dataset format (`ref_genome`, `ref_anno`, `samples_file`, ... at the top level) is still accepted, as reference and dataset `default`. `CHANGES-module.md` has the table of old and new keys. If you run with `--configfile`, note that Snakemake merges it with the directory's `config.yml`. Either edit `config.yml`, or run from another directory with `-s <path>/Snakefile --directory <dir>`.
+The older single-dataset format (`ref_genome`, `ref_anno`, `samples_file`, ... at the top level) is still accepted, as reference and dataset `default`. `CHANGES-module.md` has the table of old and new keys. If you run with `--configfile`, note that Snakemake merges it with the directory's `config.yml`. Either edit `config.yml`, or run from another directory with `-s <path>/Snakefile --directory <dir>`. For the same reason, an old-format override such as `--config read_length=100` is an error next to the new-format `config.yml`. Put the override in a file instead, which Snakemake deep-merges into `config.yml`: `--configfile override.yml` with `datasets: {default: {read_length: 100}}`. (`--config 'datasets={default: {...}}'` works only for string values, because Snakemake passes nested `--config` values as strings.)
+
+An optional `defaults:` block is deep-merged under every dataset (dataset values win, lists replace). A dataset can add keys to it or override them, but not remove them, so keep modality groups that differ between datasets out of `defaults`.
 
 An optional per-dataset `laddr:` section enables latent residual phenotypes. Key options include:
 
@@ -290,7 +292,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.0")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.1")
     config:
         config["pantry"]["phenotyping"]
 
@@ -302,14 +304,16 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.0")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.1")
     config:
         config["pantry"]["pheast"]
 
 use rule * from pantry_pheast as pantry_pheast_*
 ```
 
-- **Linking the stages.** Point a Pheast dataset's `phenotype_dir` at the phenotyping output (`results/pantry/phenotypes/<dataset>`) to chain the two stages in one DAG.
+- **Pass `config:`.** Give each `module` directive its config section with `config:`, as above. Without it, Snakemake does not skip the module's standalone `configfile: "config.yml"`, which would then load a `config.yml` from the host's working directory.
+- **Linking the stages.** Point a Pheast dataset's `phenotype_dir` at the phenotyping output (`results/pantry/phenotypes/<dataset>`) to chain the two stages in one DAG. The path must be spelled exactly as the phenotyping module's resolved `<pantry_output>/{dataset}` (relative vs absolute matters); otherwise Pheast fails with missing input files.
+- **`defaults:`** is deep-merged under every dataset, and a dataset can add or override keys but not remove them. Keep modality groups, modalities and analyses that vary between datasets out of `defaults`.
 - **Profile settings.** In the profile, `set-resources` keys use the prefixed rule names (e.g. `pantry_pheast_tensorqtl_cis`).
 - **gcta under `github()`.** Under `github()`, the FUSION install job downloads the `gcta_nr_robust` binary from a pinned URL and checks its sha256. Offline sites set `gcta` in the Pheast config instead.
 - **Examples and details.** `tests/host/` holds a working example (`Snakefile`, `config.yaml`, `profile/`). Details are in `docs/module-status.md` and `CHANGES-module.md`.
