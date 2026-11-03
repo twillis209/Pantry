@@ -227,6 +227,16 @@ def test_empty_config_raises():
         cfg.normalise({})
 
 
+def test_legacy_keys_beside_datasets_rejected():
+    # e.g. an old-format --configfile merged over the new-format config.yml
+    mixed = new_config()
+    mixed.update(geno_prefix="other", qtl_min_allele_count=20)
+    with pytest.raises(ValueError, match="geno_prefix, qtl_min_allele_count"):
+        cfg.normalise(mixed)
+    # New-format top-level settings stay allowed.
+    cfg.normalise({**new_config(), "gcta": "/x/gcta", "pathvars": {}})
+
+
 def test_load_samples(tmp_path):
     f = tmp_path / "samples.txt"
     f.write_text("s1\ns2\n")

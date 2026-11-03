@@ -15,6 +15,20 @@ from pathlib import Path
 
 # Top-level settings shared by all datasets of a module instance.
 _TOP_LEVEL_KEYS = ("fusion_dir", "gcta", "gcta_url", "gcta_sha256")
+# Top-level keys of the legacy single-dataset format.
+_LEGACY_TOP_LEVEL_KEYS = (
+    "phenotype_dir",
+    "geno_prefix",
+    "samples_file",
+    "modalities",
+    "analyses",
+    "qtl_min_allele_count",
+    "qtl_maf_threshold",
+    "twas_snps",
+    "twas_models_per_job",
+    "twas_threads",
+    "intermediate_dir",
+)
 
 CROSS_MODALITY_MESSAGE = (
     'The "cross_modality" modality should only be used with analysis "qtl" '
@@ -97,6 +111,23 @@ def _check_dataset(name: str, ds: dict):
             raise ValueError(f"datasets.{name}: {CROSS_MODALITY_MESSAGE}")
 
 
+def _reject_legacy_keys(config: dict, legacy_keys) -> None:
+    """Raise if a multi-dataset config also has legacy single-dataset keys.
+
+    They would be ignored. This happens e.g. when an old-format --configfile
+    is merged over a new-format config.yml (Snakemake merges both).
+    """
+    found = [key for key in legacy_keys if key in config]
+    if found:
+        raise ValueError(
+            "Config has 'datasets' and also legacy single-dataset top-level keys, "
+            f"which would be ignored: {', '.join(found)}. Use one format; note "
+            "that Snakemake merges --configfile with the workflow's config.yml, "
+            "so an old-format config should replace config.yml (or be used from "
+            "a directory without one, via --directory)."
+        )
+
+
 def normalise(config: dict) -> dict:
     """Return a multi-dataset config built from config, which is not modified.
 
@@ -108,6 +139,7 @@ def normalise(config: dict) -> dict:
     if not config:
         raise ValueError("No config file provided, or it is empty.")
     if "datasets" in config:
+        _reject_legacy_keys(config, _LEGACY_TOP_LEVEL_KEYS)
         out = copy.deepcopy(config)
         out["legacy_pathvars"] = {}
     else:

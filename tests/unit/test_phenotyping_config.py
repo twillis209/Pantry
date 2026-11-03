@@ -292,6 +292,23 @@ def test_cross_modality_modalities_validated():
         cfg.normalise(new_config(cross_modality={"modalities": "expression"}))
 
 
+def test_cross_modality_duplicates_rejected():
+    with pytest.raises(ValueError, match="more than once: expression"):
+        cfg.normalise(
+            new_config(cross_modality={"modalities": ["expression", "expression"]})
+        )
+
+
+def test_legacy_keys_beside_datasets_rejected():
+    # e.g. an old-format --configfile merged over the new-format config.yml
+    mixed = new_config()
+    mixed.update(read_length=100, samples_file="samples.txt")
+    with pytest.raises(ValueError, match="read_length, samples_file"):
+        cfg.normalise(mixed)
+    # New-format top-level settings stay allowed.
+    cfg.normalise({**new_config(), "majiq_env": "majiq3", "pathvars": {}})
+
+
 def test_existing_bins_require_dirs():
     with pytest.raises(ValueError, match="existing_info_dir"):
         cfg.normalise(new_config(laddr={"use_existing_bins": True}))

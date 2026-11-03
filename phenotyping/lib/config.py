@@ -17,6 +17,20 @@ _LEGACY_GROUP_REFERENCE_KEYS = {
     "intron_retention": "annotation_gff3",
 }
 _LEGACY_DIR_KEYS = ("intermediate_dir", "intermediate_ref_dir")
+# Top-level keys of the legacy single-dataset format.
+_LEGACY_TOP_LEVEL_KEYS = (
+    "paired_end",
+    "read_length",
+    "fragment_length_mean",
+    "fragment_length_sd",
+    "fastq_dir",
+    "fastq_map",
+    "ref_genome",
+    "ref_anno",
+    "samples_file",
+    "modality_groups",
+    "laddr",
+) + _LEGACY_DIR_KEYS
 
 LADDR_TARGETS = [
     "latent_residual.bed.gz",
@@ -136,6 +150,12 @@ def _check_dataset(name: str, ds: dict, references: dict):
             raise ValueError(
                 f"datasets.{name}.cross_modality.modalities must be a list of strings"
             )
+        duplicates = sorted({x for x in mods if mods.count(x) > 1})
+        if duplicates:
+            raise ValueError(
+                f"datasets.{name}.cross_modality.modalities lists modalities more "
+                "than once: " + ", ".join(duplicates)
+            )
         invalid = sorted(set(mods) - set(available_modalities(groups)))
         if invalid:
             raise ValueError(
@@ -174,6 +194,23 @@ def _check_dataset(name: str, ds: dict, references: dict):
                 )
 
 
+def _reject_legacy_keys(config: dict, legacy_keys) -> None:
+    """Raise if a multi-dataset config also has legacy single-dataset keys.
+
+    They would be ignored. This happens e.g. when an old-format --configfile
+    is merged over a new-format config.yml (Snakemake merges both).
+    """
+    found = [key for key in legacy_keys if key in config]
+    if found:
+        raise ValueError(
+            "Config has 'datasets' and also legacy single-dataset top-level keys, "
+            f"which would be ignored: {', '.join(found)}. Use one format; note "
+            "that Snakemake merges --configfile with the workflow's config.yml, "
+            "so an old-format config should replace config.yml (or be used from "
+            "a directory without one, via --directory)."
+        )
+
+
 def normalise(config: dict) -> dict:
     """Return a multi-dataset config built from config, which is not modified.
 
@@ -185,6 +222,7 @@ def normalise(config: dict) -> dict:
     if not config:
         raise ValueError("No config file provided, or it is empty.")
     if "datasets" in config:
+        _reject_legacy_keys(config, _LEGACY_TOP_LEVEL_KEYS)
         out = copy.deepcopy(config)
         out["legacy_pathvars"] = {}
     else:
