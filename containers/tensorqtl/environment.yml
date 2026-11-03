@@ -1,0 +1,26 @@
+# Conda part of the tensorQTL image: the packages pheast/scripts/run_tensorqtl.py
+# needs, pinned to their versions in tests/hpc/envs/baseline-pheast.lock.txt.
+# tensorqtl and torch come from pip (see Dockerfile and constraints.txt), as in
+# the baseline env, where pip then replaced conda's numpy 1.26.4 with the
+# numpy 2.5.4 wheel and added scipy 1.18.1 (wheels with bundled OpenBLAS).
+# Not reproducible: the lock's pyarrow 26.0.0 needs numpy>=2 and dask 2024.1.1
+# needs numpy<2 (the baseline env got both through successive installs), so
+# conda solves pyarrow 25.0.1 here; pyarrow is only used by cis_nominal output.
+name: base
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12.16
+  - pip
+  - numpy=1.26.4
+  - pandas=2.3.3
+  - pandas-plink=2.3.2
+  - dask=2024.1.1
+  - xarray=2025.6.1
+  - fsspec=2026.9.0
+  - jinja2=3.1.6
+  - typing_extensions=4.16.0
+  - rpy2=3.6.9
+  - r-base=4.5.3
+  - bioconductor-qvalue=2.42.0
