@@ -11,6 +11,8 @@ rule install_fusion:
         profile_wgt="<pantry_resources>/fusion/utils/FUSION.profile_wgt.R",
         gcta="<pantry_resources>/fusion/gcta_nr_robust",
     localrule: True
+    conda:
+        "../envs/fusion.yaml"
     params:
         compute_weights=script("fusion_twas/FUSION.compute_weights.R"),
         plink_utils=script("fusion_twas/utils/plink_utils.R"),

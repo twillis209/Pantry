@@ -11,6 +11,8 @@ rule calculate_heritability_chr_batch:
         covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.plink.tsv",
     output:
         hsq="<pantry_intermediate>/{dataset}/heritability/{modality}.hsq.{chrom}.batch{batch}.tsv",
+    conda:
+        "../envs/gcta.yaml"
     resources:
         mem_mb=8000,
         runtime="24h",
@@ -57,6 +59,8 @@ rule combine_heritability_chr:
         heritability_batches,
     output:
         hsq="<pantry_output>/{dataset}/heritability/{modality}.hsq.tsv",
+    conda:
+        "../envs/gcta.yaml"
     params:
         hsq_dir=parent_dir,
     shell:

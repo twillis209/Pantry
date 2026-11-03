@@ -26,6 +26,8 @@ rule twas_geno:
         snps=twas_snps,
     output:
         multiext("<pantry_intermediate>/{dataset}/twas/geno", ".bed", ".bim", ".fam"),
+    conda:
+        "../envs/plink.yaml"
     params:
         in_geno_prefix=geno_input_prefix,
         out_geno_prefix=lambda w, output: output[0].removesuffix(".bed"),
@@ -55,6 +57,8 @@ rule twas_compute_weights_batch:
         gcta=FUSION["gcta"],
     output:
         "<pantry_intermediate>/{dataset}/twas/status_{modality}/{batch_start}_{batch_end}.tsv",
+    conda:
+        "../envs/fusion.yaml"
     threads: twas_threads
     resources:
         runtime="8h",
@@ -101,6 +105,8 @@ rule twas_assemble_summary:
         file_list="<pantry_intermediate>/{dataset}/twas/{modality}.list",
         profile="<pantry_intermediate>/{dataset}/twas/{modality}.profile",
         summary="<pantry_intermediate>/{dataset}/twas/{modality}.profile.err",
+    conda:
+        "../envs/fusion.yaml"
     params:
         script=script("assemble_twas_weight_list.py"),
         # An absolute path, as the shell changes into the intermediate dir:
@@ -127,6 +133,8 @@ rule twas_pos_file:
     output:
         pos_file="<pantry_intermediate>/{dataset}/twas/{modality}.pos",
     localrule: True
+    conda:
+        "../envs/plink.yaml"
     params:
         n_samples=lambda w: len(dataset_samples(w.dataset)),
     shell:
@@ -155,6 +163,8 @@ rule twas_compress_output:
         pos_file="<pantry_intermediate>/{dataset}/twas/{modality}.pos",
     output:
         "<pantry_output>/{dataset}/twas/{modality}.tar.bz2",
+    conda:
+        "../envs/fusion.yaml"
     params:
         twas_interm_dir=lambda w, input: str(Path(input.file_list).parent),
         twas_output_dir=parent_dir,

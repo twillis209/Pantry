@@ -1,0 +1,8 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheast.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - r-base=4.5.3
+  - bioconductor-impute=1.84.0

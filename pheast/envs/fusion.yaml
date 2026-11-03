@@ -1,0 +1,14 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheast.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12.16
+  - r-base=4.5.3
+  - r-glmnet=5.0
+  - r-optparse=1.8.2
+  - r-matrix=1.7_6
+  - gemma=0.98.5
+  - plink=1.90
+  - bzip2=1.0.8

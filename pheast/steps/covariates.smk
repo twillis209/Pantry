@@ -9,6 +9,8 @@ rule prune_for_covar:
         multiext(
             "<pantry_intermediate>/{dataset}/covar/geno_pruned", ".bed", ".bim", ".fam"
         ),
+    conda:
+        "../envs/plink.yaml"
     params:
         geno_prefix=geno_input_prefix,
         pruned_dir=parent_dir,
@@ -42,6 +44,8 @@ rule covariates:
         bed=pheno_bed,
     output:
         "<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
+    conda:
+        "../envs/covariates.yaml"
     resources:
         mem_mb=32000,
     params:

@@ -1,0 +1,8 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheast.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - plink=1.90
+  - plink2=2.0.0a7.post13

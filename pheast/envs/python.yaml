@@ -1,0 +1,12 @@
+# Versions pinned to the upstream test baseline env (tests/hpc/envs/baseline-pheast.lock.txt).
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12.16
+  - numpy=1.26.4
+  - pandas=2.3.3
+  - pandas-plink=2.3.2
+  - dask=2024.1.1
+  - xarray=2025.6.1
