@@ -425,3 +425,94 @@ def test_schema_accepts_fusion_overrides(validate):
     c["gcta"] = 5
     with pytest.raises(Exception):
         validate(cfg.normalise(c))
+
+
+GCTA_URL = (
+    "https://raw.githubusercontent.com/PejLab/Pantry/8da7787/pheast/scripts/"
+    "fusion_twas/gcta_nr_robust"
+)
+GCTA_SHA256 = "7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9"
+
+
+def test_schema_sets_gcta_download_defaults(validate):
+    out = cfg.normalise(new_config())
+    validate(out)
+    assert out["gcta_url"] == GCTA_URL
+    assert out["gcta_sha256"] == GCTA_SHA256
+
+
+def test_schema_rejects_bad_gcta_sha256(validate):
+    c = new_config()
+    c["gcta_sha256"] = "abc"
+    with pytest.raises(Exception):
+        validate(cfg.normalise(c))
+
+
+def test_shim_moves_gcta_download_keys_to_top_level():
+    legacy = legacy_config()
+    legacy["gcta_url"] = "file:///x"
+    legacy["gcta_sha256"] = "0" * 64
+    out = cfg.normalise(legacy)
+    assert out["gcta_url"] == "file:///x"
+    assert out["gcta_sha256"] == "0" * 64
+    assert "gcta_url" not in out["datasets"]["default"]
+
+
+def test_install_fusion_outputs_follow_overrides():
+    fusion = "<pantry_resources>/fusion"
+    scripts = {
+        "compute_weights": f"{fusion}/FUSION.compute_weights.R",
+        "plink_utils": f"{fusion}/utils/plink_utils.R",
+        "profile_wgt": f"{fusion}/utils/FUSION.profile_wgt.R",
+    }
+    gcta = {"gcta": f"{fusion}/gcta_nr_robust"}
+    assert cfg.install_fusion_outputs({}) == {**scripts, **gcta}
+    assert cfg.install_fusion_outputs({"gcta": "/opt/gcta64"}) == scripts
+    assert cfg.install_fusion_outputs({"fusion_dir": "/opt/fusion"}) == gcta
+    assert cfg.install_fusion_outputs({"fusion_dir": "/f", "gcta": "/g"}) == {}
+    # Agrees with fusion_paths on where the installed files are.
+    paths = cfg.fusion_paths({})
+    assert all(paths[k] == v for k, v in cfg.install_fusion_outputs({}).items())
+
+
+def _is_executable(path) -> bool:
+    return bool(Path(path).stat().st_mode & 0o100)
+
+
+def test_install_gcta_copies_local_source(tmp_path):
+    src = tmp_path / "src.bin"
+    src.write_bytes(b"\x7fELF\x00\xff")
+    src.chmod(0o640)
+    dest = tmp_path / "fusion" / "gcta_nr_robust"
+    cfg.install_gcta(dest, src=src)
+    assert dest.read_bytes() == b"\x7fELF\x00\xff"
+    assert _is_executable(dest)
+
+
+def test_install_gcta_downloads_and_checks_sha256(tmp_path):
+    import hashlib
+
+    src = tmp_path / "remote.bin"
+    data = b"\x7fELF\x00\xfe binary"
+    src.write_bytes(data)
+    dest = tmp_path / "fusion" / "gcta_nr_robust"
+    cfg.install_gcta(
+        dest, url=src.as_uri(), sha256=hashlib.sha256(data).hexdigest().upper()
+    )
+    assert dest.read_bytes() == data
+    assert _is_executable(dest)
+
+
+def test_install_gcta_rejects_sha256_mismatch(tmp_path):
+    src = tmp_path / "remote.bin"
+    src.write_bytes(b"tampered")
+    dest = tmp_path / "fusion" / "gcta_nr_robust"
+    with pytest.raises(ValueError, match="sha256"):
+        cfg.install_gcta(dest, url=src.as_uri(), sha256=GCTA_SHA256)
+    assert not dest.exists()
+    assert not dest.with_name("gcta_nr_robust.part").exists()
+
+
+def test_install_gcta_needs_a_source(tmp_path):
+    with pytest.raises(ValueError):
+        cfg.install_gcta(tmp_path / "g", url=None, sha256=GCTA_SHA256)

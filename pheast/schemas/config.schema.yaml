@@ -29,6 +29,17 @@ properties:
     description: >-
       Optional path to a gcta binary for FUSION, used instead of the bundled
       gcta_nr_robust (a file path, not a command name on PATH).
+  gcta_url:
+    type: string
+    default: "https://raw.githubusercontent.com/PejLab/Pantry/8da7787/pheast/scripts/fusion_twas/gcta_nr_robust"
+    description: >-
+      Where install_fusion downloads gcta_nr_robust when the module is not
+      loaded from a local path (e.g. github()) and gcta is not configured.
+  gcta_sha256:
+    type: string
+    pattern: "^[0-9a-fA-F]{64}$"
+    default: "7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9"
+    description: sha256 the gcta_url download must have; a mismatch fails install_fusion.
 
 $defs:
   dataset:
