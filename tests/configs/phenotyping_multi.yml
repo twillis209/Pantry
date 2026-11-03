@@ -1,0 +1,69 @@
+# Multi-dataset acceptance config (criterion 2): two datasets sharing one
+# reference and read length, so one STAR index and one kallisto index serve
+# both. 'full' has the baseline settings (tests/configs/phenotyping_baseline.yml)
+# and must match the baseline; 'half_se' is the first 8 samples with R1 only,
+# read as single-end.
+# Paths are relative to the run directory, which needs an 'input' link to the
+# phenotyping test data and the half_se inputs from the fixture script:
+#   ln -s <test data>/phenotyping/input input
+#   python tests/fixtures/make_multi_inputs.py phenotyping input multi_inputs/half_se
+references:
+  grch38_chr1:
+    genome: input/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+    annotation: input/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+    edit_sites_bed: input/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+
+defaults:
+  reference: grch38_chr1
+  fastq_dir: input/fastq
+  read_length: 75
+  modality_groups:
+    alt_TSS_polyA:
+      files:
+        - alt_TSS.bed.gz
+        - alt_TSS.bed.gz.tbi
+        - alt_TSS.phenotype_groups.txt
+        - alt_polyA.bed.gz
+        - alt_polyA.bed.gz.tbi
+        - alt_polyA.phenotype_groups.txt
+    expression:
+      files:
+        - expression.bed.gz
+        - expression.bed.gz.tbi
+        - isoforms.bed.gz
+        - isoforms.bed.gz.tbi
+        - isoforms.phenotype_groups.txt
+    RNA_editing:
+      edit_sites_min_coverage: 20
+      edit_sites_min_samples: 10
+      edit_sites_min_samples_fraction: 0.1
+      edit_sites_cluster: false
+      edit_sites_correlation_threshold: 0.9
+      files:
+        - RNA_editing.bed.gz
+        - RNA_editing.bed.gz.tbi
+        - RNA_editing.phenotype_groups.txt
+        - RNA_editing.site_to_phenotype.tsv
+    splicing:
+      files:
+        - splicing.bed.gz
+        - splicing.bed.gz.tbi
+        - splicing.phenotype_groups.txt
+    stability:
+      files:
+        - stability.bed.gz
+        - stability.bed.gz.tbi
+
+datasets:
+  # 16 paired-end samples, as the baseline.
+  full:
+    samples: input/samples.txt
+    fastq_map: input/fastq_map.txt
+    paired_end: true
+  # First 8 samples, R1 FASTQs only, as single-end with the same read length.
+  half_se:
+    samples: multi_inputs/half_se/samples.txt
+    fastq_map: multi_inputs/half_se/fastq_map.txt
+    paired_end: false
+    fragment_length_mean: 200
+    fragment_length_sd: 50

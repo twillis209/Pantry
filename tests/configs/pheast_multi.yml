@@ -1,0 +1,54 @@
+# Multi-dataset acceptance config (criterion 2). 'full' has the baseline
+# settings (tests/configs/pheast_baseline.yml) and must match the baseline;
+# 'subset' is the first 300 samples with qtl_min_allele_count 20. pheast's
+# samples list does not subset the analysis, so 'subset' reads BEDs cut to its
+# samples by the fixture script.
+# Paths are relative to the run directory, which needs an 'input' link to the
+# pheast test data and the subset inputs:
+#   ln -s <test data>/pheast/input input
+#   python tests/fixtures/make_multi_inputs.py pheast input multi_inputs/subset
+defaults:
+  geno_prefix: input/GEUVADIS.445_samples.GRCh38.chr1_120Mb
+  qtl_min_allele_count: 10
+  twas_snps: input/ld_snps_chr1.txt
+  twas_models_per_job: 200
+  twas_threads: 4
+  modalities:
+    alt_polyA:
+      grouped: true
+    alt_TSS:
+      grouped: true
+    expression:
+      grouped: false
+    intron_retention:
+      grouped: true
+    isoforms:
+      grouped: true
+    RNA_editing:
+      grouped: true
+    splicing:
+      grouped: true
+    stability:
+      grouped: false
+  analyses:
+    heritability:
+      files:
+        - "{modality}.hsq.tsv"
+    qtl:
+      files:
+        - "{modality}.cis_qtl.txt.gz"
+        - "{modality}.cis_independent_qtl.txt.gz"
+    twas:
+      files:
+        - "{modality}.tar.bz2"
+
+datasets:
+  # 445 samples, as the baseline.
+  full:
+    phenotype_dir: input/phenotypes
+    samples: input/samples.txt
+  # First 300 samples (BEDs and sample list from the fixture script).
+  subset:
+    phenotype_dir: multi_inputs/subset/phenotypes
+    samples: multi_inputs/subset/samples.txt
+    qtl_min_allele_count: 20
