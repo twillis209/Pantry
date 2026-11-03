@@ -17,20 +17,22 @@ apptainer-args: "--bind=/data/hps/assoc/private/gdml --nv"
 # Shared across run dirs so gate runs reuse the built envs and pulled image.
 conda-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/conda-envs"
 apptainer-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/apptainer"
-# Flat form (a nested threads: mapping is rejected at submission).
+# Flat form (a nested threads: mapping is rejected at submission). The GPU is
+# requested with the slurm plugin's gpu resource: the plugin rejects --gpus in
+# slurm_extra (genex's form).
 set-resources:
   tensorqtl_cis:
     slurm_partition: "gpu-core"
     slurm_account: "gdml"
-    slurm_extra: "'--gpus=1'"
+    gpu: 1
   tensorqtl_cis_independent:
     slurm_partition: "gpu-core"
     slurm_account: "gdml"
-    slurm_extra: "'--gpus=1'"
+    gpu: 1
   tensorqtl_trans:
     slurm_partition: "gpu-core"
     slurm_account: "gdml"
-    slurm_extra: "'--gpus=1'"
+    gpu: 1
 rerun-triggers: mtime
 keep-going: True
 rerun-incomplete: True
