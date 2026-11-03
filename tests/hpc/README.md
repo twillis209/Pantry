@@ -136,3 +136,23 @@ by the current slurm executor plugin ("The --GPU-allocation option is not allowe
     image-on-CPU vs baseline: pval_nominal differs in 104 rows (max rel 4.4e-5), slope 11, slope_se 4; image-on-GPU vs baseline: 116 / 18 / 6
     rows (max rel 5.9e-5); GPU vs image-on-CPU: 102 rows (8.2e-5). So the image's software stack (tensorqtl 1.0.9 / torch 2.1.2 / pandas 2.1.4)
     already moves results at float level on CPU, and the GPU adds a comparable float-level difference; neither changes af or the analysis.
+
+## Task 13: multi-dataset acceptance (criterion 2)
+Configs `tests/configs/{phenotyping,pheast}_multi.yml`; derived inputs from `tests/fixtures/make_multi_inputs.py`, run on the HPC
+against the test data into the run dirs (job 8395740, env pantry-baseline-pheno for bgzip/tabix):
+`make_multi_inputs.py phenotyping input multi_inputs/half_se` (first 8 samples, R1-only map) and
+`make_multi_inputs.py pheast input multi_inputs/subset` (first 300 samples; 8 BEDs cut to them, bgzip + tabix; 6 groups files).
+Run dirs `$H/pantry-runs/multi-pheno` and `multi-pheast` (`input` link, config.yml = the multi config), same profile, prefixes and
+controller envs as Task 12: `sjob -c 2 -m 7500M -t 0-12:00:00 -e <env> bash t13_run.sh <stage> <rundir>`.
+`tests/fixtures/check_targets.py <stage> config.yml <dataset> output/<dataset>` checks every `rule all` target of a dataset
+(exists, non-empty, >= 1 data row / archive member).
+- Phenotyping 8395741: 19m15s, 468/468, EXIT=0. Job stats: `star_index 1`, `kallisto_index 1` (alt_TSS_polyA_kallisto_index 4 = 2 groups x
+  2 positions, reference-level), `write_samples 2`; `intermediate/reference/grch38_chr1/` has one `star_index_75/` and one `kallisto.idx`.
+  Compare 8396520: `full` vs `archive/phenotyping` `--noise archive/phenotyping archive/phenotyping_run2` -> exit 0, MATCH (kallisto files within
+  the noise envelope: expression 0.366/0.732, isoforms 0.149/0.167, unnorm expression 440/676). check_targets: full 20/20, half_se 20/20
+  (half_se rows: alt_TSS 166, alt_polyA 137, expression 106, isoforms 129, RNA_editing 11, splicing 72, stability 15).
+- Pheast 8395742: 11m02s, 388/388, EXIT=0 (tensorQTL on GPU). Compare 8396510: `full` vs `archive/pheast_run1` `--noise run1 run2` ->
+  76 mismatches, all in `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking, R22, as in gate 3 conda); heritability x8, TWAS x8, genotype_qc pass.
+  R22(a): `intermediate/full/covar` (covar.tsv x8, covar.plink.tsv x8, geno_pruned.{bed,bim,fam,prune.in,prune.out}) byte-identical to the
+  baseline's; the 17 `full` run_tensorqtl.py/genotype_qc.py command lines identical to `gate3-pheast/cmds_baseline.norm`.
+  check_targets: full 33/33, subset 33/33 (subset covariates have 300 samples; genotype_qc threshold 20).
