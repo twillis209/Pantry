@@ -394,6 +394,20 @@ def test_edit_sites_min_samples():
     assert cfg.edit_sites_min_samples(10, 0.5, 30) == 15
 
 
+def test_edit_sites_threshold_note_once_per_dataset(capsys):
+    for _ in range(3):
+        cfg.note_edit_sites_threshold("t18_small", 10, 0.1, 8)
+        cfg.note_edit_sites_threshold("t18_big", 10, 0.1, 16)
+    cfg.note_edit_sites_threshold("t18_small2", 10, 0.1, 8)
+    lines = capsys.readouterr().out.splitlines()
+    assert lines == [
+        "Note: RNA editing site sample threshold of dataset 't18_small' is greater "
+        "than the number of samples (8). Setting to 8.",
+        "Note: RNA editing site sample threshold of dataset 't18_small2' is greater "
+        "than the number of samples (8). Setting to 8.",
+    ]
+
+
 def test_available_modalities():
     groups = legacy_config()["modality_groups"]
     assert cfg.available_modalities(groups) == [

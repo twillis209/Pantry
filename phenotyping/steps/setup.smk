@@ -4,7 +4,6 @@ It normalises and validates the configuration and defines config helpers.
 """
 
 import functools
-import math
 import importlib.util
 
 from snakemake.utils import validate
@@ -127,9 +126,6 @@ def rna_editing_min_samples(w) -> int:
     n = len(dataset_samples(w.dataset))
     configured = params["edit_sites_min_samples"]
     fraction = params["edit_sites_min_samples_fraction"]
-    if max(configured, math.ceil(fraction * n)) > n:
-        print(
-            f"Note: RNA editing site sample threshold is greater than the number of samples ({n}). Setting to {n}."
-        )
+    pantry_config.note_edit_sites_threshold(w.dataset, configured, fraction, n)
     min_samples = pantry_config.edit_sites_min_samples(configured, fraction, n)
     return min_samples

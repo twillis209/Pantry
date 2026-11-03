@@ -383,6 +383,21 @@ def edit_sites_min_samples(configured: int, fraction: float, n: int) -> int:
     return min(max(configured, math.ceil(fraction * n)), n)
 
 
+_EDIT_SITES_NOTED = set()
+
+
+def note_edit_sites_threshold(dataset: str, configured: int, fraction: float, n: int):
+    """Print, once per dataset, that the RNA editing threshold is capped at n."""
+    if dataset in _EDIT_SITES_NOTED:
+        return
+    _EDIT_SITES_NOTED.add(dataset)
+    if max(configured, math.ceil(fraction * n)) > n:
+        print(
+            f"Note: RNA editing site sample threshold of dataset {dataset!r} is "
+            f"greater than the number of samples ({n}). Setting to {n}."
+        )
+
+
 def available_modalities(modality_groups: dict) -> list:
     """Get phenotype modality names with normalized BED outputs."""
     modalities = []
