@@ -130,6 +130,8 @@ rule majiq_build:
         experiments=rules.make_majiq_experiments_tsv.output,
         # Only used to name the junction coverage files (see _majiq_sj).
         bams=per_sample("<pantry_intermediate>/{dataset}/bam/{sample_id}.bam"),
+    # splicegraph sits inside build: Snakemake allows nested directory
+    # outputs only within one job, so both must stay outputs of this rule.
     output:
         build=directory("<pantry_intermediate>/{dataset}/intron_retention/build"),
         splicegraph=directory(
