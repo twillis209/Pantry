@@ -7,6 +7,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 work=${1:?workdir}
 tag=v3.0.22
+commit=d841baad8a3498251e0113fe5f7c41783c4eb55f
 mkdir -p "$work"
 mamba env remove -y -n majiq3 >/dev/null 2>&1 || true
 mamba env create -y -f "$here/majiq3.yml" --override-channels -c conda-forge -c bioconda
@@ -19,7 +20,12 @@ rm -rf "$work/majiq_academic"
 # Full clone: setuptools_scm derives the version from the tag.
 git clone -q https://bitbucket.org/biociphers/majiq_academic.git "$work/majiq_academic"
 git -C "$work/majiq_academic" checkout -q "$tag"
-echo "majiq_academic $tag commit $(git -C "$work/majiq_academic" rev-parse HEAD)"
+head=$(git -C "$work/majiq_academic" rev-parse HEAD)
+echo "majiq_academic $tag commit $head"
+if [ "$head" != "$commit" ]; then
+    echo "error: tag $tag is at $head, expected $commit" >&2
+    exit 1
+fi
 cd "$work/majiq_academic"
 pip install --no-cache-dir .
 cd "$work"
