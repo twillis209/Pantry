@@ -275,3 +275,46 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
 - Symlinked BAMs (fix 21ec32d): `$H/pantry-runs/gate-ir-symlink` = `cp -a` of gate-ir with `bam/{s}.bam{,.bai}` -> `../bam_real/{s}.renamed.bam{,.bai}`
   and the IR outputs removed. Dry run 8399693: 9 IR jobs, `.sj` paths `build/{s}.renamed.sj`. Run 8399696 (9/9, EXIT=0): MAJIQ wrote
   `build/{s}.renamed.sj`, psi-coverage read them, and the 3 final files are byte-identical to gate-ir's.
+
+## Task 18: github() full host run at module-v0.1.1; dry-run scaling
+- Tag `module-v0.1.1` (annotated) = befa72c. Fork entries cleared from `~/.cache/snakemake/snakemake/source-cache/` first
+  (`hosted-git/githubfile/github.com/twillis209`, `snakemake-git-cache/github.com/twillis209`).
+- Run dir `$H/pantry-runs/host-github-v011`: `config.yaml` = `tests/host/config.yaml` plus an `intron_retention` group for `full`
+  (`psicov_batch_size: 25`, `min_experiments: 0.01`, as `tests/configs/phenotyping_baseline_ir.yml`; `$H/pantry-runs/t18/mk_gh_config.py`), env
+  pantry-baseline-pheno. Job 8399793 (`$H/pantry-runs/t18/gh_run.sh`, `sjob -c 2 -m 7500M -t 0-12:00:00`): fetched befa72c; dry run of `all`
+  482 jobs (Task 14's 470 + intron_retention), EXIT=0; run of `tested` EXIT=0, 549/549 steps, 1h06m (incl. 13 conda envs rebuilt: env files
+  fetched by github() lack the final newline, so their hashes differ from the local-path ones; source-cache bug 2 below), 16 tensorQTL jobs
+  on `gpu-core` (`gres/gpu:a100=1`). gcta downloaded from the full-SHA `gcta_url`, sha256 7b51e51d...93e9.
+  - Job counts: `tested` started at 423 jobs = 482 minus the 59 `chained` jobs (7 modalities x 8 per-modality pheast rules + check_genotype_samples,
+    prune_for_covar, qtl_genotype_qc); the checkpoints added 126 (geuvadis' 8 modalities: heritability batches 80, TWAS weight batches 37,
+    twas_geno 1, plink_covariates 8, as gate 3's 69 -> 195), giving 549. The in-script dry run of `tested` failed (exit 2) because
+    `--quiet rules tested` takes `tested` as a `--quiet` choice; after the run, `t18/dry_tested.sh` (job 8400337, target before `--quiet`): EXIT=0,
+    nothing to be done.
+- Compare 8400338 (`host-github-v011/compare.sh`, env pantry-baseline-pheast; Task 14's script plus intron_retention):
+  - phenotyping `full` (view without `cross_modality.*`, `intron_retention.*`) vs `archive/phenotyping` `--noise`: exit 0, MATCH (alt_polyA
+    0.213/0.328, expression 0.366/0.732, isoforms 0.0835/0.167, unnorm alt_polyA 4.8e-4/2.8e-3, unnorm expression 338/676, unnorm isoforms 3.0e-3/6.1e-3);
+    check_targets 26/26; `cross_modality` bed and groups byte-identical to upstream `combine_modalities.sh` (771 rows).
+  - intron_retention vs `archive/phenotyping_ir` without `--noise`: exit 0, MATCH; all 4 files byte-identical (`cmp`).
+  - pheast `geuvadis` vs `archive/pheast_run1` `--noise run1 run2`: 80 mismatches, all in the 16 `*.cis_qtl`/`*.cis_independent_qtl` files
+    (non-blocking, R22); heritability x8, TWAS x8, genotype_qc pass; check_targets 33/33. Covar inputs: 21 byte-identical, only `geno_pruned.log` differs.
+  - Command lines (job 8400342, `cmds.sh` in env pantry-baseline-pheno; the same step in compare.sh failed for lack of gtfparse in the pheast env):
+    17/17 run_tensorqtl.py/genotype_qc.py lines identical to the baseline's.
+  - vs the Task 14 local-path host run: every phenotyping file byte-identical except `unnorm/alt_polyA.bed` (kallisto noise), every pheast
+    non-tensorQTL file byte-identical.
+- Scaling (dry runs, `$H/pantry-runs/t18/scale.sh <name> <datasets> <samples> <mode>`, `tests/fixtures/make_scaling_config.py`, env
+  pantry-baseline-pheno, Snakemake 9.27.1, `-n --quiet rules`, `/usr/bin/time -v`, `sjob -c 2`). Synthetic datasets = copies of the host's `full`
+  (7 modalities + cross_modality) with inline sample lists and FASTQ maps of empty files; pheast datasets chained to them (cold, so the
+  checkpoint-dependent jobs are not counted). Phenotyping-only 1-dataset runs use the old-format baseline config with file maps.
+
+  | Case | Job | Jobs | Wall | Max RSS |
+  |---|---|---|---|---|
+  | upstream 8da7787 standalone phenotyping, 1 x 1000 | 8399787 | 12149 | 32.8 s | 393 MB |
+  | module standalone phenotyping, 1 x 1000 | 8399786 | 12151 | 38.0 s | 401 MB |
+  | host, 17 x 100 (phenotyping + pheast) | 8399785 | 22053 | 63.6 s | 628 MB |
+  | host, 17 x 300, under cProfile | 8399788 | 62853 | 6m43 | 1.75 GB |
+  | host, 17 x 1000 (`-m 16000M`) | 8399789 | 205653 | 12m20 | 4.38 GB |
+
+  About 3 ms per job throughout (2.7 upstream, 3.1 ours at 1 x 1000, 3.6 at 17 x 1000), so time and memory grow roughly linearly with
+  jobs. Profile (`t18/p17x300/prof.txt`, `t18/ours.py`): Snakemake internals dominate: dry-run job printing evaluates resources
+  (`expand_resources` 170 s of 393 s, much of it `inspect.signature`), DAG building 125 s, input sizes 63 s, conda env specs 38 s. All of
+  the workflow's own functions together take under 6 s (largest: `parent_dir` 1.6 s over 56k calls); no helper of ours dominates.
