@@ -1,0 +1,12 @@
+# Published image pin, checked by containers/check_pins.sh (workflow image-pins).
+# The image was built and pushed by Actions run <run> (fusion-image.yml) from
+# <commit>; each tree line is `git rev-parse <commit>:<path>`, the recipe input at
+# that commit. Image builds are not byte-reproducible, so pull by digest only.
+image ghcr.io/twillis209/pantry-fusion
+digest sha256:87335916d0395fe07cb6abe01e6cfa52838a85cd8bf538f32bfa11c17fdb4009
+run 41755433329
+commit 11d208d4985607ecf7e7343796dce57196114f22
+tree containers/fusion 7add2e1a506f36836d56e66d97a0fbfd903a3bcd
+tree pheast/scripts/fusion_twas 8a904cbcf1006dd8cc22cf5e29d9035e35db35ae
+tree pheast/envs/fusion.yaml ba83793fe2834a89bd4b424462aebd9d82990d9f
+ref pheast/steps/twas.smk

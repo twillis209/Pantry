@@ -1,0 +1,11 @@
+# Published image pin, checked by containers/check_pins.sh (workflow image-pins).
+# The image was built and pushed by Actions run <run> (tensorqtl-image.yml) from
+# <commit>; each tree line is `git rev-parse <commit>:<path>`, the recipe input at
+# that commit. Image builds are not byte-reproducible (run 41737670211 rebuilt the
+# same tree and pushed sha256:111e79ff...), so pull by digest only.
+image ghcr.io/twillis209/pantry-tensorqtl
+digest sha256:65a42f9fd74a4bc5f0f6a1a2a88a19e1140b62bbef5b3f2e6fc9de4330bde9b8
+run 41716028853
+commit 206c8920cd142ecd6d20cdf79be9d2b778aba1f9
+tree containers/tensorqtl 34f2a4f384536eb07e1816555b8524fc19e86a65
+ref pheast/steps/qtl.smk
