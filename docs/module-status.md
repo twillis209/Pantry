@@ -43,7 +43,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.2")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.3")
     config:
         config["pantry"]["phenotyping"]
 
@@ -55,7 +55,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.2")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.3")
     config:
         config["pantry"]["pheast"]
 
