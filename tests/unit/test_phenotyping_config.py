@@ -395,6 +395,7 @@ def test_edit_sites_min_samples():
 
 
 def test_edit_sites_threshold_note_once_per_dataset(capsys):
+    # The seen-set is process-wide, so use dataset names no other test uses.
     for _ in range(3):
         cfg.note_edit_sites_threshold("t18_small", 10, 0.1, 8)
         cfg.note_edit_sites_threshold("t18_big", 10, 0.1, 16)

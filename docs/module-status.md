@@ -102,7 +102,7 @@ rule all:
 - **Linking the stages is by path text.** A pheast `phenotype_dir` must equal the phenotyping `<pantry_output>/{dataset}` path as the host resolves it (`results/pantry/phenotypes/<name>` above). A relative vs absolute spelling of the same directory does not link, and pheast then fails with missing input files.
 - **`defaults:`** can be added to or overridden per dataset, but a dataset cannot remove a key from it. Keep modality groups, modalities and analyses that vary between datasets out of `defaults`. (Removal support is deferred.)
 - **Stage directories and `--config`.** Inside `phenotyping/` or `pheast/`, `--config key=value` with a legacy key (e.g. `read_length=100`) is an error next to the new-format `config.yml`. Use `--configfile override.yml` with `datasets: {default: {read_length: 100}}` (deep-merged), edit `config.yml`, or run an old-format config from another directory (`--directory`). Nested `--config` values arrive as strings, so `--config 'datasets={...}'` works only for string-valued keys.
-- **`github()` and gcta.** A `github()` module downloads `gcta_nr_robust` in the `pantry_pheast_install_fusion` job (pinned URL plus sha256; Snakemake's source cache can't fetch binaries). That job needs network access. **Offline sites set `gcta`** (or `fusion_dir` for the R scripts as well). Local-path modules copy the bundled binary.
+- **`github()` and gcta.** A `github()` module downloads `gcta_nr_robust` in the `pantry_pheast_install_fusion` job (pinned URL plus sha256; Snakemake's source cache can't fetch binaries). That job needs network access. **Offline sites set `gcta`** (or `fusion_dir` for the R scripts as well). Local-path modules copy the bundled binary. A `github()` module also builds its own conda envs: env files fetched from GitHub lose their final newline (Snakemake source-cache bug), so their hashes differ from the local-path ones (13 envs, about 15 min in Task 18). Outputs are unaffected.
 - **Profile for GPU tensorQTL.**
 
   ```yaml
@@ -184,6 +184,6 @@ About 3 ms per job in all cases, so cost grows roughly linearly with the job cou
 
 1. Runtime verification of LaDDR (MAJIQ done, Task 17).
 2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD. MAJIQ's named env is built from `tests/hpc/envs/majiq3.yml` + `majiq3-install.sh` (v3.0.22), but the rules still name it rather than pin it.
-3. Report the Snakemake source-cache bugs upstream: binary files fail, and text files lose their final newline under `github()`.
+3. Report the Snakemake source-cache bugs upstream: binary files fail, and text files lose their final newline under `github()` (which also makes a `github()` module rebuild its conda envs).
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".

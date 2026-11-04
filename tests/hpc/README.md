@@ -283,7 +283,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   (`psicov_batch_size: 25`, `min_experiments: 0.01`, as `tests/configs/phenotyping_baseline_ir.yml`; `$H/pantry-runs/t18/mk_gh_config.py`), env
   pantry-baseline-pheno. Job 8399793 (`$H/pantry-runs/t18/gh_run.sh`, `sjob -c 2 -m 7500M -t 0-12:00:00`): fetched befa72c; dry run of `all`
   482 jobs (Task 14's 470 + intron_retention), EXIT=0; run of `tested` EXIT=0, 549/549 steps, 1h06m (incl. 13 conda envs rebuilt: env files
-  fetched by github() lack the final newline, so their hashes differ from the local-path ones; source-cache bug 2 below), 16 tensorQTL jobs
+  fetched by github() lack the final newline, so their hashes differ from the local-path ones; source-cache bug 2 above), 16 tensorQTL jobs
   on `gpu-core` (`gres/gpu:a100=1`). gcta downloaded from the full-SHA `gcta_url`, sha256 7b51e51d...93e9.
   - Job counts: `tested` started at 423 jobs = 482 minus the 59 `chained` jobs (7 modalities x 8 per-modality pheast rules + check_genotype_samples,
     prune_for_covar, qtl_genotype_qc); the checkpoints added 126 (geuvadis' 8 modalities: heritability batches 80, TWAS weight batches 37,
@@ -302,7 +302,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   - vs the Task 14 local-path host run: every phenotyping file byte-identical except `unnorm/alt_polyA.bed` (kallisto noise), every pheast
     non-tensorQTL file byte-identical.
 - Scaling (dry runs, `$H/pantry-runs/t18/scale.sh <name> <datasets> <samples> <mode>`, `tests/fixtures/make_scaling_config.py`, env
-  pantry-baseline-pheno, Snakemake 9.27.1, `-n --quiet rules`, `/usr/bin/time -v`, `sjob -c 2`). Synthetic datasets = copies of the host's `full`
+  pantry-baseline-pheno, Snakemake 9.27.1, `-n --quiet rules` (no target; a target must come before `--quiet rules`, which otherwise takes it as a choice), `/usr/bin/time -v`, `sjob -c 2`). Synthetic datasets = copies of the host's `full`
   (7 modalities + cross_modality) with inline sample lists and FASTQ maps of empty files; pheast datasets chained to them (cold, so the
   checkpoint-dependent jobs are not counted). Phenotyping-only 1-dataset runs use the old-format baseline config with file maps.
 
