@@ -381,7 +381,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   the job's working directory).
 - Unset route unchanged (job 8403902, `t20/before/dry.sh`, `-n -p`): before = `$H/Pantry` f9c2345 (code = ccc56d6), after = `t20/repo`.
   Standalone 61 / 61 jobs, host 481 / 481; job sets identical (rule, wildcards, inputs, outputs, resources, shell commands, after
-  normalising repo paths; `/tmp/t20cmp_blocks.py`-style comparison, checkpoint-aware).
+  normalising repo paths; `t20/before/jobsets.py`, run from that dir).
 - Licence file in the container: job 8403903 (`t20/lic/lic.sh`, Snakemake's form `apptainer exec --home <run dir>` + the profile's
   `--bind=/data/hps/assoc/private/gdml --nv`): the source cache `$HOME/.cache/snakemake/...` is **not** visible (`ls`: No such file;
   `mount home = yes`, but `--home` replaces it). Job 8403905 (`lic2.sh`, `majiq.sif`): with `--bind=/data/hps/home/twil15/.cache/snakemake`
