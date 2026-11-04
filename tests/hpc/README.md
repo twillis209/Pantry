@@ -405,3 +405,54 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   da54ff9 locally and on the remote; host config + intron_retention, `majiq_container` unset: GH_DRY_unset_EXIT=0, 481 jobs; set: GH_DRY_set_EXIT=0,
   481 jobs (5 MAJIQ-related jobs each); no UnicodeEncodeError.
 - `pytest tests/unit -q`: 151 passed (local).
+
+## Task 21: pins, Snakemake floor 9.14, image-pin check, legacy env headers (R28, module-v0.1.4)
+- Scratch `$H/pantry-runs/t21`; `t21/repo` = the working tree by `tar`. Explicit-list check for each env: every package basename in the
+  built env's `conda list --explicit` must appear verbatim in the lock (`comm -23` on sorted basenames).
+- txrevise (`t21/tx/tx.sh`: gate-2 `config.yml`, `--profile tests/profile`, `--conda-create-envs-only`, `conda list --explicit`, then the
+  target `intermediate/reference/default/txrevise/completed.txt`). With only the yaml's 15 direct packages pinned, the existing env
+  (`conda-envs/7710e88d…`) had 47 of 261 packages not in `baseline-pheno.lock.txt` (python 3.15, r-base build hc28aa72_21, …). Every package
+  now pinned `name=version=build` from the lock: first build (job 8404058, cancelled) 271 of 272 in the lock (`packaging` 26.3); with it
+  pinned, job 8404170 (env `8abe62ff…`): 272 of 272 in the lock, RUN_EXIT=0. `t21/tx/cmp.sh` (8404628), `cmp2.sh` (8404697), `rds2.R`
+  (8404733) vs `$H/pantry-baseline/phenotyping/intermediate/reference/txrevise`: `gene_annotations.gtf`, `transcript_tags.txt` and the
+  4 merged `txrevise.grp_{1,2}.{upstream,downstream}.gff3` byte-identical; the 600 `batch/*.gff3`: 225 byte-identical, the other 375
+  identical except the `##date 2026-11-01`/`2026-11-04` header line; `txrevise_annotations.rds` differs in bytes (as gate 2's does, same env
+  as the baseline): `transcript_metadata` identical, `exons`/`cdss` identical once `metadata()$genomeInfo` `Data source` (the GTF path,
+  `reference/txrevise/` vs `reference/default/txrevise/`) and `Creation time` are dropped.
+- LaDDR (`t21/laddr/laddr.sh`, `mamba env create -p`). First build (8404059), LaDDR v1.0.0 with the yaml's version pins: CREATE_EXIT=0 but
+  pip had replaced conda's scipy 1.17.1 with 1.16.3 (LaDDR requires scipy<1.17) and `laddr --help` failed (scikit-fda 0.10.1 with
+  multimethod 2.1: `TypeError: metaclass conflict`). Final yaml (conda stack pinned `name=version=build` from the lock, scipy
+  1.16.3=py312h54fa4ab_2, `multimethod==1.12`), job 8404179: 105 conda packages, all in the lock except scipy; pip scipy 1.16.3 (no
+  uninstall), laddr 1.0.0, multimethod 1.12; `laddr --help` and `import laddr, skfda, pyBigWig, bx` OK. LaDDR v1.0.0 = 2addf6fe; the only
+  later commit, fae1b0d (2026-04-29, what an unpinned install at 8da7787 got), adds a stranded-bigWig option Pantry does not use.
+- MAJIQ image rebuild (job 8404060, `t21/build/build.sh` as Task 20's; `majiq3.yml` pinned to `majiq3.lock.txt`, pip by `constraints.txt`):
+  BUILD_EXIT=0, 4:59, 3.6 GB; `majiq --version: majiq 3.0.22`. Image vs lock: conda 64/64 identical (incl. kernel-headers 5.14.0 and
+  sysroot 2.34, which drifted in Task 20), pip list identical to the lock's pip lines. IR check with this image and the profile without the
+  source-cache bind (job 8404171, `t21/accept.sh` = Task 20's on `$H/pantry-runs/gate-ir{,-symlink}-sif21`): 9/9 each, all 4 IR files `cmp`
+  SAME as upstream, every MAJIQ job log `Activating singularity image …/t21/majiq.sif`, 0 conda, `.sj` after the symlink targets.
+- Floor: `gh api repos/snakemake/snakemake/compare/f1e8b629...<tag>`: v9.13.0-v9.13.7 behind (v9.13.7 by 10), v9.14.0 ahead 5, behind 0;
+  v9.14.0 published 2025-11-27 (the commit is dated 2025-11-27 15:16). v9.12.0/v9.13.7 `singularity.py` already bind
+  `<user_cache_dir>/snakemake/source-cache`, which is `workflow.source_cache_path` under the default shared-FS settings.
+- Dry runs before (`$H/Pantry` at da54ff9, code = 73eb0e6) and after (`t21/repo`), job 8404177 (`t21/dry/dry.sh`) + 8404187
+  (`jobsets.py`, as Task 20's): gate-2 phenotyping 345/345, `dryrun_majiq_laddr.yml` 166/166, `pheast_baseline.yml` 68/68, local-path
+  host 481/481; identical job sets in all four.
+- Image pins: `containers/pins/{tensorqtl,fusion}`, seeded from the Actions logs (`gh run view <id> --log`, "exporting manifest"):
+  tensorqtl run 41716028853 at 206c8920 pushed sha256:65a42f9f… (= `qtl.smk`); run 41737670211 at d05c168f rebuilt the same tree (34f2a4f3)
+  and pushed sha256:111e79ff…; fusion run 41755433329 at 11d208d4 pushed sha256:87335916… (= `twas.smk`). Trees at those commits equal
+  HEAD's. Workflow `image-pins` run 41908908129 (push of 01b8623): PINS_OK, both manifests HTTP 200. Local failure demos: a pins copy with
+  a wrong tree hash and a wrong digest (`check_pins.sh --offline /tmp/pins_bad`), and a scratch worktree commit editing
+  `containers/tensorqtl/Dockerfile`: PINS_FAIL, exit 1.
+- Full `github()` host run, `$H/pantry-runs/host-github-v014` (config as `host-github-v012` plus `majiq_container:
+  $H/pantry-runs/t21/majiq.sif` under `pantry.phenotyping`; `tests/host/profile` without the source-cache bind; `Snakefile.github` at
+  1e5c858 fetching commit 01b8623; fork entries cleared from the source cache first). Job 8404292 (`t21/gh_run.sh`, env
+  pantry-baseline-pheno, Snakemake 9.27.1, `--slurm-keep-successful-logs`): DRY_ALL_EXIT=0 (481), DRY_TESTED_EXIT=0 (422), RUN_EXIT=0,
+  548/548. MAJIQ jobs 8404709 (build), 8404722 (psi-coverage), 8404730 (psi): `Activating singularity image
+  /data/hps/assoc/private/gdml/user/twil15/pantry-runs/t21/majiq.sif`, 0 conda lines; all 16 tensorQTL and 45 TWAS-image job logs show
+  their image activation.
+- Compare 8404824 (`host-github-v014/compare.sh`, env pantry-baseline-pheast): PHENO_COMPARE_EXIT=0 (alt_polyA 0.222/0.328, expression
+  0.366/0.732, isoforms 0.0835/0.167, unnorm 4.6e-4/2.8e-3, 338/676, 3.0e-3/6.1e-3), PHENO_CHECK_EXIT=0; IR_COMPARE_EXIT=0, IR_BYTES_SAME x4;
+  XM_BED_SAME, XM_GROUPS_SAME (771 rows); PHEAST_COMPARE_EXIT=1 with 78 mismatches, all in the 16 `qtl/*.cis_qtl`/`*.cis_independent_qtl`
+  files (non-blocking, R22); heritability x8, TWAS x8, genotype_qc no mismatch; PHEAST_CHECK_EXIT=0; covar inputs 21 SAME, `geno_pruned.log`
+  DIFF. Job 8404825 (`cmds.sh`, env pantry-baseline-pheno): CMDS_EXIT=0, 17/17, CMDS_IDENTICAL. HOSTDIFF vs the Task 14 local-path run:
+  `alt_polyA.bed.gz(.tbi)`, `unnorm/alt_polyA.bed`, `cross_modality.bed.gz(.tbi)` (kallisto noise, as in Task 19).
+- `pytest tests/unit -q`: 151 passed (local).
