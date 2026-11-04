@@ -50,6 +50,10 @@ rule covariates:
         mem_mb=32000,
     params:
         script=script("covariates.R"),
+        # Unused here: covariates.R sources fusion_twas/utils/plink_utils.R
+        # relative to itself, and source_path puts that file beside it in
+        # the source cache (the job runs the cached copy).
+        plink_utils=script("fusion_twas/utils/plink_utils.R"),
         pruned_prefix=lambda w, input: input.geno[0].removesuffix(".bed"),
         n_geno_pcs=5,
         n_pheno_pcs=20,
