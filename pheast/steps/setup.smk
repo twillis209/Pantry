@@ -5,7 +5,6 @@ It normalises and validates the configuration and defines config helpers.
 
 import functools
 import importlib.util
-import os
 
 from snakemake.utils import validate
 
@@ -53,16 +52,6 @@ if CONFIG["legacy_pathvars"]:
     pathvars:
         pantry_intermediate=CONFIG["legacy_pathvars"]["pantry_intermediate"],
         pantry_resources=CONFIG["legacy_pathvars"]["pantry_resources"],
-
-
-# FUSION files for TWAS: installed by install_fusion unless configured.
-FUSION = pantry_config.fusion_paths(CONFIG)
-
-# Whether this module is loaded from a local path (standalone or a host's
-# local 'snakefile:'), i.e. its source directory exists on disk. If not (e.g.
-# github()), install_fusion downloads gcta from gcta_url instead of copying the
-# bundled binary: Snakemake's git source cache cannot fetch binary files.
-LOCAL_SOURCE = Path(workflow.current_basedir.get_path_or_uri(secret_free=True)).is_dir()
 
 
 def ds(w) -> dict:

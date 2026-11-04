@@ -1,3 +1,13 @@
+# FUSION weight fitting and profiling run in this container (under --sdm
+# apptainer) rather than a conda env: containers/fusion (the FUSION R scripts
+# and gcta_nr_robust of pheast/scripts/fusion_twas under /opt/fusion, R 4.5.3,
+# plink 1.90, gemma 0.98.5, Python 3.12, as in the baseline env), built by
+# .github/workflows/fusion-image.yml and pinned by digest. The /opt/fusion
+# paths are params, not inputs: they exist only inside the container.
+FUSION_CONTAINER = "docker://ghcr.io/twillis209/pantry-fusion@sha256:87335916d0395fe07cb6abe01e6cfa52838a85cd8bf538f32bfa11c17fdb4009"
+FUSION_DIR = "/opt/fusion"
+
+
 def twas_snps(w) -> str:
     """Input function: the {dataset}'s twas_snps file."""
     return str(Path(ds(w)["twas_snps"]).expanduser())
@@ -52,13 +62,10 @@ rule twas_compute_weights_batch:
         geno=twas_geno_input,
         bed=pheno_bed,
         covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.plink.tsv",
-        fusion_script=FUSION["compute_weights"],
-        fusion_utils=FUSION["plink_utils"],
-        gcta=FUSION["gcta"],
     output:
         "<pantry_intermediate>/{dataset}/twas/status_{modality}/{batch_start}_{batch_end}.tsv",
-    conda:
-        "../envs/fusion.yaml"
+    container:
+        FUSION_CONTAINER
     threads: twas_threads
     resources:
         runtime="8h",
@@ -66,6 +73,8 @@ rule twas_compute_weights_batch:
         script=script("fit_twas_weights.py"),
         twas_geno_prefix=lambda w, input: input.geno[0].removesuffix(".bed"),
         twas_interm_dir=lambda w, output: str(Path(output[0]).parent.parent),
+        fusion_script=f"{FUSION_DIR}/FUSION.compute_weights.R",
+        gcta=f"{FUSION_DIR}/gcta_nr_robust",
     shell:
         """
         python {params.script} \
@@ -78,8 +87,8 @@ rule twas_compute_weights_batch:
             --output-dir {params.twas_interm_dir} \
             --status {output} \
             --threads {threads} \
-            --fusion-script {input.fusion_script} \
-            --gcta {input.gcta}
+            --fusion-script {params.fusion_script} \
+            --gcta {params.gcta}
         """
 
 
@@ -100,17 +109,16 @@ rule twas_assemble_summary:
     """
     input:
         status=twas_batch_status_input,
-        profile_script=FUSION["profile_wgt"],
     output:
         file_list="<pantry_intermediate>/{dataset}/twas/{modality}.list",
         profile="<pantry_intermediate>/{dataset}/twas/{modality}.profile",
         summary="<pantry_intermediate>/{dataset}/twas/{modality}.profile.err",
-    conda:
-        "../envs/fusion.yaml"
+    container:
+        FUSION_CONTAINER
     params:
         script=script("assemble_twas_weight_list.py"),
         # An absolute path, as the shell changes into the intermediate dir:
-        profile_script=lambda w, input: os.path.abspath(input.profile_script),
+        profile_script=f"{FUSION_DIR}/utils/FUSION.profile_wgt.R",
         twas_interm_dir=lambda w, output: str(Path(output.file_list).parent),
     shell:
         """
