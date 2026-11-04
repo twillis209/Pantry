@@ -359,3 +359,46 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   (as before). The in-script command check fails in this env (no gtfparse, as Task 18); job 8403792 (`cmds.sh`, env pantry-baseline-pheno):
   CMDS_EXIT=0, 17/17, CMDS_IDENTICAL. HOSTDIFF vs the Task 14 local-path host run: `alt_polyA.bed.gz(.tbi)`, `unnorm/alt_polyA.bed`,
   `cross_modality.bed.gz(.tbi)` (kallisto noise; cross_modality includes alt_polyA; both within the noise envelope in PHENO_COMPARE).
+
+## Task 20: user-built MAJIQ image, `majiq_container` (R27, module-v0.1.3)
+- Scratch `$H/pantry-runs/t20`; `t20/repo` = the working tree by `tar` (code files checked identical to the commits, by sha1).
+- Spike 1 (job 8403888, cpu-20, apptainer 1.5.2-1.el9; `t20/spike1/mini.def` from the pinned micromamba base): `apptainer build plain.sif
+  mini.def` PLAIN_EXIT=0, `apptainer build --fakeroot` FAKEROOT_EXIT=0. Both log "User not listed in /etc/subuid, trying root-mapped
+  namespace" and run `%post` under the fakeroot command, so the plain form is enough.
+- Build (job 8403896, `t20/build/build.sh`, `sjob -c 4 -m 7500M -t 0-02:00:00`): `cd containers/majiq && apptainer build majiq.sif majiq.def`
+  -> `t20/majiq.sif`, BUILD_EXIT=0, 4:59 wall, 3.6 GB max RSS; `%test` passed; in-build `majiq --version: majiq 3.0.22`, `import rna_majiq,
+  rna_voila: ok`. `apptainer exec`: `/opt/conda/bin/majiq`; `/opt/majiq` holds NOTICE (Penn copyright, creators) and the clone's 10 licence
+  files (boost, bxzstr, moccasin, eigen); labels `majiq.copyright`, `majiq.creators`, `majiq.licence`, `majiq.commit`. The def's header
+  comments were reworded after this build (no other change). Image env vs `containers/majiq/majiq3.lock.txt`: conda packages identical
+  except the build-only kernel-headers 6.12.0 (lock 5.14.0) and sysroot 2.39 (lock 2.34); pip numpy 2.0.1, zarr 2.18.3, xarray 2024.6.0,
+  dask 2024.7.1, pandas 2.2.2, scipy 1.14.0, numcodecs 0.13.1, h5py 3.11.0 as the lock (`t20/build/image_*.txt`, `lock_vs_image.diff`).
+- Docker route: not built. Local Docker (colima) cannot pull from Docker Hub here (TLS interception, x509 unknown authority); the HPC has no
+  Docker or podman.
+- Spike 2 (job 8403890 dry runs `t20/spike2/spike2.sh`; job 8403893 `rules.py`, Snakemake API): `conda: None if MAJIQ_CONTAINER else MAJIQ_ENV`
+  and `container: MAJIQ_CONTAINER` parse; dry runs EXIT=0 standalone (gate-ir config) and local-path host (host config + intron_retention),
+  each with `majiq_container` unset / absolute `.sif` / relative `majiq.sif`. Parsed MAJIQ rules: unset `conda='majiq3' container=None`; set
+  `conda=None container=<path as given>`, also as `pantry_pheno_majiq_*` in the host. Local image paths are used as given (relative = against
+  the job's working directory).
+- Unset route unchanged (job 8403902, `t20/before/dry.sh`, `-n -p`): before = `$H/Pantry` f9c2345 (code = ccc56d6), after = `t20/repo`.
+  Standalone 61 / 61 jobs, host 481 / 481; job sets identical (rule, wildcards, inputs, outputs, resources, shell commands, after
+  normalising repo paths; `/tmp/t20cmp_blocks.py`-style comparison, checkpoint-aware).
+- Licence file in the container: job 8403903 (`t20/lic/lic.sh`, Snakemake's form `apptainer exec --home <run dir>` + the profile's
+  `--bind=/data/hps/assoc/private/gdml --nv`): the source cache `$HOME/.cache/snakemake/...` is **not** visible (`ls`: No such file;
+  `mount home = yes`, but `--home` replaces it). Job 8403905 (`lic2.sh`, `majiq.sif`): with `--bind=/data/hps/home/twil15/.cache/snakemake`
+  the bundled `.lic` is visible, md5 99b38b20... as on the host; PATH in the container `/opt/conda/bin:/usr/local/sbin:...` (no host PATH).
+  So `tests/profile` and `tests/host/profile` now also bind the source cache (d95e2d4).
+- Acceptance (job 8403914, `t20/accept.sh`, env pantry-baseline-pheno, `tests/profile` with `--sdm conda apptainer`,
+  `--slurm-keep-successful-logs`; the first attempt 8403906 was cancelled because the slurm plugin deletes successful job logs).
+  Run dirs `$H/pantry-runs/gate-ir-sif` and `gate-ir-symlink-sif` = `cp -a` of Task 17's `gate-ir` / `gate-ir-symlink` with the
+  intron_retention intermediates and outputs removed and `majiq_container: $H/pantry-runs/t20/majiq.sif` appended to `config.yml`.
+  No `majiq` on the controller's PATH.
+  - gate-ir-sif: DRY 9 jobs; RUN_EXIT=0, 9 of 9 steps; MAJIQ jobs 8403915 (build), 8403917 (psi-coverage), 8403918 (psi): each log has
+    `Activating singularity image /data/hps/assoc/private/gdml/user/twil15/pantry-runs/t20/majiq.sif`, 0 lines matching conda/majiq3.
+    `cmp` vs `archive/phenotyping_ir`: SAME `intron_retention.bed.gz`, `.bed.gz.tbi`, `.phenotype_groups.txt`, `unnorm/intron_retention.bed`.
+    `.sj` = `build/HG00108.sj` etc. Rerun dry run: nothing to be done.
+  - gate-ir-symlink-sif: DRY 9 jobs; RUN_EXIT=0, 9 of 9; MAJIQ jobs 8403925 / 8403927 / 8403928, same image line, 0 conda; `.sj` =
+    `build/HG00108.renamed.sj` etc. (symlink targets); `cmp` SAME for all 4 files. Rerun: nothing to be done.
+- `github()` host dry run at the tag (job 8403936, `t20/gh_dry.sh`, fork entries cleared from the source cache): tag `module-v0.1.3` =
+  da54ff9 locally and on the remote; host config + intron_retention, `majiq_container` unset: GH_DRY_unset_EXIT=0, 481 jobs; set: GH_DRY_set_EXIT=0,
+  481 jobs (5 MAJIQ-related jobs each); no UnicodeEncodeError.
+- `pytest tests/unit -q`: 151 passed (local).
