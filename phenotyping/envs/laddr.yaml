@@ -2,7 +2,8 @@
 # repository, with the Python stack of the test baseline env
 # (tests/hpc/envs/baseline-pheno.lock.txt): every conda package, transitive ones
 # included, as name=version=build from that lock, except scipy (LaDDR requires
-# scipy<1.17; the lock has 1.17.1, which pip would silently replace).
+# scipy<1.17; the lock has 1.17.1, which pip would silently replace) and icu
+# (unpinned; it resolves to the lock's 73.2=h59595ed_0).
 channels:
   - conda-forge
   - bioconda

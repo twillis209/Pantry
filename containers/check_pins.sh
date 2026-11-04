@@ -20,6 +20,9 @@ for f in "$pins"/*; do
     if [ -z "$image" ] || [ -z "$digest" ] || [ -z "$ref" ]; then
         echo "FAIL $name: image, digest and ref lines are required"; fail=1; continue
     fi
+    if ! awk '$1 == "tree" {n++} END {exit !n}' "$f"; then
+        echo "FAIL $name: at least one tree line is required"; fail=1; continue
+    fi
     while read -r _ path want; do
         got=$(git rev-parse "HEAD:$path" 2>/dev/null || echo missing)
         if [ "$got" = "$want" ]; then
