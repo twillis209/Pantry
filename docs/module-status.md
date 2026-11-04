@@ -1,6 +1,6 @@
 # Pantry module refactor: status note
 
-Date: 2026-11-02. This is the report back requested by the scPantry handover (`~/projects/scPantry/docs/handover/2026-10-30-pantry-fork-handover.md`, "Report back").
+Date: 2026-11-03. This is the report back requested by the scPantry handover (`~/projects/scPantry/docs/handover/2026-10-30-pantry-fork-handover.md`, "Report back").
 Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Run records: `tests/hpc/README.md`.
 
 ## Branch and tag
@@ -22,6 +22,7 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
   - the default `gcta_url` names upstream's full commit SHA (same file, same sha256);
   - the tensorQTL image workflow builds only on pushes to `module`; `majiq3-install.sh` checks the tag's commit;
   - docs.
+- The full `github()` host run (Task 18, job 8399793) fetched `module-v0.1.1` = `befa72c`. Later commits on `module` only add run records to the docs.
 
 ## How a host imports it
 
@@ -143,7 +144,7 @@ Everything ran on the GDML HPC (SLURM, `sjob`, profile `tests/profile` or `tests
 | Multi-dataset (2) | phenotyping `full` + `half_se` (8 samples, R1 as single-end) on one reference (job 8395741, 468/468) | `multi-pheno` | `full` MATCH vs baseline; 1 STAR index, 1 kallisto index shared; `half_se` 20/20 targets | `multi-pheno/compare.md` |
 | Multi-dataset (2) | pheast `full` + `subset` (300 samples, MAC 20) (job 8395742, 388/388, GPU) | `multi-pheast` | `full`: heritability/TWAS/genotype_qc pass, 76 tensorQTL mismatches (non-blocking); `subset` 33/33 targets | `multi-pheast/compare.md` |
 | Host, local path (3) | `tests/host/Snakefile`: dry run of `all` (472 jobs, incl. pheast `chained` on phenotyping output in the same DAG); full run of phenotyping `full` + pheast `geuvadis` (job 8396531, 539/539, tensorQTL on GPU with prefixed set-resources) | `host` | phenotyping MATCH; `cross_modality` byte-identical to upstream `combine_modalities.sh`; pheast: blocking files pass, 79 tensorQTL mismatches (non-blocking) | `host/compare_pheno.md`, `host/compare_pheast.md` |
-| Host, `github()` (3) | `tests/host/Snakefile.github` at `module-rc1` (job 8398071): dry run of `all` (470 jobs); ran `install_fusion` (gcta downloaded, sha256 OK, identical to bundled) and one script rule (`exonic_intronic_from_GTF`, output identical to the local host's) | `host-github` | pass. No full pipeline run via `github()` | `tests/hpc/README.md` (Task 14) |
+| Host, `github()` (3) | `tests/host/Snakefile.github` at `module-v0.1.1` (= `befa72c`), full run of phenotyping `full` (+ intron_retention) and pheast `geuvadis` (job 8399793, 549/549, tensorQTL on GPU); earlier, at `module-rc1`, dry run and two jobs only (job 8398071) | `host-github-v011` | phenotyping MATCH; intron_retention byte-identical to upstream; `cross_modality` identical to the script; pheast: blocking files pass, 80 tensorQTL mismatches (non-blocking), inputs and 17 command lines identical; gcta downloaded, sha256 OK | `host-github-v011/compare_{pheno,ir,pheast}.md`, `tests/hpc/README.md` (Task 18) |
 | Lint, format (4) | `snakemake --lint`, `snakefmt` | local | remaining warnings justified in `CHANGES-module.md` (no log directives, as upstream; justified `run:` blocks; mixed rules/functions; two upstream-body items) | `CHANGES-module.md` |
 
 How far the tensorQTL results are from upstream's:
@@ -157,6 +158,17 @@ How far the tensorQTL results are from upstream's:
 **HPC note: pulling the tensorQTL image.** The image `ghcr.io/twillis209/pantry-tensorqtl` is public, but stale stored ghcr.io credentials make apptainer fail with 403 on the token request (seen on this account, Task 16). Run `apptainer registry logout docker://ghcr.io` (and drop `ghcr.io` from `~/.docker/config.json`) or refresh the login. The runs here used an anonymous pre-pull into the profile's `apptainer-prefix` (`tests/hpc/README.md`, Task 16).
 
 **LaDDR** was restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. It is excluded from every run above.
+
+**Scaling (dry runs, Task 18).** Synthetic host configs with N datasets (copies of the test `full` dataset, 7 modalities + cross_modality, chained pheast datasets) on the HPC, Snakemake 9.27.1:
+
+| Case | Jobs | Wall | Max RSS |
+|---|---|---|---|
+| upstream 8da7787 standalone phenotyping, 1 dataset x 1000 samples | 12149 | 32.8 s | 393 MB |
+| this module, standalone phenotyping, 1 x 1000 | 12151 | 38.0 s | 401 MB |
+| host, 17 x 100 | 22053 | 64 s | 628 MB |
+| host, 17 x 1000 | 205653 | 12m20 | 4.4 GB |
+
+About 3 ms per job in all cases, so cost grows roughly linearly with the job count. A profile of 17 x 300 shows Snakemake's own work (resource evaluation while printing jobs, DAG building, input sizes, conda env specs) dominating; Pantry's helper functions take under 2% of the time. Details: `tests/hpc/README.md`, Task 18.
 
 **Margin to watch.** The isoforms kallisto margin in the multi-dataset run was close: max |diff| 0.149 vs allowed 0.167. The envelope comes from a single baseline pair.
 
