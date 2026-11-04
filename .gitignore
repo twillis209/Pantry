@@ -14,3 +14,4 @@ build
 tests/**/input
 tests/**/results
 tests/**/resources
+*.sif
