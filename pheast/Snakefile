@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 from snakemake.utils import min_version
 
-min_version("9.12")
+min_version("9.14")
 
 
 configfile: "config.yml"
