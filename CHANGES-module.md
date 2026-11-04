@@ -246,4 +246,5 @@ Remaining warnings, each justified:
 - **Stage linking is by path text**: pheast `phenotype_dir` must spell the phenotyping `<pantry_output>/{dataset}` path exactly as the host resolves it (relative vs absolute matters); otherwise pheast reports missing input files.
 - **Hosts must pass `config:`** in each `module` directive; otherwise the module's standalone `configfile: config.yml` can load a `config.yml` from the host's working directory.
 - pheast `samples` still doesn't subset the analysis (upstream semantics): to analyse fewer samples, supply BEDs with those samples.
+- **Scaling** (dry runs, Task 18): about 3 ms and ~20 KB per job, roughly linear; 17 datasets x 1000 samples (205,653 jobs) dry-run in 12m20 with 4.4 GB, against 33 s for upstream's 1 x 1000 (38 s here). Snakemake's own job handling dominates, not Pantry's helpers. See `tests/hpc/README.md`, Task 18.
 - Ideas not taken: the standard `workflow/` layout; wrapping `prepare_phenotypes.py` in a rule.
