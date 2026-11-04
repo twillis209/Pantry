@@ -4,7 +4,7 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
-> **Module branch.** This fork's `module` branch (release `module-v0.1.2`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+> **Module branch.** This fork's `module` branch (release `module-v0.1.4`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.14**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
 
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
@@ -66,7 +66,7 @@ max-jobs-per-timespan: "1/1s"
 max-status-checks-per-second: 5
 ```
 
-This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules and the FUSION TWAS rules (`twas_compute_weights_batch`, `twas_assemble_summary`), which run in pinned containers under apptainer, and the MAJIQ rules, which use an image or env you build yourself (see [MAJIQ](#majiq-intron_retention) below). `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. In a cluster job, `script()` paths point into Snakemake's source cache (`~/.cache/snakemake/snakemake/source-cache`), for local-path and `github()` modules alike. Snakemake 9.14 and later binds that cache into container jobs itself, so no profile bind is needed. On Snakemake 9.12-9.13, which `min_version("9.12")` still allows, every containerised rule (tensorQTL, TWAS, MAJIQ) needs `--bind <home>/.cache/snakemake` (an absolute path; or `$XDG_CACHE_HOME/snakemake`) in `apptainer-args`, or its scripts are invisible in the container. The FUSION R scripts and gcta are in the TWAS image, but `fit_twas_weights.py` and `assemble_twas_weight_list.py` come from the source cache. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment), and the TWAS analysis cannot run: FUSION and gcta are only in its image. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
+This uses Snakemake 9.14 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules and the FUSION TWAS rules (`twas_compute_weights_batch`, `twas_assemble_summary`), which run in pinned containers under apptainer, and the MAJIQ rules, which use an image or env you build yourself (see [MAJIQ](#majiq-intron_retention) below). `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. In a cluster job, `script()` paths point into Snakemake's source cache (`~/.cache/snakemake/snakemake/source-cache`), for local-path and `github()` modules alike. Snakemake binds that cache into container jobs itself (from 9.14, the cache path actually in use, wherever it is), so `apptainer-args` needs no bind for it. The FUSION R scripts and gcta are in the TWAS image, but `fit_twas_weights.py` and `assemble_twas_weight_list.py` come from the source cache. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment), and the TWAS analysis cannot run: FUSION and gcta are only in its image. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
 
 ### MAJIQ (intron_retention)
 
@@ -88,7 +88,7 @@ The `intron_retention` modality runs [MAJIQ](https://majiq.biociphers.org/) v3, 
    apptainer build majiq.sif docker-archive://majiq.tar
    ```
 
-   Then copy `majiq.sif` to the machine that runs Pantry. Both recipes run the same `majiq3-install.sh` and check that `majiq --version` reports 3.0.22.
+   Then copy `majiq.sif` to the machine that runs Pantry. Both recipes run the same `majiq3-install.sh` and check that `majiq --version` reports 3.0.22. Every conda package is pinned to `majiq3.lock.txt` (`majiq3.yml`), and MAJIQ's Python dependencies by `constraints.txt`, so a build installs the package versions of the tested env (Task 21: conda and pip lists identical to the lock).
 3. **Point Pantry at it.** Set the top-level `majiq_container` to the image's **absolute** path (a relative path is resolved against Snakemake's working directory, not the config file). A `docker://` or `oras://` URI also works, for an image in a private registry that only you can pull from (anything others can pull counts as redistribution). This URI route is untested end to end: only schema validation and parsing were exercised, with no pull or run. Standalone, in `phenotyping/config.yml`:
 
    ```yaml
@@ -96,9 +96,9 @@ The `intron_retention` modality runs [MAJIQ](https://majiq.biociphers.org/) v3, 
    ```
 
    In a host workflow, put it in the phenotyping module's `config:` section (e.g. `pantry: phenotyping: majiq_container: /path/to/majiq.sif` in the host's config). `majiq_container` takes precedence over `majiq_env`: the three MAJIQ rules (`majiq_build`, `majiq_psi_coverage`, `majiq_psi`) then run in the image with no conda env.
-4. **Run with apptainer.** Use `--sdm conda apptainer` (`software-deployment-method: [conda, apptainer]` in the profile). The container sees only the working directory and what is bound, so `apptainer-args` must bind your data, including the targets of symlinks. This matters in particular for BAM files: MAJIQ names its junction files (`.sj`) after the resolved BAM path, so if the BAMs under `<pantry_intermediate>/{dataset}/bam/` are symlinks, their targets must be under a bound directory too. (Snakemake's source cache, which holds the bundled licence file, also needs a bind on Snakemake 9.12-9.13; see the apptainer paragraph above.) A `license` you configure must likewise be under a bound directory. For example: `apptainer-args: "--bind=/path/to/your/data"`, plus `--bind=/home/you/.cache/snakemake` on Snakemake below 9.14 (absolute paths, as in `tests/profile/config.yaml`).
+4. **Run with apptainer.** Use `--sdm conda apptainer` (`software-deployment-method: [conda, apptainer]` in the profile). The container sees only the working directory and what is bound, so `apptainer-args` must bind your data, including the targets of symlinks. This matters in particular for BAM files: MAJIQ names its junction files (`.sj`) after the resolved BAM path, so if the BAMs under `<pantry_intermediate>/{dataset}/bam/` are symlinks, their targets must be under a bound directory too. A `license` you configure must likewise be under a bound directory. For example: `apptainer-args: "--bind=/path/to/your/data"` (absolute paths, as in `tests/profile/config.yaml`). Snakemake binds its own source cache, which holds the bundled licence file.
 
-Without an image, the MAJIQ rules use a named conda env instead: `majiq_env` (default `majiq3`). Build it with `bash containers/majiq/majiq3-install.sh <workdir>`, which creates the env `majiq3` from `containers/majiq/majiq3.yml` and pip-installs MAJIQ into it by the same steps as the image (`containers/majiq/majiq3.lock.txt` records a working env). The same licence terms apply.
+Without an image, the MAJIQ rules use a named conda env instead: `majiq_env` (default `majiq3`). Build it with `bash containers/majiq/majiq3-install.sh <workdir>`, which creates the env `majiq3` from `containers/majiq/majiq3.yml` and pip-installs MAJIQ into it by the same steps and pins as the image (`containers/majiq/majiq3.lock.txt` records the tested env). The same licence terms apply.
 
 ## Run on test data
 
@@ -315,7 +315,7 @@ Pheast will generate, in its own `output/` directory, results in their typical f
 
 ## Using Pantry as a module
 
-A host Snakemake workflow (Snakemake ≥ 9.12) can import each stage once and run all its datasets in one DAG. It sets the output locations with pathvars:
+A host Snakemake workflow (Snakemake ≥ 9.14) can import each stage once and run all its datasets in one DAG. It sets the output locations with pathvars:
 
 ```python
 module pantry_pheno:
@@ -324,7 +324,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.3")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.4")
     config:
         config["pantry"]["phenotyping"]
 
@@ -336,7 +336,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.3")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.4")
     config:
         config["pantry"]["pheast"]
 
