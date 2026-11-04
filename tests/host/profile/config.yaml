@@ -12,8 +12,13 @@ software-deployment-method:
 # --nv exposes the GPU to the tensorQTL container (a warning only on CPU
 # nodes; Snakemake has no per-rule apptainer-args). The bind is the group
 # share: a container otherwise sees only $PWD, not the targets of symlinks
-# such as input/ -> the test data.
-apptainer-args: "--bind=/data/hps/assoc/private/gdml --nv"
+# such as input/ -> the test data. With majiq_container set, MAJIQ runs in
+# the container too and names its .sj files after the resolved BAMs, so the
+# bind must also cover the targets of symlinked BAMs. The second bind is the
+# Snakemake source cache, where workflow.source_path puts the bundled MAJIQ
+# licence file: Snakemake runs apptainer exec --home <workdir>, so the real
+# $HOME is not mounted in the container.
+apptainer-args: "--bind=/data/hps/assoc/private/gdml --bind=/data/hps/home/twil15/.cache/snakemake --nv"
 # Shared across run dirs so gate runs reuse the built envs and pulled image.
 conda-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/conda-envs"
 apptainer-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/apptainer"
