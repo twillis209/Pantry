@@ -64,8 +64,6 @@ def new_config(**dataset_over) -> dict:
 def test_shim_wraps_legacy_config():
     legacy = legacy_config()
     legacy["intermediate_dir"] = "~/interm"
-    legacy["fusion_dir"] = "/opt/fusion"
-    legacy["gcta"] = "/opt/gcta64"
     before = copy.deepcopy(legacy)
     out = cfg.normalise(legacy)
     assert legacy == before  # input not mutated
@@ -76,10 +74,7 @@ def test_shim_wraps_legacy_config():
     assert ds["phenotype_dir"] == "input/phenotypes"
     assert ds["modalities"] == legacy["modalities"]
     assert ds["analyses"] == legacy["analyses"]
-    for key in ("intermediate_dir", "fusion_dir", "gcta"):
-        assert key not in ds
-    assert out["fusion_dir"] == "/opt/fusion"
-    assert out["gcta"] == "/opt/gcta64"
+    assert "intermediate_dir" not in ds
     interm = str(Path("~/interm").expanduser())
     assert out["legacy_pathvars"] == {
         "pantry_intermediate": interm,
@@ -233,8 +228,8 @@ def test_legacy_keys_beside_datasets_rejected():
     mixed.update(geno_prefix="other", qtl_min_allele_count=20)
     with pytest.raises(ValueError, match="geno_prefix, qtl_min_allele_count"):
         cfg.normalise(mixed)
-    # New-format top-level settings stay allowed.
-    cfg.normalise({**new_config(), "gcta": "/x/gcta", "pathvars": {}})
+    # Other top-level keys stay allowed.
+    cfg.normalise({**new_config(), "pathvars": {}})
 
 
 def test_load_samples(tmp_path):
@@ -273,7 +268,6 @@ def test_schema_defaults_land_per_dataset(validate):
         assert "qtl_maf_threshold" not in ds
     assert out["datasets"]["d1"]["twas_threads"] == 4
     assert out["datasets"]["d2"]["twas_threads"] == 8
-    assert "fusion_dir" not in out and "gcta" not in out
 
 
 @pytest.mark.parametrize(
@@ -399,131 +393,23 @@ def test_phenotype_summary_empty_bed(tmp_path):
     assert cfg.read_phenotype_summary(out) == ([], 0)
 
 
-def test_fusion_paths_default_to_installed_copy():
-    out = cfg.fusion_paths(cfg.normalise(new_config()))
-    assert out == {
-        "compute_weights": "<pantry_resources>/fusion/FUSION.compute_weights.R",
-        "plink_utils": "<pantry_resources>/fusion/utils/plink_utils.R",
-        "profile_wgt": "<pantry_resources>/fusion/utils/FUSION.profile_wgt.R",
-        "gcta": "<pantry_resources>/fusion/gcta_nr_robust",
-    }
+REMOVED_KEYS = ("fusion_dir", "gcta", "gcta_url", "gcta_sha256")
 
 
-def test_fusion_paths_overrides():
+@pytest.mark.parametrize("key", REMOVED_KEYS)
+def test_removed_fusion_keys_rejected(key):
+    # Top level of the new format.
+    with pytest.raises(ValueError, match=f"{key} are no longer supported"):
+        cfg.normalise({**new_config(), key: "/x"})
+    # Under defaults and under a dataset.
     c = new_config()
-    c["fusion_dir"] = "~/fusion"
-    out = cfg.fusion_paths(cfg.normalise(c))
-    home = str(Path("~").expanduser())
-    assert out["compute_weights"] == f"{home}/fusion/FUSION.compute_weights.R"
-    assert out["plink_utils"] == f"{home}/fusion/utils/plink_utils.R"
-    assert out["profile_wgt"] == f"{home}/fusion/utils/FUSION.profile_wgt.R"
-    assert out["gcta"] == "<pantry_resources>/fusion/gcta_nr_robust"
-    c["gcta"] = "/opt/gcta64"
-    assert cfg.fusion_paths(cfg.normalise(c))["gcta"] == "/opt/gcta64"
-    c["fusion_dir"] = None
-    assert cfg.fusion_paths(cfg.normalise(c))["compute_weights"].startswith(
-        "<pantry_resources>/"
-    )
-
-
-def test_schema_accepts_fusion_overrides(validate):
+    c["defaults"] = {key: "/x"}
+    with pytest.raises(ValueError, match=f"defaults.{key} "):
+        cfg.normalise(c)
     c = new_config()
-    c["fusion_dir"], c["gcta"] = None, None
-    validate(cfg.normalise(c))
-    c["fusion_dir"], c["gcta"] = "/opt/fusion", "/opt/gcta64"
-    validate(cfg.normalise(c))
-    c["gcta"] = 5
-    with pytest.raises(Exception):
-        validate(cfg.normalise(c))
-
-
-GCTA_URL = (
-    "https://raw.githubusercontent.com/PejLab/Pantry/8da77879ba7a6c12c5f7a2e95954ae144f68130c/"
-    "pheast/scripts/"
-    "fusion_twas/gcta_nr_robust"
-)
-GCTA_SHA256 = "7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9"
-
-
-def test_schema_sets_gcta_download_defaults(validate):
-    out = cfg.normalise(new_config())
-    validate(out)
-    assert out["gcta_url"] == GCTA_URL
-    assert out["gcta_sha256"] == GCTA_SHA256
-
-
-def test_schema_rejects_bad_gcta_sha256(validate):
-    c = new_config()
-    c["gcta_sha256"] = "abc"
-    with pytest.raises(Exception):
-        validate(cfg.normalise(c))
-
-
-def test_shim_moves_gcta_download_keys_to_top_level():
-    legacy = legacy_config()
-    legacy["gcta_url"] = "file:///x"
-    legacy["gcta_sha256"] = "0" * 64
-    out = cfg.normalise(legacy)
-    assert out["gcta_url"] == "file:///x"
-    assert out["gcta_sha256"] == "0" * 64
-    assert "gcta_url" not in out["datasets"]["default"]
-
-
-def test_install_fusion_outputs_follow_overrides():
-    fusion = "<pantry_resources>/fusion"
-    scripts = {
-        "compute_weights": f"{fusion}/FUSION.compute_weights.R",
-        "plink_utils": f"{fusion}/utils/plink_utils.R",
-        "profile_wgt": f"{fusion}/utils/FUSION.profile_wgt.R",
-    }
-    gcta = {"gcta": f"{fusion}/gcta_nr_robust"}
-    assert cfg.install_fusion_outputs({}) == {**scripts, **gcta}
-    assert cfg.install_fusion_outputs({"gcta": "/opt/gcta64"}) == scripts
-    assert cfg.install_fusion_outputs({"fusion_dir": "/opt/fusion"}) == gcta
-    assert cfg.install_fusion_outputs({"fusion_dir": "/f", "gcta": "/g"}) == {}
-    # Agrees with fusion_paths on where the installed files are.
-    paths = cfg.fusion_paths({})
-    assert all(paths[k] == v for k, v in cfg.install_fusion_outputs({}).items())
-
-
-def _is_executable(path) -> bool:
-    return bool(Path(path).stat().st_mode & 0o100)
-
-
-def test_install_gcta_copies_local_source(tmp_path):
-    src = tmp_path / "src.bin"
-    src.write_bytes(b"\x7fELF\x00\xff")
-    src.chmod(0o640)
-    dest = tmp_path / "fusion" / "gcta_nr_robust"
-    cfg.install_gcta(dest, src=src)
-    assert dest.read_bytes() == b"\x7fELF\x00\xff"
-    assert _is_executable(dest)
-
-
-def test_install_gcta_downloads_and_checks_sha256(tmp_path):
-    import hashlib
-
-    src = tmp_path / "remote.bin"
-    data = b"\x7fELF\x00\xfe binary"
-    src.write_bytes(data)
-    dest = tmp_path / "fusion" / "gcta_nr_robust"
-    cfg.install_gcta(
-        dest, url=src.as_uri(), sha256=hashlib.sha256(data).hexdigest().upper()
-    )
-    assert dest.read_bytes() == data
-    assert _is_executable(dest)
-
-
-def test_install_gcta_rejects_sha256_mismatch(tmp_path):
-    src = tmp_path / "remote.bin"
-    src.write_bytes(b"tampered")
-    dest = tmp_path / "fusion" / "gcta_nr_robust"
-    with pytest.raises(ValueError, match="sha256"):
-        cfg.install_gcta(dest, url=src.as_uri(), sha256=GCTA_SHA256)
-    assert not dest.exists()
-    assert not dest.with_name("gcta_nr_robust.part").exists()
-
-
-def test_install_gcta_needs_a_source(tmp_path):
-    with pytest.raises(ValueError):
-        cfg.install_gcta(tmp_path / "g", url=None, sha256=GCTA_SHA256)
+    c["datasets"]["d1"][key] = None
+    with pytest.raises(ValueError, match=f"datasets.d1.{key} "):
+        cfg.normalise(c)
+    # Top level of the legacy format.
+    with pytest.raises(ValueError, match="pantry-fusion"):
+        cfg.normalise({**legacy_config(), key: "/x"})

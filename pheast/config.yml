@@ -5,23 +5,6 @@
 # below at the top level, with samples_file instead of samples) is still
 # accepted; it is read as dataset 'default'.
 
-# Optional FUSION overrides, shared by all datasets. By default the bundled
-# FUSION scripts and gcta_nr_robust binary are installed under
-# <pantry_resources>/fusion/ (default intermediate/resources/fusion/).
-# fusion_dir must contain FUSION.compute_weights.R, utils/plink_utils.R and
-# utils/FUSION.profile_wgt.R; gcta is the path to a gcta binary.
-# fusion_dir: /path/to/fusion
-# gcta: /path/to/gcta64
-#
-# When this workflow is loaded from a local path, the bundled gcta_nr_robust is
-# copied. When it is loaded remotely (e.g. github() in a host's module), the
-# install_fusion job downloads gcta_nr_robust from gcta_url instead (Snakemake's
-# source cache cannot fetch binary files) and checks its sha256, so it needs
-# network access; offline sites set gcta instead.
-# The defaults are upstream Pantry 8da7787's binary:
-# gcta_url: https://raw.githubusercontent.com/PejLab/Pantry/8da77879ba7a6c12c5f7a2e95954ae144f68130c/pheast/scripts/fusion_twas/gcta_nr_robust
-# gcta_sha256: 7b51e51d53d520589ce3c922cb13f4562cb67f842ffe6172aec7dfa1b91c93e9
-
 # Optional settings deep-merged under every dataset (dataset values win, lists
 # replace). A dataset can add or override keys but not remove them, so a
 # modality or analysis put here runs for every dataset: keep modalities and

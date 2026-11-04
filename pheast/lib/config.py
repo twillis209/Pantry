@@ -6,15 +6,12 @@ workflow is used as a remote module.
 """
 
 import copy
-import hashlib
-import os
 import re
-import shutil
-import urllib.request
 from pathlib import Path
 
-# Top-level settings shared by all datasets of a module instance.
-_TOP_LEVEL_KEYS = ("fusion_dir", "gcta", "gcta_url", "gcta_sha256")
+# FUSION override keys of module-v0.1.0/v0.1.1, removed once FUSION moved into
+# the container image; rejected wherever they appear, as they would be ignored.
+_REMOVED_KEYS = ("fusion_dir", "gcta", "gcta_url", "gcta_sha256")
 # Top-level keys of the legacy single-dataset format.
 _LEGACY_TOP_LEVEL_KEYS = (
     "phenotype_dir",
@@ -53,11 +50,7 @@ def _shim(config: dict) -> dict:
     if "samples_file" in dataset:
         dataset["samples"] = dataset.pop("samples_file")
     dataset.pop("intermediate_dir", None)
-    out = {"datasets": {"default": dataset}, "legacy_pathvars": _legacy_pathvars(config)}
-    for key in _TOP_LEVEL_KEYS:
-        if key in dataset:
-            out[key] = dataset.pop(key)
-    return out
+    return {"datasets": {"default": dataset}, "legacy_pathvars": _legacy_pathvars(config)}
 
 
 def _check_name(kind: str, name):
@@ -128,6 +121,25 @@ def _reject_legacy_keys(config: dict, legacy_keys) -> None:
         )
 
 
+def _reject_removed_keys(config: dict) -> None:
+    """Raise if the config sets a removed FUSION override key, at the top
+    level, under defaults or under a dataset."""
+    places = {"": config}
+    if isinstance(config.get("defaults"), dict):
+        places["defaults."] = config["defaults"]
+    if isinstance(config.get("datasets"), dict):
+        for name, ds in config["datasets"].items():
+            if isinstance(ds, dict):
+                places[f"datasets.{name}."] = ds
+    found = [p + k for p, d in places.items() for k in _REMOVED_KEYS if k in d]
+    if found:
+        raise ValueError(
+            f"Config keys {', '.join(found)} are no longer supported: the FUSION "
+            "scripts and gcta_nr_robust now ship in the TWAS rules' container "
+            "image (ghcr.io/twillis209/pantry-fusion). Remove them."
+        )
+
+
 def normalise(config: dict) -> dict:
     """Return a multi-dataset config built from config, which is not modified.
 
@@ -138,6 +150,7 @@ def normalise(config: dict) -> dict:
     """
     if not config:
         raise ValueError("No config file provided, or it is empty.")
+    _reject_removed_keys(config)
     if "datasets" in config:
         _reject_legacy_keys(config, _LEGACY_TOP_LEVEL_KEYS)
         out = copy.deepcopy(config)
@@ -243,78 +256,3 @@ def read_phenotype_summary(path) -> tuple:
         raise ValueError(f"Unexpected phenotype summary header in {path}")
     chroms, n_models = row.split("\t")
     return (chroms.split(",") if chroms else []), int(n_models)
-
-
-def fusion_paths(config: dict) -> dict:
-    """FUSION files used by TWAS: the install_fusion copy unless overridden.
-
-    A configured fusion_dir must hold FUSION.compute_weights.R and
-    utils/{plink_utils.R,FUSION.profile_wgt.R} (compute_weights sources
-    plink_utils.R relative to itself); a configured gcta is a binary path.
-    """
-    installed = "<pantry_resources>/fusion"
-    fusion_dir = config.get("fusion_dir")
-    base = str(Path(fusion_dir).expanduser()) if fusion_dir else installed
-    gcta = config.get("gcta")
-    return {
-        "compute_weights": f"{base}/FUSION.compute_weights.R",
-        "plink_utils": f"{base}/utils/plink_utils.R",
-        "profile_wgt": f"{base}/utils/FUSION.profile_wgt.R",
-        "gcta": str(Path(gcta).expanduser()) if gcta else f"{installed}/gcta_nr_robust",
-    }
-
-
-def install_fusion_outputs(config: dict) -> dict:
-    """install_fusion's outputs: the FUSION R scripts unless fusion_dir is
-    configured, and gcta_nr_robust unless gcta is configured."""
-    installed = "<pantry_resources>/fusion"
-    outputs = {}
-    if not config.get("fusion_dir"):
-        outputs.update(
-            compute_weights=f"{installed}/FUSION.compute_weights.R",
-            plink_utils=f"{installed}/utils/plink_utils.R",
-            profile_wgt=f"{installed}/utils/FUSION.profile_wgt.R",
-        )
-    if not config.get("gcta"):
-        outputs["gcta"] = f"{installed}/gcta_nr_robust"
-    return outputs
-
-
-def _sha256(path) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def install_gcta(dest, src=None, url=None, sha256=None) -> None:
-    """Install the gcta binary at dest and make it executable.
-
-    With src (the bundled copy of a module loaded from a local path), copy it.
-    Otherwise download url and check its sha256; a mismatch raises and leaves
-    nothing at dest.
-    """
-    dest = Path(dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if src is not None:
-        shutil.copyfile(src, dest)
-    else:
-        if not url or not sha256:
-            raise ValueError("install_gcta needs src, or url and sha256")
-        part = dest.with_name(dest.name + ".part")
-        try:
-            # timeout bounds a stalled connection (seconds per blocking read).
-            with urllib.request.urlopen(url, timeout=300) as response, open(
-                part, "wb"
-            ) as out:
-                shutil.copyfileobj(response, out)
-            actual = _sha256(part)
-            if actual != sha256.lower():
-                raise ValueError(
-                    f"gcta download {url} has sha256 {actual}, expected {sha256}"
-                )
-            os.replace(part, dest)
-        finally:
-            part.unlink(missing_ok=True)
-    dest.chmod(dest.stat().st_mode | 0o111)
