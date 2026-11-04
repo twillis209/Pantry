@@ -3,6 +3,7 @@
 Run at build time (Dockerfile) and on the HPC.
 """
 
+import glob
 import json
 import subprocess
 
@@ -13,9 +14,13 @@ def run(*cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
-# Conda package versions, as in tests/hpc/envs/baseline-pheast.lock.txt.
-listing = run("micromamba", "list", "-n", "base", "--json", check=True).stdout
-versions = {p["name"]: p["version"] for p in json.loads(listing)}
+# Conda package versions, as in tests/hpc/envs/baseline-pheast.lock.txt, from
+# the env's package records.
+versions = {}
+for path in glob.glob("/opt/conda/conda-meta/*.json"):
+    with open(path) as f:
+        record = json.load(f)
+    versions[record["name"]] = record["version"]
 want = {
     "python": "3.12.16",
     "r-base": "4.5.3",
