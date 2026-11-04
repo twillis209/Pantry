@@ -1,3 +1,7 @@
+# Legacy: upstream's single environment, unchanged and not tested here. It
+# covers only the conda rules. tensorQTL and TWAS (pheast) and MAJIQ (when
+# majiq_container is set) need apptainer. The per-rule environments in envs/
+# (--sdm conda) are the maintained route.
 name: pantry
 channels:
   - conda-forge

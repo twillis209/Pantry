@@ -1,3 +1,8 @@
+# Legacy: upstream's single environment, unchanged and not tested here. It
+# covers only the conda rules. tensorQTL, TWAS and MAJIQ (phenotyping, when
+# majiq_container is set) run in containers under apptainer; without apptainer
+# the tensorQTL rules use the python3 on PATH (e.g. this env) and TWAS cannot
+# run. The per-rule environments in envs/ (--sdm conda) are the maintained route.
 name: pheast
 channels:
   - conda-forge
