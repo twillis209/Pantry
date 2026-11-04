@@ -455,4 +455,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   files (non-blocking, R22); heritability x8, TWAS x8, genotype_qc no mismatch; PHEAST_CHECK_EXIT=0; covar inputs 21 SAME, `geno_pruned.log`
   DIFF. Job 8404825 (`cmds.sh`, env pantry-baseline-pheno): CMDS_EXIT=0, 17/17, CMDS_IDENTICAL. HOSTDIFF vs the Task 14 local-path run:
   `alt_polyA.bed.gz(.tbi)`, `unnorm/alt_polyA.bed`, `cross_modality.bed.gz(.tbi)` (kallisto noise, as in Task 19).
+- Tag `module-v0.1.4` (annotated) = f72dc9d (stage code = 01b8623, which the run above fetched; then docs and `Snakefile.github` re-pointed;
+  the tag was held until the run passed). `github()` dry run of `all` at the tag (job 8404833, `t21/gh_dry.sh`, fork entries cleared from the
+  source cache, `host-github-v014` config): fetched f72dc9d (= remote), GH_DRY_TAG_EXIT=0, 481 jobs, no UnicodeEncodeError.
 - `pytest tests/unit -q`: 151 passed (local).
