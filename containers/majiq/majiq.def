@@ -19,6 +19,7 @@ From: mambaorg/micromamba@sha256:c3897a06f87c1c13f038188b3665a8c4162da62eac5109a
 %files
     majiq3.yml /opt/majiq-build/majiq3.yml
     majiq3-install.sh /opt/majiq-build/majiq3-install.sh
+    constraints.txt /opt/majiq-build/constraints.txt
 
 %post
     set -eu

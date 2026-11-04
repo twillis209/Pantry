@@ -28,7 +28,7 @@ LABEL org.opencontainers.image.title="pantry-majiq (user-built, not for redistri
       majiq.creators="Yoseph Barash, Jorge V. Garcia, Alejandro Barrera, Matthew Gazzara" \
       majiq.notices="/opt/majiq"
 
-COPY --chown=$MAMBA_USER:$MAMBA_USER majiq3.yml majiq3-install.sh /tmp/majiq-build/
+COPY --chown=$MAMBA_USER:$MAMBA_USER majiq3.yml majiq3-install.sh constraints.txt /tmp/majiq-build/
 
 # The env of the conda route (majiq3.yml), as the image's base env.
 RUN micromamba install -y -n base --override-channels -c conda-forge -c bioconda \

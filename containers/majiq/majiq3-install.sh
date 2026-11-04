@@ -6,7 +6,8 @@
 #
 # Install MAJIQ v3 (academic, https://bitbucket.org/biociphers/majiq_academic,
 # tag v3.0.22) by "pip install ." from the repository root, with HTSLIB_* set,
-# as in its README. This is the single set of install steps for both routes:
+# as in its README, with the pip packages constrained by constraints.txt (next
+# to this script). This is the single set of install steps for both routes:
 #
 #   bash majiq3-install.sh <workdir>
 #       conda route: (re)create the named conda env 'majiq3' from majiq3.yml,
@@ -64,7 +65,7 @@ if [ "$head" != "$commit" ]; then
     echo "error: tag $tag is at $head, expected $commit" >&2
     exit 1
 fi
-(cd "$src" && pip install --no-cache-dir .)
+(cd "$src" && pip install --no-cache-dir -c "$here/constraints.txt" .)
 
 # Keep MAJIQ's notices (licence Section 7): every licence/copying file of the
 # clone, at its path in the repository, plus Penn's copyright notice.

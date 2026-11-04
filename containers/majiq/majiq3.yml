@@ -1,24 +1,79 @@
 # Build env for MAJIQ v3 (Biociphers, academic build); the conda part only.
 # MAJIQ itself is pip-installed from source by majiq3-install.sh, which
 # points the build at this env's htslib (the yml's pip: section cannot).
+# Every package, transitive ones (compilers, sysroot, kernel headers) included,
+# is pinned as name=version=build to majiq3.lock.txt (the env of job 8399463,
+# the runtime-verified build); the pip packages are pinned by constraints.txt.
 name: majiq3
 channels:
   - conda-forge
   - bioconda
   - nodefaults
 dependencies:
-  - python=3.12
-  - pip
-  - setuptools
-  - git
-  - cmake
-  - make
-  - cxx-compiler
-  - htslib
-  - zstd
+  - python=3.12.16=h5f976f7_0_cpython
+  - pip=26.2.2=pyh8b19718_2
+  - setuptools=84.2.1=pyhe730653_0
+  - git=2.56.0=pl5440h3795e67_0
+  - cmake=4.4.5=hff7ac6b_0
+  - make=4.4.1=h1114479_4
+  - cxx-compiler=2.0.0=hdab9b82_0
+  - htslib=1.25=ha79157c_0
   # Compression libraries of the bundled bxzstr (headers too: the
   # system liblzma has none).
-  - xz
-  - liblzma-devel
-  - bzip2
-  - zlib
+  - zstd=1.5.7=hb78ec9c_7
+  - xz=5.8.3=ha02ee65_1
+  - liblzma-devel=5.8.3=hb03c661_1
+  - bzip2=1.0.8=hda65f42_10
+  - zlib=1.3.2=h25fd6f3_3
+  # Transitive dependencies, from the same lock.
+  - _openmp_mutex=4.5=20_gnu
+  - binutils_impl_linux-64=2.46.1=default_hfdba357_103
+  - c-ares=1.34.9=hebe6cf0_0
+  - ca-certificates=2026.10.23=hbd8a1cb_0
+  - conda-gcc-specs=15.3.0=h8846f6e_7
+  - gcc=15.3.0=hc6a0c74_7
+  - gcc_impl_linux-64=15.3.0=h6ad849d_7
+  - gxx=15.3.0=hc6a0c74_7
+  - gxx_impl_linux-64=15.3.0=h90d9265_7
+  - icu=79.1=py314hb486520_0
+  - kernel-headers_linux-64=5.14.0=he073ed8_3
+  - keyutils=1.6.3=h7cc23a3_1
+  - krb5=1.22.2=hbc21106_2
+  - ld_impl_linux-64=2.46.1=default_hbd61a6d_103
+  - libcurl=8.23.0=ha042cf0_0
+  - libdeflate=1.25=hd45a770_1
+  - libedit=3.1.20260512=pl5321h373387f_0
+  - libev=4.33=h280c20c_3
+  - libexpat=2.9.0=hd2095e1_0
+  - libffi=3.7.0=h81df57d_1
+  - libgcc=16.2.0=ha9f2e26_7
+  - libgcc-devel_linux-64=15.3.0=h2b852eb_107
+  - libgomp=16.2.0=he0feb66_7
+  - libiconv=1.18=h0cb94f2_3
+  - liblzma=5.8.3=hb03c661_1
+  - libnghttp2=1.71.0=hc5e5977_0
+  - libnsl=2.0.1=hb9d3cd8_1
+  - libpsl=0.23.1=h7fe8442_2
+  - libpython=3.12.16=ha57cdbe_0_cpython
+  - libsanitizer=15.3.0=h54950a5_7
+  - libsqlite=3.54.1=hf739112_1
+  - libssh2=1.11.1=h6154650_1
+  - libstdcxx=16.2.0=h934c35e_7
+  - libstdcxx-devel_linux-64=15.3.0=hb2c5482_107
+  - libuuid=2.42.4=hcfc3c73_0
+  - libuv=1.52.1=h280c20c_1
+  - libxcrypt=4.4.38=h280c20c_0
+  - libzlib=1.3.2=h25fd6f3_3
+  - ncurses=6.6=hdb14827_1
+  - openssl=3.6.5=h781a0a9_0
+  - packaging=26.3=pyhc364b38_0
+  - pcre2=10.47=h8b3dc9c_1
+  - perl=5.44.0=1_h7cc23a3_perl5
+  - readline=8.3=hd6e31c0_1
+  - rhash=1.4.6=hb03c661_2
+  - sysroot_linux-64=2.34=h087de78_3
+  - tk=8.6.13=noxft_h1df4ec4_4
+  - tzdata=2026e=h5d301ff_0
+  - wheel=0.48.0=pyhd8ed1ab_0
+  - xz-gpl-tools=5.8.3=ha02ee65_1
+  - xz-tools=5.8.3=hb03c661_1
