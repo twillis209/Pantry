@@ -4,7 +4,7 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
-> **Module branch.** This fork's `module` branch (release `module-v0.1.1`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+> **Module branch.** This fork's `module` branch (release `module-v0.1.2`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.12**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
 
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
@@ -57,7 +57,7 @@ set-resources:
     slurm_partition: "our-gpu-partition"
     slurm_account: "our-gpu-account"
     gpu: 1
-software-deployment-method:  # drop apptainer if you don't have it; tensorqtl then runs in your env
+software-deployment-method:  # apptainer is needed for TWAS (FUSION image); without it tensorqtl runs in your env
   - conda
   - apptainer
 apptainer-args: "--nv --bind=/path/to/your/data"
@@ -66,7 +66,7 @@ max-jobs-per-timespan: "1/1s"
 max-status-checks-per-second: 5
 ```
 
-This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules, which run in a pinned container under apptainer. `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment). The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
+This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules and the FUSION TWAS rules (`twas_compute_weights_batch`, `twas_assemble_summary`), which run in pinned containers under apptainer. `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment), and the TWAS analysis cannot run: FUSION and gcta are only in its image. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
 
 ## Run on test data
 
@@ -273,7 +273,7 @@ It is recommended to run the script before executing the Pheast snakemake workfl
 
 #### Pheast config
 
-The Pheast config also lists datasets under `datasets:` (each with `phenotype_dir`, `geno_prefix`, `samples`, `modalities`, `analyses` and the QTL/TWAS settings), with an optional `defaults:` block shared by all of them; see `pheast/config.yml`. The old single-dataset format is still accepted. Outputs go to `output/<dataset>/`. FUSION, bundled in `scripts/fusion_twas/`, is installed into `intermediate/resources/fusion/`; `fusion_dir` and `gcta` override it.
+The Pheast config also lists datasets under `datasets:` (each with `phenotype_dir`, `geno_prefix`, `samples`, `modalities`, `analyses` and the QTL/TWAS settings), with an optional `defaults:` block shared by all of them; see `pheast/config.yml`. The old single-dataset format is still accepted. Outputs go to `output/<dataset>/`. FUSION, bundled in `scripts/fusion_twas/`, runs from the pinned image `ghcr.io/twillis209/pantry-fusion` (built from those files by `containers/fusion/`), so TWAS needs apptainer; nothing is downloaded at run time beyond the image.
 
 #### Pheast output files
 
@@ -292,7 +292,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["phenotyping"]
 
@@ -304,7 +304,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["pheast"]
 
@@ -315,7 +315,7 @@ use rule * from pantry_pheast as pantry_pheast_*
 - **Linking the stages.** Point a Pheast dataset's `phenotype_dir` at the phenotyping output (`results/pantry/phenotypes/<dataset>`) to chain the two stages in one DAG. The path must be spelled exactly as the phenotyping module's resolved `<pantry_output>/{dataset}` (relative vs absolute matters); otherwise Pheast fails with missing input files.
 - **`defaults:`** is deep-merged under every dataset, and a dataset can add or override keys but not remove them. Keep modality groups, modalities and analyses that vary between datasets out of `defaults`.
 - **Profile settings.** In the profile, `set-resources` keys use the prefixed rule names (e.g. `pantry_pheast_tensorqtl_cis`).
-- **gcta under `github()`.** Under `github()`, the FUSION install job downloads the `gcta_nr_robust` binary from a pinned URL and checks its sha256. Offline sites set `gcta` in the Pheast config instead.
+- **Containers.** The tensorQTL and FUSION (TWAS) rules run in digest-pinned images under apptainer: use `software-deployment-method: [conda, apptainer]`.
 - **Examples and details.** `tests/host/` holds a working example (`Snakefile`, `config.yaml`, `profile/`). Details are in `docs/module-status.md` and `CHANGES-module.md`.
 
 ## Citing

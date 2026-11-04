@@ -5,7 +5,7 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 
 ## Branch and tag
 
-- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.1`** (earlier `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
+- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.2`** (earlier `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
 - What ran at which commit:
   - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
   - the full local-path host run (job 8396531) ran at `56c8c22`;
@@ -22,7 +22,8 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
   - the default `gcta_url` names upstream's full commit SHA (same file, same sha256);
   - the tensorQTL image workflow builds only on pushes to `module`; `majiq3-install.sh` checks the tag's commit;
   - docs.
-- The full `github()` host run (Task 18, job 8399793) fetched `module-v0.1.1` = `befa72c`. Later commits on `module` only add run records to the docs.
+- The full `github()` host run (Task 18, job 8399793) fetched `module-v0.1.1` = `befa72c`.
+- `module-v0.1.2` (Task 19, R26, superseding R24) moves FUSION (R scripts, gcta_nr_robust, R, plink, gemma) into the digest-pinned image `ghcr.io/twillis209/pantry-fusion`, removes `install_fusion` and the `fusion_dir`/`gcta`/`gcta_url`/`gcta_sha256` keys, and was re-run on the gate-3 config (below). TWAS now needs apptainer. Later commits on `module` only add run records to the docs.
 
 ## How a host imports it
 
@@ -41,7 +42,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["phenotyping"]
 
@@ -53,7 +54,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["pheast"]
 
@@ -94,7 +95,6 @@ rule all:
           modalities: {expression: {grouped: false}, ...}
           analyses: {qtl: {files: [...]}, heritability: {...}, twas: {...}}
           qtl_min_allele_count: 10    # qtl_maf_threshold, qtl_cis_window optional
-      # fusion_dir / gcta: optional overrides; gcta_url / gcta_sha256: download source
   ```
 
   Pass new-format configs only. A legacy `intermediate_dir` in a module config would override the host's pathvars.
@@ -102,8 +102,8 @@ rule all:
 - **Linking the stages is by path text.** A pheast `phenotype_dir` must equal the phenotyping `<pantry_output>/{dataset}` path as the host resolves it (`results/pantry/phenotypes/<name>` above). A relative vs absolute spelling of the same directory does not link, and pheast then fails with missing input files.
 - **`defaults:`** can be added to or overridden per dataset, but a dataset cannot remove a key from it. Keep modality groups, modalities and analyses that vary between datasets out of `defaults`. (Removal support is deferred.)
 - **Stage directories and `--config`.** Inside `phenotyping/` or `pheast/`, `--config key=value` with a legacy key (e.g. `read_length=100`) is an error next to the new-format `config.yml`. Use `--configfile override.yml` with `datasets: {default: {read_length: 100}}` (deep-merged), edit `config.yml`, or run an old-format config from another directory (`--directory`). Nested `--config` values arrive as strings, so `--config 'datasets={...}'` works only for string-valued keys.
-- **`github()` and gcta.** A `github()` module downloads `gcta_nr_robust` in the `pantry_pheast_install_fusion` job (pinned URL plus sha256; Snakemake's source cache can't fetch binaries). That job needs network access. **Offline sites set `gcta`** (or `fusion_dir` for the R scripts as well). Local-path modules copy the bundled binary. A `github()` module also builds its own conda envs: env files fetched from GitHub lose their final newline (Snakemake source-cache bug), so their hashes differ from the local-path ones (13 envs, about 15 min in Task 18). Outputs are unaffected.
-- **Profile for GPU tensorQTL.**
+- **TWAS needs apptainer.** The FUSION rules (`twas_compute_weights_batch`, `twas_assemble_summary`) run only in the pinned image `ghcr.io/twillis209/pantry-fusion` (FUSION scripts and gcta under `/opt/fusion`), so the profile needs `software-deployment-method: [conda, apptainer]` (below); no network is needed at run time beyond the image pulls. A `github()` module fetches no binary file. A `github()` module builds its own conda envs: env files fetched from GitHub lose their final newline (Snakemake source-cache bug), so their hashes differ from the local-path ones (13 envs, about 15 min in Task 18). Outputs are unaffected.
+- **Profile for the containers and GPU tensorQTL.**
 
   ```yaml
   software-deployment-method: [conda, apptainer]
@@ -117,7 +117,7 @@ rule all:
   - `set-resources` keys are the **prefixed** rule names.
   - Use `gpu: 1`, not `slurm_extra: --gpus`/`--gres`; the current slurm executor plugin rejects those.
   - `--nv` exposes the GPU to the container. The bind must cover every data path, including symlink targets, and the module checkout when the module is loaded by local path.
-  - Without apptainer, the tensorQTL rules run the host `python3`, which must provide tensorqtl.
+  - Without apptainer, the tensorQTL rules run the host `python3`, which must provide tensorqtl; the TWAS rules cannot run.
   - Full example: `tests/host/profile/config.yaml`.
 
 ## Acceptance results
@@ -141,6 +141,7 @@ Everything ran on the GDML HPC (SLURM, `sjob`, profile `tests/profile` or `tests
 | Gate 2 conda (1) | per-rule conda envs (job 8394948) | `gate2-pheno-conda` | MATCH | `gate2-pheno-conda/compare.md` |
 | Gate 3 conda+GPU (1) | conda envs + tensorQTL container on A100 (jobs 8394949, 8395487) | `gate3-pheast-conda` | all non-tensorQTL files identical. 85 tensorQTL mismatches (non-blocking, R22); inputs and commands identical | `gate3-pheast-conda/compare.md` |
 | Gate 3 GPU, tensorqtl 1.0.10 image (1) | `ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9f…` on A100 (job 8399104, 195/195); image on 1 CPU for all 8 cis runs (jobs 8399314, 8399317–8399323) | `gate3-pheast-gpu1010`, `t16` | non-tensorQTL files pass; 81 tensorQTL mismatches (non-blocking, R22); inputs and commands identical. On 1 CPU core, cis nominal stats identical to the baseline on same-top-variant rows, at written precision | `gate3-pheast-gpu1010/compare.md`, `tests/hpc/README.md` (Task 16) |
+| Gate 3, FUSION image (1; Task 19, R26) | `ghcr.io/twillis209/pantry-fusion@sha256:87335916…` for the TWAS rules, `install_fusion` removed, conda + apptainer, tensorQTL on GPU (job 8400497, 194/194 = 195 − `install_fusion`; cold dry runs 69 → 68 standalone, 472 → 471 host) | `gate3-pheast-fusion`, `t19` | heritability ×8, TWAS ×8 (tar members byte-identical except `.profile.err`, RDat all.equal 1e-8), genotype_qc pass; `twas/*.{profile,pos,list}` 24/24 byte-identical to gate 3's (GPU 1.0.10 and CPU); 81 tensorQTL mismatches (non-blocking, R22); inputs and 17 command lines identical | `gate3-pheast-fusion/compare.md`, `tests/hpc/README.md` (Task 19) |
 | Multi-dataset (2) | phenotyping `full` + `half_se` (8 samples, R1 as single-end) on one reference (job 8395741, 468/468) | `multi-pheno` | `full` MATCH vs baseline; 1 STAR index, 1 kallisto index shared; `half_se` 20/20 targets | `multi-pheno/compare.md` |
 | Multi-dataset (2) | pheast `full` + `subset` (300 samples, MAC 20) (job 8395742, 388/388, GPU) | `multi-pheast` | `full`: heritability/TWAS/genotype_qc pass, 76 tensorQTL mismatches (non-blocking); `subset` 33/33 targets | `multi-pheast/compare.md` |
 | Host, local path (3) | `tests/host/Snakefile`: dry run of `all` (472 jobs, incl. pheast `chained` on phenotyping output in the same DAG); full run of phenotyping `full` + pheast `geuvadis` (job 8396531, 539/539, tensorQTL on GPU with prefixed set-resources) | `host` | phenotyping MATCH; `cross_modality` byte-identical to upstream `combine_modalities.sh`; pheast: blocking files pass, 79 tensorQTL mismatches (non-blocking) | `host/compare_pheno.md`, `host/compare_pheast.md` |
@@ -155,7 +156,7 @@ How far the tensorQTL results are from upstream's:
 
 **MAJIQ (`intron_retention`)** is now verified at run time (Task 17): with MAJIQ 3.0.22 in the named env `majiq3`, the refactored rules reproduce upstream 8da7787 byte for byte on the test data (`intron_retention.bed.gz`, `.phenotype_groups.txt`, `unnorm/intron_retention.bed`), as do two upstream runs of each other. A run with renamed, symlinked BAMs names the `.sj` files after the targets and gives the same outputs. See `tests/hpc/README.md`, Task 17.
 
-**HPC note: pulling the tensorQTL image.** The image `ghcr.io/twillis209/pantry-tensorqtl` is public, but stale stored ghcr.io credentials make apptainer fail with 403 on the token request (seen on this account, Task 16). Run `apptainer registry logout docker://ghcr.io` (and drop `ghcr.io` from `~/.docker/config.json`) or refresh the login. The runs here used an anonymous pre-pull into the profile's `apptainer-prefix` (`tests/hpc/README.md`, Task 16).
+**HPC note: pulling the images.** The images `ghcr.io/twillis209/pantry-tensorqtl` and `ghcr.io/twillis209/pantry-fusion` are public, but stale stored ghcr.io credentials make apptainer fail with 403 on the token request (seen on this account, Task 16). Run `apptainer registry logout docker://ghcr.io` (and drop `ghcr.io` from `~/.docker/config.json`) or refresh the login. The runs here used an anonymous pre-pull into the profile's `apptainer-prefix` (`tests/hpc/README.md`, Tasks 16 and 19).
 
 **LaDDR** was restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. It is excluded from every run above.
 
@@ -175,7 +176,7 @@ About 3 ms per job in all cases, so cost grows roughly linearly with the job cou
 ## Deviations from the handover contract
 
 - **Item 1**: each stage is its own module with its own config section and prefix (`config["pantry"]["phenotyping"]`, `config["pantry"]["pheast"]`), not one `config["pantry"]` with prefix `pantry_*`. Both define `all`.
-- **Item 8**: FUSION is vendored upstream with modifications, and `install_fusion` installs it rather than fetching a FUSION commit. gcta is downloaded from a pinned URL with a sha256 check only for remote modules. gemma comes from conda.
+- **Item 8**: FUSION is vendored upstream with modifications; rather than fetching a FUSION commit, the module's copy, gcta and gemma ship in a digest-pinned image built from the repository (R26).
 - **Item 11**: standalone works, with the old config format too, but outputs gain a `default/` level (`output/default/…`).
 - **Criterion 1**: kallisto- and tensorQTL-derived files are judged within measured noise or by attribution (R11, R12, R21, R22).
 - Also: `index_fasta` removed (R15). LaDDR `dataset_name` defaults to the dataset key (R16). Validation is stricter on quoted numbers (R14, R18).
@@ -184,6 +185,6 @@ About 3 ms per job in all cases, so cost grows roughly linearly with the job cou
 
 1. Runtime verification of LaDDR (MAJIQ done, Task 17).
 2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD. MAJIQ's named env is built from `tests/hpc/envs/majiq3.yml` + `majiq3-install.sh` (v3.0.22), but the rules still name it rather than pin it.
-3. Report the Snakemake source-cache bugs upstream: binary files fail, and text files lose their final newline under `github()` (which also makes a `github()` module rebuild its conda envs).
+3. Report the Snakemake source-cache bugs upstream: binary files fail (no longer affects Pantry since R26), and text files lose their final newline under `github()` (which also makes a `github()` module rebuild its conda envs).
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".

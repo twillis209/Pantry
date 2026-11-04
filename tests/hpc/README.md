@@ -318,3 +318,27 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   jobs. Profile (`t18/p17x300/prof.txt`, `t18/ours.py`): Snakemake internals dominate: dry-run job printing evaluates resources
   (`expand_resources` 170 s of 393 s, much of it `inspect.signature`), DAG building 125 s, input sizes 63 s, conda env specs 38 s. All of
   the workflow's own functions together take under 6 s (largest: `parent_dir` 1.6 s over 56k calls); no helper of ours dominates.
+
+## Task 19: FUSION image replaces install_fusion (R26, module-v0.1.2)
+- Image `ghcr.io/twillis209/pantry-fusion@sha256:87335916d0395fe07cb6abe01e6cfa52838a85cd8bf538f32bfa11c17fdb4009` (tag `sha-11d208d`),
+  built by `.github/workflows/fusion-image.yml` run 41755433329 from `containers/fusion/` (context = repo root; `Dockerfile.dockerignore`
+  sends only `pheast/envs/fusion.yaml`, `pheast/scripts/fusion_twas/`, `check_image.py`). First run 41755267647 failed in `check_image.py`
+  (micromamba 2's `list --json` format); fixed by reading `conda-meta`. Build gate: python 3.12.16, r-base 4.5.3, r-glmnet 5.0, r-optparse 1.8.2,
+  r-matrix 1.7_6, plink 1.90, gemma 0.98.5; gcta sha256 OK, `ldd`: not a dynamic executable (static), runs; R packages load; plink, gemma run.
+- Anonymous pull from the HPC (token + manifest by digest): HTTP 200, so public without a visibility change. `$H/pantry-runs/t19/pull.sh`
+  (job 8400427, as `t16/pull.sh`) pulled it into the profile's apptainer-prefix as `46cbe05b95ea22cb3a829882a86c1c08.simg` and ran
+  `check_image.py` in it: same versions, CHECK_EXIT=0.
+- Cold dry runs of `all` (`t19/dry.sh`, env pantry-baseline-pheno; standalone pheast on `tests/configs/pheast_baseline.yml`, local-path host
+  `tests/host/Snakefile` on `tests/host/config.yaml`): before (`$H/Pantry` at 474d3ef, code = 27860e1; job 8400376) 69 and 472 jobs, each with
+  one `install_fusion`; after (ffe95c5; job 8400428) 68 and 471. Exactly the one `install_fusion` job fewer.
+- Gate-3 config run `$H/pantry-runs/gate3-pheast-fusion` (`t12_run.sh pheast`, `sjob -c 2 -m 7500M`, env pantry-baseline-pheno, `tests/profile`:
+  `--sdm conda apptainer`, tensorQTL on GPU). The first attempt (8400482, at ffe95c5; logs in `t19/failed1`) failed in all 8 `covariates` jobs:
+  `covariates.R` sources `fusion_twas/utils/plink_utils.R` relative to itself, and only `install_fusion`'s params had put that file into the
+  source cache. Fixed in 6c5aaf6 (`covariates` params `source_path` it). Run 8400497 at 6c5aaf6: 194/194 (195 minus `install_fusion`), EXIT=0;
+  TWAS jobs ran in the image (`Activating singularity image …/46cbe05b….simg`), the cached scripts under `$HOME` being bound by apptainer by default.
+- Compare 8400498 (`gate3-pheast-fusion/compare.sh`, env pantry-baseline-pheast; `compare_outputs.py archive/pheast_run1 output/default --noise
+  run1 run2`): exit 1, 81 mismatches, all in the 16 `*.cis_qtl`/`*.cis_independent_qtl` files (non-blocking, R22); heritability x8,
+  TWAS x8 (every tar member byte-identical except `.profile.err`, `.wgt.RDat` all.equal at 1e-8) and genotype_qc pass; check_targets 33/33.
+  TWAS intermediates `twas/{modality}.{profile,pos,list}` vs gate 3: 24/24 byte-identical vs `gate3-pheast-gpu1010` and 24/24 vs `gate3-pheast` (CPU).
+  Covar inputs: 21 byte-identical to the baseline's, only `geno_pruned.log` differs. Job 8400678 (`cmds.sh`): 17/17 run_tensorqtl.py/genotype_qc.py
+  command lines identical to the baseline's; rerun check: nothing to be done.
