@@ -336,7 +336,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   `--sdm conda apptainer`, tensorQTL on GPU). The first attempt (8400482, at ffe95c5; logs in `t19/failed1`) failed in all 8 `covariates` jobs:
   `covariates.R` sources `fusion_twas/utils/plink_utils.R` relative to itself, and only `install_fusion`'s params had put that file into the
   source cache. Fixed in 6c5aaf6 (`covariates` params `source_path` it). Run 8400497 at 6c5aaf6: 194/194 (195 minus `install_fusion`), EXIT=0;
-  TWAS jobs ran in the image (`Activating singularity image …/46cbe05b….simg`), the cached scripts under `$HOME` being bound by apptainer by default.
+  TWAS jobs ran in the image (`Activating singularity image …/46cbe05b….simg`), the cached scripts under `$HOME` being bound by Snakemake by default.
 - Compare 8400498 (`gate3-pheast-fusion/compare.sh`, env pantry-baseline-pheast; `compare_outputs.py archive/pheast_run1 output/default --noise
   run1 run2`): exit 1, 81 mismatches, all in the 16 `*.cis_qtl`/`*.cis_independent_qtl` files (non-blocking, R22); heritability x8,
   TWAS x8 (every tar member byte-identical except `.profile.err`, `.wgt.RDat` all.equal at 1e-8) and genotype_qc pass; check_targets 33/33.
@@ -387,6 +387,9 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   `mount home = yes`, but `--home` replaces it). Job 8403905 (`lic2.sh`, `majiq.sif`): with `--bind=/data/hps/home/twil15/.cache/snakemake`
   the bundled `.lic` is visible, md5 99b38b20... as on the host; PATH in the container `/opt/conda/bin:/usr/local/sbin:...` (no host PATH).
   So `tests/profile` and `tests/host/profile` now also bind the source cache (d95e2d4).
+  **Correction (Task 20 review, I1):** this test left out Snakemake's own `--bind <source cache>` (Snakemake >= 9.14.0, `runtime_paths`), so the cache is
+  visible in real jobs and the bind is redundant on 9.14 and later (all runs here used 9.27.1). It is needed only on 9.12-9.13, for every containerised
+  rule (tensorQTL, TWAS, MAJIQ), since `script()` paths point into the source cache for local-path and `github()` modules alike.
 - Acceptance (job 8403914, `t20/accept.sh`, env pantry-baseline-pheno, `tests/profile` with `--sdm conda apptainer`,
   `--slurm-keep-successful-logs`; the first attempt 8403906 was cancelled because the slurm plugin deletes successful job logs).
   Run dirs `$H/pantry-runs/gate-ir-sif` and `gate-ir-symlink-sif` = `cp -a` of Task 17's `gate-ir` / `gate-ir-symlink` with the

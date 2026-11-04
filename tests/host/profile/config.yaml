@@ -15,9 +15,11 @@ software-deployment-method:
 # such as input/ -> the test data. With majiq_container set, MAJIQ runs in
 # the container too and names its .sj files after the resolved BAMs, so the
 # bind must also cover the targets of symlinked BAMs. The second bind is the
-# Snakemake source cache, where workflow.source_path puts the bundled MAJIQ
-# licence file: Snakemake runs apptainer exec --home <workdir>, so the real
-# $HOME is not mounted in the container.
+# Snakemake source cache, where script()/workflow.source_path files live
+# (tensorQTL, TWAS and MAJIQ scripts, the MAJIQ licence file). It is needed
+# only for Snakemake < 9.14, which does not bind its source cache into
+# containers (apptainer exec --home <workdir> hides the real $HOME); it is
+# redundant on 9.14 and later.
 apptainer-args: "--bind=/data/hps/assoc/private/gdml --bind=/data/hps/home/twil15/.cache/snakemake --nv"
 # Shared across run dirs so gate runs reuse the built envs and pulled image.
 conda-prefix: "/data/hps/assoc/private/gdml/user/twil15/pantry-runs/conda-envs"
