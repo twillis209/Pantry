@@ -1,8 +1,8 @@
 # Host workflow test (criterion 3), remote variant: as tests/host/Snakefile,
-# but both stages are fetched from GitHub at tag module-v0.1.1 with github().
-# Snakemake's git source cache cannot fetch binary files, so pheast's
-# install_fusion downloads gcta from gcta_url (sha256-checked) here instead of
-# copying the bundled one; see tests/hpc/README.md, Task 14.
+# but both stages are fetched from GitHub at tag module-v0.1.2 with github().
+# FUSION and gcta come from pheast's TWAS container image, so nothing binary is
+# fetched (Snakemake's git source cache cannot fetch binary files; see
+# tests/hpc/README.md, Tasks 14 and 19).
 # Run from a run directory holding config.yaml (a copy of
 # tests/host/config.yaml) and the input/ links it describes, with the host
 # profile:
@@ -28,7 +28,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["phenotyping"]
 
@@ -42,7 +42,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.1")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.2")
     config:
         config["pantry"]["pheast"]
 
