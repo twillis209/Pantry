@@ -29,9 +29,12 @@ references:
     # Optional GFF3 annotation for MAJIQ (intron_retention).
     # annotation_gff3: input/ref/gencode.v47.annotation.gff3.gz
 
-# Name of the conda environment providing MAJIQ (intron_retention), shared by
-# all datasets.
+# MAJIQ (intron_retention), shared by all datasets: either the name of a conda
+# environment providing it, or a MAJIQ image you built yourself (see the README,
+# "MAJIQ (intron_retention)"): an absolute .sif path or a docker:// / oras://
+# URI. The image takes precedence over the env and needs --sdm apptainer.
 # majiq_env: majiq3
+# majiq_container: /path/to/majiq.sif
 
 # Optional settings deep-merged under every dataset (dataset values win, lists
 # replace). A dataset can add or override keys but not remove them, so a

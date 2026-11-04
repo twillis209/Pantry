@@ -78,8 +78,9 @@ def _shim(config: dict) -> dict:
         "legacy_pathvars": _legacy_pathvars(config),
     }
     # Top-level settings shared by all datasets stay top-level.
-    if "majiq_env" in dataset:
-        out["majiq_env"] = dataset.pop("majiq_env")
+    for key in ("majiq_env", "majiq_container"):
+        if key in dataset:
+            out[key] = dataset.pop(key)
     return out
 
 

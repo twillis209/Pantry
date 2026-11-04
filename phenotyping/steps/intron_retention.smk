@@ -1,6 +1,11 @@
 from math import ceil
 
-# One MAJIQ conda env (by name) per module instance: a top-level setting.
+# MAJIQ comes from a user-built image (majiq_container: a local .sif path or
+# a docker:// / oras:// URI) or else from a named conda env (majiq_env). Both
+# are top-level settings, one per module instance. With the image set, the
+# MAJIQ rules have no conda env: under --sdm conda apptainer a rule with both
+# would activate the env inside the container, where it does not exist.
+MAJIQ_CONTAINER = CONFIG.get("majiq_container")
 MAJIQ_ENV = CONFIG.get("majiq_env", "majiq3")
 
 
@@ -138,7 +143,9 @@ rule majiq_build:
             "<pantry_intermediate>/{dataset}/intron_retention/build/splicegraph.zarr"
         ),
     conda:
-        MAJIQ_ENV
+        None if MAJIQ_CONTAINER else MAJIQ_ENV
+    container:
+        MAJIQ_CONTAINER
     threads: majiq_threads
     resources:
         mem_mb=64000,
@@ -175,7 +182,9 @@ rule majiq_psi_coverage:
             "<pantry_intermediate>/{dataset}/intron_retention/psicov/batch_{batch}.psicov.zarr"
         ),
     conda:
-        MAJIQ_ENV
+        None if MAJIQ_CONTAINER else MAJIQ_ENV
+    container:
+        MAJIQ_CONTAINER
     threads: majiq_threads
     resources:
         mem_mb=32000,
@@ -207,7 +216,9 @@ rule majiq_psi:
     output:
         "<pantry_intermediate>/{dataset}/intron_retention/majiq.psi.tsv",
     conda:
-        MAJIQ_ENV
+        None if MAJIQ_CONTAINER else MAJIQ_ENV
+    container:
+        MAJIQ_CONTAINER
     threads: majiq_threads
     resources:
         mem_mb=64000,

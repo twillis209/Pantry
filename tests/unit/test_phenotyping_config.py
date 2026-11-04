@@ -322,7 +322,14 @@ def test_legacy_keys_beside_datasets_rejected():
     with pytest.raises(ValueError, match="read_length, samples_file"):
         cfg.normalise(mixed)
     # New-format top-level settings stay allowed.
-    cfg.normalise({**new_config(), "majiq_env": "majiq3", "pathvars": {}})
+    cfg.normalise(
+        {
+            **new_config(),
+            "majiq_env": "majiq3",
+            "majiq_container": "/images/majiq.sif",
+            "pathvars": {},
+        }
+    )
 
 
 def test_existing_bins_require_dirs():
@@ -545,6 +552,40 @@ def test_shim_keeps_majiq_env_top_level():
     out = cfg.normalise(raw)
     assert out["majiq_env"] == "majiq-site"
     assert "majiq_env" not in out["datasets"]["default"]
+
+
+def test_shim_keeps_majiq_container_top_level(validate):
+    raw = legacy_config()
+    raw["majiq_container"] = "/images/majiq.sif"
+    out = cfg.normalise(raw)
+    validate(out)
+    assert out["majiq_container"] == "/images/majiq.sif"
+    assert "majiq_container" not in out["datasets"]["default"]
+    # majiq_env keeps its default; the rules give the image precedence.
+    assert out["majiq_env"] == "majiq3"
+
+
+def test_majiq_container_optional(validate):
+    out = cfg.normalise(new_config())
+    validate(out)
+    assert "majiq_container" not in out
+
+
+@pytest.mark.parametrize(
+    "value", ["/images/majiq.sif", "docker://example.org/majiq@sha256:00", "oras://x/y:1"]
+)
+def test_majiq_container_accepted(validate, value):
+    out = cfg.normalise({**new_config(), "majiq_container": value, "majiq_env": "m"})
+    validate(out)
+    assert (out["majiq_container"], out["majiq_env"]) == (value, "m")
+
+
+@pytest.mark.parametrize("value", ["", 1, None, ["/images/majiq.sif"]])
+def test_majiq_container_rejected(validate, value):
+    exceptions = pytest.importorskip("snakemake.exceptions")
+    out = cfg.normalise({**new_config(), "majiq_container": value})
+    with pytest.raises(exceptions.WorkflowError):
+        validate(out)
 
 
 def test_laddr_project_dir_dropped():
