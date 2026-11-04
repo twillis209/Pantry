@@ -413,3 +413,12 @@ def test_removed_fusion_keys_rejected(key):
     # Top level of the legacy format.
     with pytest.raises(ValueError, match="pantry-fusion"):
         cfg.normalise({**legacy_config(), key: "/x"})
+
+
+def test_covariates_keeps_plink_utils_beside_its_script():
+    # covariates.R sources fusion_twas/utils/plink_utils.R relative to itself;
+    # the covariates rule's script() param is what puts it in the source cache.
+    r_script = (PHEAST / "scripts" / "covariates.R").read_text()
+    assert '"fusion_twas", "utils", "plink_utils.R"' in r_script
+    rule = (PHEAST / "steps" / "covariates.smk").read_text()
+    assert 'script("fusion_twas/utils/plink_utils.R")' in rule
