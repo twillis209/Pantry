@@ -342,3 +342,8 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   TWAS intermediates `twas/{modality}.{profile,pos,list}` vs gate 3: 24/24 byte-identical vs `gate3-pheast-gpu1010` and 24/24 vs `gate3-pheast` (CPU).
   Covar inputs: 21 byte-identical to the baseline's, only `geno_pruned.log` differs. Job 8400678 (`cmds.sh`): 17/17 run_tensorqtl.py/genotype_qc.py
   command lines identical to the baseline's; rerun check: nothing to be done.
+- Tag `module-v0.1.2` (annotated) = 0d30215 (code and docs 8c43615 + `Snakefile.github` re-pointed). `github()` host dry run of `all` at the tag
+  (`t19/gh_dry.sh`, job 8400681; fork entries cleared from the source cache first; run dir `t19/dry-host-github`): fetched 0d30215, EXIT=0,
+  471 jobs (Task 18's 482 at v0.1.1 included 12 intron_retention jobs from its own config; the local-path host on the same config: 471).
+  No `UnicodeEncodeError`; the 62 fetched files (`hosted-git/…/module-v0.1.2/`) are all text except 3 `__pycache__/*.pyc` written locally
+  by Python imports; from `fusion_twas/` only `utils/plink_utils.R` (for `covariates`) is fetched, no gcta.
