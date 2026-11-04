@@ -347,3 +347,14 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   471 jobs (Task 18's 482 at v0.1.1 included 12 intron_retention jobs from its own config; the local-path host on the same config: 471).
   No `UnicodeEncodeError`; the 62 fetched files (`hosted-git/…/module-v0.1.2/`) are all text except 3 `__pycache__/*.pyc` written locally
   by Python imports; from `fusion_twas/` only `utils/plink_utils.R` (for `covariates`) is fetched, no gcta.
+- Full `github()` host run at `module-v0.1.2` (= 0d30215; local clone f9c2345 for the host Snakefile, profile and tools). Run dir
+  `$H/pantry-runs/host-github-v012`, config as `host-github-v011` (phenotyping `full` + intron_retention, pheast `geuvadis`). Job 8402594
+  (`t19/gh_run.sh`, `sjob -c 2 -m 7500M -t 0-12:00:00`, env pantry-baseline-pheno; targets now before `--quiet rules`): DRY_ALL_EXIT=0,
+  DRY_TESTED_EXIT=0, RUN_EXIT=0, 548/548 steps (Task 18's 549 minus `install_fusion`).
+- Compare 8403790 (`host-github-v012/compare.sh`, as Task 18's, env pantry-baseline-pheast): PHENO_COMPARE_EXIT=0, PHENO_CHECK_EXIT=0;
+  intron_retention IR_COMPARE_EXIT=0 and IR_BYTES_SAME x4 vs upstream; XM_BED_SAME, XM_GROUPS_SAME (771 rows); PHEAST_COMPARE_EXIT=1 with
+  84 mismatches, all in the 16 `*.cis_qtl`/`*.cis_independent_qtl` files (non-blocking, R22; cis_independent row counts within 2x noise);
+  heritability x8, TWAS x8 (tar members, RDat 1e-8) and genotype_qc pass; PHEAST_CHECK_EXIT=0; covar inputs 21 SAME, `geno_pruned.log` DIFF
+  (as before). The in-script command check fails in this env (no gtfparse, as Task 18); job 8403792 (`cmds.sh`, env pantry-baseline-pheno):
+  CMDS_EXIT=0, 17/17, CMDS_IDENTICAL. HOSTDIFF vs the Task 14 local-path host run: `alt_polyA.bed.gz(.tbi)`, `unnorm/alt_polyA.bed`,
+  `cross_modality.bed.gz(.tbi)` (kallisto noise; cross_modality includes alt_polyA; both within the noise envelope in PHENO_COMPARE).
