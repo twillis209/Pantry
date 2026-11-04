@@ -448,7 +448,8 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   pantry-baseline-pheno, Snakemake 9.27.1, `--slurm-keep-successful-logs`): DRY_ALL_EXIT=0 (481), DRY_TESTED_EXIT=0 (422), RUN_EXIT=0,
   548/548. MAJIQ jobs 8404709 (build), 8404722 (psi-coverage), 8404730 (psi): `Activating singularity image
   /data/hps/assoc/private/gdml/user/twil15/pantry-runs/t21/majiq.sif`, 0 conda lines; all 16 tensorQTL and 45 TWAS-image job logs show
-  their image activation.
+  their image activation. The run built its txrevise env from the fetched 01b8623 yaml (`conda-envs/c60512a8…`, a different hash from the
+  local-path `8abe62ff…`: source-cache bug 2); its explicit list is the same 272 packages, all in the lock.
 - Compare 8404824 (`host-github-v014/compare.sh`, env pantry-baseline-pheast): PHENO_COMPARE_EXIT=0 (alt_polyA 0.222/0.328, expression
   0.366/0.732, isoforms 0.0835/0.167, unnorm 4.6e-4/2.8e-3, 338/676, 3.0e-3/6.1e-3), PHENO_CHECK_EXIT=0; IR_COMPARE_EXIT=0, IR_BYTES_SAME x4;
   XM_BED_SAME, XM_GROUPS_SAME (771 rows); PHEAST_COMPARE_EXIT=1 with 78 mismatches, all in the 16 `qtl/*.cis_qtl`/`*.cis_independent_qtl`
