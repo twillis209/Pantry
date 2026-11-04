@@ -1,11 +1,11 @@
 # Pantry module refactor: status note
 
-Date: 2026-11-03. This is the report back requested by the scPantry handover (`~/projects/scPantry/docs/handover/2026-10-30-pantry-fork-handover.md`, "Report back").
+Date: 2026-11-04. This is the report back requested by the scPantry handover (`~/projects/scPantry/docs/handover/2026-10-30-pantry-fork-handover.md`, "Report back").
 Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Run records: `tests/hpc/README.md`.
 
 ## Branch and tag
 
-- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.2`** (earlier `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
+- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.3`** (earlier `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
 - What ran at which commit:
   - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
   - the full local-path host run (job 8396531) ran at `56c8c22`;
@@ -23,7 +23,8 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
   - the tensorQTL image workflow builds only on pushes to `module`; `majiq3-install.sh` checks the tag's commit;
   - docs.
 - The full `github()` host run (Task 18, job 8399793) fetched `module-v0.1.1` = `befa72c`.
-- `module-v0.1.2` (Task 19, R26, superseding R24) moves FUSION (R scripts, gcta_nr_robust, R, plink, gemma) into the digest-pinned image `ghcr.io/twillis209/pantry-fusion`, removes `install_fusion` and the `fusion_dir`/`gcta`/`gcta_url`/`gcta_sha256` keys, and was re-run on the gate-3 config (below). TWAS now needs apptainer. Later commits on `module` only add run records to the docs.
+- `module-v0.1.2` (Task 19, R26, superseding R24) moves FUSION (R scripts, gcta_nr_robust, R, plink, gemma) into the digest-pinned image `ghcr.io/twillis209/pantry-fusion`, removes `install_fusion` and the `fusion_dir`/`gcta`/`gcta_url`/`gcta_sha256` keys, and was re-run on the gate-3 config (below). TWAS now needs apptainer.
+- `module-v0.1.3` (Task 20, R27) adds the optional `majiq_container`: MAJIQ in an image each user builds from `containers/majiq/` (not published: Penn's academic licence forbids redistribution). With it unset, the MAJIQ rules and every other job dry-run unchanged. It was re-run on the Task 17 MAJIQ configs (below). Later commits on `module` only add run records to the docs.
 
 ## How a host imports it
 
@@ -156,6 +157,8 @@ How far the tensorQTL results are from upstream's:
 
 **MAJIQ (`intron_retention`)** is now verified at run time (Task 17): with MAJIQ 3.0.22 in the named env `majiq3`, the refactored rules reproduce upstream 8da7787 byte for byte on the test data (`intron_retention.bed.gz`, `.phenotype_groups.txt`, `unnorm/intron_retention.bed`), as do two upstream runs of each other. A run with renamed, symlinked BAMs names the `.sj` files after the targets and gives the same outputs. See `tests/hpc/README.md`, Task 17.
 
+**MAJIQ image (R27, Task 20).** MAJIQ's [academic licence](https://majiq.biociphers.org/Academic_License.txt) forbids redistribution, so there is no published MAJIQ image: users accept the licence and build one from `containers/majiq/majiq.def` (`apptainer build majiq.sif majiq.def`, unprivileged, about 5 minutes) or the `Dockerfile`, which fetch MAJIQ v3.0.22 (commit `d841baad`) at build time, then set `majiq_container` (README, "MAJIQ (intron_retention)"). The MAJIQ rules then run in the image with no conda env. Rerunning the Task 17 configs with the image under `--sdm conda apptainer` gave intron_retention outputs byte-identical to upstream's, with plain and with symlinked BAMs. Hosts must bind their data, symlinked-BAM targets and Snakemake's source cache (`~/.cache/snakemake`, which holds the bundled licence file) in `apptainer-args`. See `tests/hpc/README.md`, Task 20.
+
 **HPC note: pulling the images.** The images `ghcr.io/twillis209/pantry-tensorqtl` and `ghcr.io/twillis209/pantry-fusion` are public, but stale stored ghcr.io credentials make apptainer fail with 403 on the token request (seen on this account, Task 16). Run `apptainer registry logout docker://ghcr.io` (and drop `ghcr.io` from `~/.docker/config.json`) or refresh the login. The runs here used an anonymous pre-pull into the profile's `apptainer-prefix` (`tests/hpc/README.md`, Tasks 16 and 19).
 
 **LaDDR** was restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. It is excluded from every run above.
@@ -179,12 +182,13 @@ About 3 ms per job in all cases, so cost grows roughly linearly with the job cou
 - **Item 8**: FUSION is vendored upstream with modifications; rather than fetching a FUSION commit, the module's copy, gcta and gemma ship in a digest-pinned image built from the repository (R26).
 - **Item 11**: standalone works, with the old config format too, but outputs gain a `default/` level (`output/default/…`).
 - **Criterion 1**: kallisto- and tensorQTL-derived files are judged within measured noise or by attribution (R11, R12, R21, R22).
+- MAJIQ: no published image (licence); each user builds one (R27).
 - Also: `index_fasta` removed (R15). LaDDR `dataset_name` defaults to the dataset key (R16). Validation is stricter on quoted numbers (R14, R18).
 
 ## Follow-ups
 
 1. Runtime verification of LaDDR (MAJIQ done, Task 17).
-2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD. MAJIQ's named env is built from `tests/hpc/envs/majiq3.yml` + `majiq3-install.sh` (v3.0.22), but the rules still name it rather than pin it.
+2. Env pinning: the txrevise python; LaDDR from a release instead of GitHub HEAD. MAJIQ's named env and image are built from `containers/majiq/` (v3.0.22, unpinned yml; `majiq3.lock.txt` records one env), but the rules name the env or take the image path from config rather than pin them.
 3. Report the Snakemake source-cache bugs upstream: binary files fail (no longer affects Pantry since R26), and text files lose their final newline under `github()` (which also makes a `github()` module rebuild its conda envs).
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".

@@ -66,7 +66,39 @@ max-jobs-per-timespan: "1/1s"
 max-status-checks-per-second: 5
 ```
 
-This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules and the FUSION TWAS rules (`twas_compute_weights_batch`, `twas_assemble_summary`), which run in pinned containers under apptainer. `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment), and the TWAS analysis cannot run: FUSION and gcta are only in its image. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
+This uses Snakemake 9.12 or higher and the `snakemake-executor-plugin-slurm` plugin. Every rule has its own conda environment (`envs/`), except the `tensorqtl` rules and the FUSION TWAS rules (`twas_compute_weights_batch`, `twas_assemble_summary`), which run in pinned containers under apptainer, and the MAJIQ rules, which use an image or env you build yourself (see [MAJIQ](#majiq-intron_retention) below). `--nv` gives the container the GPU, and the bind must cover your data, including symlink targets. Without apptainer, the `tensorqtl` rules use the `python3` on your PATH, which then needs tensorqtl (e.g. the `pheast/environment.yml` environment), and the TWAS analysis cannot run: FUSION and gcta are only in its image. The `tensorqtl` steps should be run on GPU for reasonable runtime, so they are specified by name here to override the default resources. The GPU is requested with `gpu: 1`, because the slurm plugin rejects `--gres`/`--gpus` in `slurm_extra`. Adjust as needed for your cluster. Additional resources are specified within some of the snakemake rules, which are passed to slurm when those jobs are submitted. Alternatively, you can run snakemake on an interactive node.
+
+### MAJIQ (intron_retention)
+
+The `intron_retention` modality runs [MAJIQ](https://majiq.biociphers.org/) v3, which is under the University of Pennsylvania's [academic licence](https://majiq.biociphers.org/Academic_License.txt). That licence forbids redistribution, so Pantry does not publish a MAJIQ image or env: each user builds their own from the recipes in `containers/majiq/`. These fetch MAJIQ from its official repository (https://bitbucket.org/biociphers/majiq_academic, tag `v3.0.22`, checked to be at commit `d841baad`) when you build, and contain no MAJIQ code themselves.
+
+1. **Accept the licence.** Read the [academic licence](https://majiq.biociphers.org/Academic_License.txt) and accept it before building. Use is for non-commercial or educational purposes only, and you must not redistribute the image you build (do not push it to a public or shared registry, or share the `.sif`). The image keeps MAJIQ's copyright and licence notices in `/opt/majiq` (and in its labels): "Copyright © 2016 University of Pennsylvania; All Rights Reserved", created by Yoseph Barash, Jorge V. Garcia, Alejandro Barrera and Matthew Gazzara.
+2. **Build the image.** With apptainer, on a node with network access, e.g. a cluster job. Neither root nor a `/etc/subuid` entry is needed: apptainer (1.1 or later; tested with 1.5.2) falls back to a root-mapped namespace, and `--fakeroot` behaves the same. The build takes about 5 minutes on 4 cores:
+
+   ```sh
+   cd Pantry/containers/majiq
+   apptainer build majiq.sif majiq.def
+   ```
+
+   If you have Docker but no apptainer on that machine, build with the `Dockerfile` instead and convert the image where apptainer is available:
+
+   ```sh
+   docker build --platform linux/amd64 -t pantry-majiq:3.0.22 Pantry/containers/majiq
+   docker save pantry-majiq:3.0.22 -o majiq.tar   # or skip, and use docker-daemon://pantry-majiq:3.0.22
+   apptainer build majiq.sif docker-archive://majiq.tar
+   ```
+
+   Then copy `majiq.sif` to the machine that runs Pantry. Both recipes run the same `majiq3-install.sh` and check that `majiq --version` reports 3.0.22.
+3. **Point Pantry at it.** Set the top-level `majiq_container` to the image's **absolute** path (a relative path is resolved against Snakemake's working directory, not the config file). A `docker://` or `oras://` URI also works, for an image in a private registry that only you can pull from (anything others can pull counts as redistribution). Standalone, in `phenotyping/config.yml`:
+
+   ```yaml
+   majiq_container: /path/to/majiq.sif
+   ```
+
+   In a host workflow, put it in the phenotyping module's `config:` section (e.g. `pantry: phenotyping: majiq_container: /path/to/majiq.sif` in the host's config). `majiq_container` takes precedence over `majiq_env`: the three MAJIQ rules (`majiq_build`, `majiq_psi_coverage`, `majiq_psi`) then run in the image with no conda env.
+4. **Run with apptainer.** Use `--sdm conda apptainer` (`software-deployment-method: [conda, apptainer]` in the profile). The container sees only the working directory and what is bound, so `apptainer-args` must bind your data, including the targets of symlinks. This matters in particular for BAM files: MAJIQ names its junction files (`.sj`) after the resolved BAM path, so if the BAMs under `<pantry_intermediate>/{dataset}/bam/` are symlinks, their targets must be under a bound directory too. Also bind Snakemake's source cache (`~/.cache/snakemake`, or `$XDG_CACHE_HOME/snakemake`): the MAJIQ rules pass the licence file bundled with Pantry from there, and Snakemake runs `apptainer exec --home <working directory>`, so your real home directory is not mounted in the container. A `license` you configure must likewise be under a bound directory. For example: `apptainer-args: "--bind=/path/to/your/data --bind=$HOME/.cache/snakemake"`. (The public MAJIQ build does not read the licence file, so a missing bind does not stop it, but keep the file visible.)
+
+Without an image, the MAJIQ rules use a named conda env instead: `majiq_env` (default `majiq3`). Build it with `bash containers/majiq/majiq3-install.sh <workdir>`, which creates the env `majiq3` from `containers/majiq/majiq3.yml` and pip-installs MAJIQ into it by the same steps as the image (`containers/majiq/majiq3.lock.txt` records a working env). The same licence terms apply.
 
 ## Run on test data
 
@@ -315,7 +347,7 @@ use rule * from pantry_pheast as pantry_pheast_*
 - **Linking the stages.** Point a Pheast dataset's `phenotype_dir` at the phenotyping output (`results/pantry/phenotypes/<dataset>`) to chain the two stages in one DAG. The path must be spelled exactly as the phenotyping module's resolved `<pantry_output>/{dataset}` (relative vs absolute matters); otherwise Pheast fails with missing input files.
 - **`defaults:`** is deep-merged under every dataset, and a dataset can add or override keys but not remove them. Keep modality groups, modalities and analyses that vary between datasets out of `defaults`.
 - **Profile settings.** In the profile, `set-resources` keys use the prefixed rule names (e.g. `pantry_pheast_tensorqtl_cis`).
-- **Containers.** The tensorQTL and FUSION (TWAS) rules run in digest-pinned images under apptainer: use `software-deployment-method: [conda, apptainer]`.
+- **Containers.** The tensorQTL and FUSION (TWAS) rules run in digest-pinned images under apptainer: use `software-deployment-method: [conda, apptainer]`. For MAJIQ, set `majiq_container` in the phenotyping module's `config:` to your own image (see [MAJIQ](#majiq-intron_retention)).
 - **Examples and details.** `tests/host/` holds a working example (`Snakefile`, `config.yaml`, `profile/`). Details are in `docs/module-status.md` and `CHANGES-module.md`.
 
 ## Citing

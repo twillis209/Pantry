@@ -252,6 +252,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   - So the remaining GPU-vs-baseline differences come from parallel reduction order (GPU or multithreaded CPU), not the software stack.
 
 ## Task 17: MAJIQ (intron_retention) at run time
+- (Task 20 moved `tests/hpc/envs/majiq3{.yml,-install.sh,.lock.txt}` to `containers/majiq/`.)
 - Env `majiq3` (named, as `majiq_env` defaults): `tests/hpc/envs/majiq3.yml` (conda part: python 3.12, htslib, zstd, xz/liblzma-devel,
   bzip2, zlib, cmake, compilers) + `tests/hpc/envs/majiq3-install.sh` (clones the public https://bitbucket.org/biociphers/majiq_academic at
   tag v3.0.22, commit d841baad, sets `HTSLIB_*` and `CMAKE_PREFIX_PATH` to the env, `pip install .` as in its README). No credentials needed.
