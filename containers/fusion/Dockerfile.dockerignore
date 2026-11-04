@@ -1,0 +1,6 @@
+# The build context is the repository root (for pheast/); send only what the
+# Dockerfile copies.
+*
+!pheast/envs/fusion.yaml
+!pheast/scripts/fusion_twas/
+!containers/fusion/check_image.py
