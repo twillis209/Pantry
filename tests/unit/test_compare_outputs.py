@@ -411,3 +411,114 @@ def test_bed_formatting_only_difference_passes(tmp_path):
     assert mism == []
     mism, _ = bed_run(tmp_path, bed(a), bed(b), bed(a), bed(a))
     assert mism == []  # zero tolerance still passes: values are equal
+
+
+# --noise with more than two runs (R12 amendment): envelope = max over all pairs.
+
+def bed_multi(tmp_path, exp, act, noise, name='expression.bed.gz'):
+    write_bed(tmp_path / 'exp' / name, exp)
+    write_bed(tmp_path / 'act' / name, act)
+    nd = []
+    for i, text in enumerate(noise):
+        d = tmp_path / f'n{i}'
+        if text is not None:
+            write_bed(d / name, text)
+        else:
+            d.mkdir()
+        nd.append(d)
+    return co.compare_dirs(tmp_path / 'exp', tmp_path / 'act', nd)
+
+
+NOISE3 = (bed(BASE), bed(shifted(0.01)), bed(shifted(0.03)))  # pair maxes 0.01, 0.03, 0.02
+
+
+def test_bed_multi_noise_uses_max_over_all_pairs(tmp_path):
+    # 0.05 <= 2 x 0.03 (n0~n2) passes; with only the first two runs it would fail (> 2 x 0.01).
+    mism, notes = bed_multi(tmp_path, bed(BASE), bed(shifted(0.05)), NOISE3)
+    assert mism == []
+    assert any('allowed 0.06' in n and 'over 3 pairs' in n for n in notes)
+    mism, _ = bed_multi(tmp_path / 'two', bed(BASE), bed(shifted(0.05)), NOISE3[:2])
+    assert len(mism) == 1 and 'max |diff|' in mism[0]
+
+
+def test_bed_multi_noise_outside_envelope_fails_and_names_pair(tmp_path):
+    mism, _ = bed_multi(tmp_path, bed(BASE), bed(shifted(0.07)), NOISE3)
+    assert len(mism) == 1 and 'allowed 0.06' in mism[0] and 'over 3 pairs' in mism[0]
+    assert str(tmp_path / 'n0') in mism[0] and str(tmp_path / 'n2') in mism[0]
+
+
+def test_bed_multi_noise_order_of_runs_irrelevant(tmp_path):
+    a, _ = bed_multi(tmp_path / 'a', bed(BASE), bed(shifted(0.05)), NOISE3)
+    b, _ = bed_multi(tmp_path / 'b', bed(BASE), bed(shifted(0.05)), NOISE3[::-1])
+    assert a == b == []
+
+
+def test_bed_multi_noise_missing_counterpart_in_third_run_fails(tmp_path):
+    mism, _ = bed_multi(tmp_path, bed(BASE), bed(shifted(0.01)), (bed(BASE), bed(shifted(0.01)), None))
+    assert len(mism) == 1 and 'noise counterpart missing' in mism[0] and 'n2' in mism[0]
+
+
+def test_bed_multi_noise_any_incomparable_pair_fails(tmp_path):
+    third = bed(BASE[:1])  # row count differs from the other two
+    mism, _ = bed_multi(tmp_path, bed(BASE), bed(shifted(0.01)), (bed(BASE), bed(shifted(0.01)), third))
+    assert len(mism) == 1 and 'noise pair not numerically comparable' in mism[0]
+
+
+def test_bed_multi_noise_all_identical_is_zero_tolerance(tmp_path):
+    mism, _ = bed_multi(tmp_path, bed(BASE), bed(shifted(0.001)), (bed(BASE),) * 3)
+    assert len(mism) == 1
+
+
+def test_bed_two_run_messages_unchanged(tmp_path):
+    mism, _ = bed_run(tmp_path, bed(BASE), bed(shifted(0.03)), bed(BASE), bed(shifted(0.01)))
+    assert mism == ['expression.bed.gz: max |diff| 0.03 > allowed 0.02 (noise pair max 0.01)']
+    mism, notes = bed_run(tmp_path / 'ok', bed(BASE), bed(shifted(0.015)), bed(BASE), bed(shifted(0.01)))
+    assert notes == ['expression.bed.gz: numeric BED: max |diff| 0.015, allowed 0.02']
+
+
+def test_cis_qtl_multi_noise_max_over_pairs(tmp_path):
+    base = cis_df()
+    runs = [base, cis_df(pval_perm=[0.51, 0.6]), cis_df(pval_perm=[0.53, 0.6])]  # max pair 0.03
+    exp, act = make_pair(tmp_path, 'x.cis_qtl.txt.gz', base, cis_df(pval_perm=[0.55, 0.6]))
+    nd = []
+    for i, df in enumerate(runs):
+        write_gz(tmp_path / f'n{i}' / 'qtl' / 'x.cis_qtl.txt.gz', df)
+        nd.append(tmp_path / f'n{i}')
+    assert co.compare_dirs(exp, act, nd)[0] == []
+    assert co.compare_dirs(exp, act, nd[:2])[0] != []
+
+
+def test_cis_independent_multi_noise_max_over_pairs(tmp_path):
+    a = indep([('g1', 1), ('g2', 1)])
+    n1 = a.copy()
+    n1['pval_nominal'] *= 1 + 1e-5
+    n2 = a.copy()
+    n2['pval_nominal'] *= 1 + 1e-4
+    actual = a.copy()
+    actual['pval_nominal'] *= 1 + 1.5e-4  # within 2 x 1e-4, not within 2 x 1e-5
+    exp, act = make_pair(tmp_path, IND, a, actual)
+    nd = []
+    for i, df in enumerate((a, n1, n2)):
+        write_gz(tmp_path / f'n{i}' / 'qtl' / IND, df)
+        nd.append(tmp_path / f'n{i}')
+    assert co.compare_dirs(exp, act, nd)[0] == []
+    assert any('pval_nominal max rel diff' in m for m in co.compare_dirs(exp, act, nd[:2])[0])
+
+
+def test_main_noise_needs_two_runs(tmp_path):
+    write_bed(tmp_path / 'exp' / 'e.bed.gz', 'a\n')
+    with pytest.raises(SystemExit):
+        co.main([str(tmp_path / 'exp'), str(tmp_path / 'exp'), '--report', str(tmp_path / 'r.md'),
+                 '--noise', str(tmp_path / 'exp')])
+
+
+def test_main_multi_noise_report_header(tmp_path):
+    for d in ('exp', 'act', 'n0', 'n1', 'n2'):
+        write_bed(tmp_path / d / 'e.bed.gz', bed(BASE))
+    rep = tmp_path / 'r.md'
+    rc = co.main([str(tmp_path / 'exp'), str(tmp_path / 'act'), '--report', str(rep),
+                  '--noise', *(str(tmp_path / f'n{i}') for i in range(3))])
+    assert rc == 0 and 'Noise runs (3; envelope = max over 3 pairs)' in rep.read_text()
+    rc = co.main([str(tmp_path / 'exp'), str(tmp_path / 'act'), '--report', str(rep),
+                  '--noise', str(tmp_path / 'n0'), str(tmp_path / 'n1')])
+    assert rc == 0 and f'Noise pair: {tmp_path / "n0"} , {tmp_path / "n1"}' in rep.read_text()

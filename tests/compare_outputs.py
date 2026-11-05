@@ -2,14 +2,17 @@
 """Compare two Pantry output directories (phenotyping or pheast archives).
 
 Usage: python tests/compare_outputs.py <expected_dir> <actual_dir> --report <md>
-                                       [--noise <dirA> <dirB>]
+                                       [--noise <dir1> <dir2> [<dir3> ...]]
 
-Exit status 0 iff every file matches. The optional --noise pair (two runs of the
-same upstream pipeline) calibrates the tolerance for non-deterministic tensorQTL
-columns: allowed |diff| = 2 x the max |diff| seen between the noise pair.
+Exit status 0 iff every file matches. The optional --noise runs (two or more runs
+of the same upstream pipeline) calibrate the tolerance for non-deterministic
+files (numeric BEDs, tensorQTL columns): allowed |diff| = 2 x the max |diff| seen
+between any pair of noise runs (R12; more than two runs: R12 amendment). With two
+runs this is the single noise pair.
 """
 import argparse
 import gzip
+import itertools
 import subprocess
 import sys
 import tarfile
@@ -286,6 +289,36 @@ def _compare_hsq(a: Path, b: Path):
     return []
 
 
+def _pairs(noise_dirs):
+    return list(itertools.combinations([Path(d) for d in noise_dirs], 2))
+
+
+def _pair_label(n_pairs, pair):
+    return '' if n_pairs == 1 else f' ({pair[0]} ~ {pair[1]})'
+
+
+def _noise_paths(noise_dirs, r):
+    """Noise counterparts of r and the first missing one (None if all exist)."""
+    paths = [Path(d) / r for d in noise_dirs]
+    return paths, next((p for p in paths if not p.exists()), None)
+
+
+def _bed_envelope(noise_dirs, r):
+    """Max over all noise-run pairs of the per-pair max |diff| of file r.
+
+    Returns (error, nmax, (dirA, dirB) giving the max, n_pairs)."""
+    pairs = _pairs(noise_dirs)
+    nmax, at = None, None
+    for da, db in pairs:
+        nerr, m = _bed_numeric(da / r, db / r)
+        if nerr:
+            return (f'noise pair not numerically comparable: {"; ".join(nerr)}'
+                    f'{_pair_label(len(pairs), (da, db))}'), None, None, len(pairs)
+        if nmax is None or m > nmax:
+            nmax, at = m, (da, db)
+    return None, nmax, at, len(pairs)
+
+
 def _files(d: Path) -> set[str]:
     return {str(p.relative_to(d)) for p in d.rglob('*') if p.is_file()}
 
@@ -315,19 +348,25 @@ def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
             exact, noisy = _tensorqtl_cols(e)
             noise, rs = {}, 0
             if noise_dirs is not None:
-                na, nb = Path(noise_dirs[0]) / r, Path(noise_dirs[1]) / r
-                if na.exists() and nb.exists():
-                    noise, rs = table_noise(na, nb)
-                else:
-                    mism.append(f'{r}: noise counterpart missing ({na if not na.exists() else nb})')
+                npaths, missing = _noise_paths(noise_dirs, r)
+                if missing is not None:
+                    mism.append(f'{r}: noise counterpart missing ({missing})')
                     continue
+                for na, nb in itertools.combinations(npaths, 2):
+                    n, k = table_noise(na, nb)
+                    for c, v in n.items():
+                        noise[c] = max(noise.get(c, 0.0), v)
+                    rs = max(rs, k)
             if 'independent' not in name:
                 rs = 0
             if 'independent' in name:
                 summ = indep_summary(e, a)
                 nsumm = None
                 if noise_dirs is not None:
-                    nsumm = indep_summary(na, nb)
+                    for na, nb in itertools.combinations(npaths, 2):
+                        s1 = indep_summary(na, nb)
+                        nsumm = s1 if nsumm is None else {
+                            k: v if v[2] >= nsumm[k][2] else nsumm[k] for k, v in s1.items()}
                     chk = indep_check(summ, nsumm)
                     msgs = [f'summary {c[0]}: deviation {c[3]:.3g} > allowed {c[5]:.3g} '
                             f'(noise {c[4]:.3g})' for c in chk if not c[6]]
@@ -345,23 +384,27 @@ def compare_dirs(expected: Path, actual: Path, noise_dirs=None, summaries=None):
         elif _read_bytes(e) != _read_bytes(a):
             msgs = ['contents differ']
             if noise_dirs is not None and name.endswith(('.bed', '.bed.gz')):
-                na, nb = Path(noise_dirs[0]) / r, Path(noise_dirs[1]) / r
-                if not (na.exists() and nb.exists()):
-                    msgs = [f'noise counterpart missing ({na if not na.exists() else nb})']
+                npaths, missing = _noise_paths(noise_dirs, r)
+                if missing is not None:
+                    msgs = [f'noise counterpart missing ({missing})']
                 else:
-                    nerr, nmax = _bed_numeric(na, nb)
+                    nerr, nmax, at, n_pairs = _bed_envelope(noise_dirs, r)
                     if nerr:
-                        msgs = [f'noise pair not numerically comparable: {"; ".join(nerr)}']
+                        msgs = [nerr]
                     else:
                         errs, dmax = _bed_numeric(e, a)
                         allowed = 2 * nmax
+                        src = ('noise pair max' if n_pairs == 1 else
+                               f'noise max over {n_pairs} pairs')
+                        where = _pair_label(n_pairs, at)
                         if errs:
                             msgs = errs
                         elif dmax > allowed:
-                            msgs = [f'max |diff| {dmax:.4g} > allowed {allowed:.4g} (noise pair max {nmax:.4g})']
+                            msgs = [f'max |diff| {dmax:.4g} > allowed {allowed:.4g} ({src} {nmax:.4g}){where}']
                         else:
                             msgs = []
-                            nts = [f'numeric BED: max |diff| {dmax:.4g}, allowed {allowed:.4g}']
+                            nts = [f'numeric BED: max |diff| {dmax:.4g}, allowed {allowed:.4g}'
+                                   + ('' if n_pairs == 1 else f' ({src} {nmax:.4g}){where}')]
         mism += [f'{r}: {m}' for m in msgs]
         notes += [f'{r}: {m}' for m in nts]
     return mism, notes
@@ -372,12 +415,18 @@ def main(argv=None) -> int:
     ap.add_argument('expected', type=Path)
     ap.add_argument('actual', type=Path)
     ap.add_argument('--report', type=Path, required=True)
-    ap.add_argument('--noise', nargs=2, type=Path, metavar=('DIR_A', 'DIR_B'))
+    ap.add_argument('--noise', nargs='+', type=Path, metavar='DIR',
+                    help='two or more upstream runs; envelope = 2 x max |diff| over all pairs')
     args = ap.parse_args(argv)
+    if args.noise is not None and len(args.noise) < 2:
+        ap.error('--noise needs at least two runs')
     summaries = []
     mism, notes = compare_dirs(args.expected, args.actual, args.noise, summaries)
     lines = [f'# Comparison: {args.expected} vs {args.actual}', '',
-             f'Noise pair: {" , ".join(map(str, args.noise)) if args.noise else "none"}', '',
+             (f'Noise pair: {" , ".join(map(str, args.noise)) if args.noise else "none"}'
+              if not args.noise or len(args.noise) == 2 else
+              f'Noise runs ({len(args.noise)}; envelope = max over {len(_pairs(args.noise))} pairs): '
+              f'{" , ".join(map(str, args.noise))}'), '',
              ('With --noise, cis_independent files are compared ONLY on the summary statistics below '
               '(no row-level comparison).' if args.noise else
               'Without --noise, cis_independent files are compared row by row (exact).'), '',
