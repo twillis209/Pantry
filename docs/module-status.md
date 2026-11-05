@@ -5,7 +5,7 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 
 ## Branch and tag
 
-- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.4`** (earlier `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
+- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.5`** (earlier `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
 - What ran at which commit:
   - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
   - the full local-path host run (job 8396531) ran at `56c8c22`;
@@ -25,7 +25,8 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 - The full `github()` host run (Task 18, job 8399793) fetched `module-v0.1.1` = `befa72c`.
 - `module-v0.1.2` (Task 19, R26, superseding R24) moves FUSION (R scripts, gcta_nr_robust, R, plink, gemma) into the digest-pinned image `ghcr.io/twillis209/pantry-fusion`, removes `install_fusion` and the `fusion_dir`/`gcta`/`gcta_url`/`gcta_sha256` keys, and was re-run on the gate-3 config (below). TWAS now needs apptainer.
 - `module-v0.1.3` (Task 20, R27) adds the optional `majiq_container`: MAJIQ in an image each user builds from `containers/majiq/` (not published: Penn's academic licence forbids redistribution). With it unset, the MAJIQ rules and every other job dry-run unchanged. It was re-run on the Task 17 MAJIQ configs (below).
-- `module-v0.1.4` (Task 21, R28) raises the floor to Snakemake 9.14, pins the txrevise and LaDDR envs (LaDDR v1.0.0) and the MAJIQ recipes to the lock files, removes the test profiles' source-cache bind, adds the `image-pins` CI check (`containers/check_pins.sh`) and headers on the legacy `environment.yml` files. Dry-run job sets are unchanged. A full `github()` host run with `majiq_container` set and no cache bind passed the Task 18/19 bar (below). Later commits on `module` only add run records to the docs.
+- `module-v0.1.4` (Task 21, R28) raises the floor to Snakemake 9.14, pins the txrevise and LaDDR envs (LaDDR v1.0.0) and the MAJIQ recipes to the lock files, removes the test profiles' source-cache bind, adds the `image-pins` CI check (`containers/check_pins.sh`) and headers on the legacy `environment.yml` files. Dry-run job sets are unchanged. A full `github()` host run with `majiq_container` set and no cache bind passed the Task 18/19 bar (below).
+- `module-v0.1.5` (Task 22, R29) verifies LaDDR at run time against upstream (below). It fully pins `deeptools.yaml` and more of `laddr.yaml` to the lock, and sets scikit-learn 1.5.2 in `laddr.yaml`, because LaDDR v1.0.0 fails in `laddr coverage` with the lock's 1.9.1. Rule code is unchanged. Later commits on `module` only add run records to the docs.
 
 ## How a host imports it
 
@@ -44,7 +45,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.4")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.5")
     config:
         config["pantry"]["phenotyping"]
 
@@ -56,7 +57,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.4")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.5")
     config:
         config["pantry"]["pheast"]
 
@@ -148,6 +149,7 @@ Everything ran on the GDML HPC (SLURM, `sjob`, profile `tests/profile` or `tests
 | Multi-dataset (2) | pheast `full` + `subset` (300 samples, MAC 20) (job 8395742, 388/388, GPU) | `multi-pheast` | `full`: heritability/TWAS/genotype_qc pass, 76 tensorQTL mismatches (non-blocking); `subset` 33/33 targets | `multi-pheast/compare.md` |
 | Host, local path (3) | `tests/host/Snakefile`: dry run of `all` (472 jobs, incl. pheast `chained` on phenotyping output in the same DAG); full run of phenotyping `full` + pheast `geuvadis` (job 8396531, 539/539, tensorQTL on GPU with prefixed set-resources) | `host` | phenotyping MATCH; `cross_modality` byte-identical to upstream `combine_modalities.sh`; pheast: blocking files pass, 79 tensorQTL mismatches (non-blocking) | `host/compare_pheno.md`, `host/compare_pheast.md` |
 | Host, `github()` (3) | At `module-v0.1.2` (= `0d30215`): dry run of `all` (job 8400681, 471 jobs, no binary fetched) and full run as Task 18's (job 8402594, 548/548; `host-github-v012`: phenotyping MATCH, intron_retention byte-identical, `cross_modality` identical, pheast blocking files incl. TWAS pass, 84 tensorQTL mismatches (R22), 17 command lines identical). Earlier, `tests/host/Snakefile.github` at `module-v0.1.1` (= `befa72c`), full run of phenotyping `full` (+ intron_retention) and pheast `geuvadis` (job 8399793, 549/549, tensorQTL on GPU); earlier, at `module-rc1`, dry run and two jobs only (job 8398071) | `host-github-v011` | phenotyping MATCH; intron_retention byte-identical to upstream; `cross_modality` identical to the script; pheast: blocking files pass, 80 tensorQTL mismatches (non-blocking), inputs and 17 command lines identical; gcta downloaded, sha256 OK | `host-github-v011/compare_{pheno,ir,pheast}.md`, `tests/hpc/README.md` (Task 18) |
+| LaDDR (1, 3; Task 22, R29) | upstream 8da7787 ×2 + seeded reruns in a LaDDR clone of the baseline env; module standalone (jobs 8405700, 8406311) and `github()` host at 54423dc (job 8406551, 575/575), each rerun seeded on U1's regressed BEDs (jobs 8406432, 8407165) | `t22`, `host-github-v015` | seeded, identical inputs: module and host byte-identical to upstream in all LaDDR files (finals and intermediates); config YAML and 26 command lines identical after path and design mappings; unseeded LaDDR is nondeterministic upstream (R29) | `tests/hpc/README.md` (Task 22) |
 | Lint, format (4) | `snakemake --lint`, `snakefmt` | local | remaining warnings justified in `CHANGES-module.md` (no log directives, as upstream; justified `run:` blocks; mixed rules/functions; two upstream-body items) | `CHANGES-module.md` |
 
 How far the tensorQTL results are from upstream's:
@@ -160,11 +162,24 @@ How far the tensorQTL results are from upstream's:
 
 **MAJIQ image (R27, Task 20).** MAJIQ's [academic licence](https://majiq.biociphers.org/Academic_License.txt) forbids redistribution, so there is no published MAJIQ image: users accept the licence and build one from `containers/majiq/majiq.def` (`apptainer build majiq.sif majiq.def`, unprivileged, about 5 minutes) or the `Dockerfile`, which fetch MAJIQ v3.0.22 (commit `d841baad`) at build time, then set `majiq_container` (README, "MAJIQ (intron_retention)"). The MAJIQ rules then run in the image with no conda env. Rerunning the Task 17 configs with the image under `--sdm conda apptainer` gave intron_retention outputs byte-identical to upstream's, with plain and with symlinked BAMs. Hosts must bind their data and symlinked-BAM targets in `apptainer-args`. Snakemake binds its own source cache (`~/.cache/snakemake`, which holds `script()` paths and the bundled licence file), so no profile bind is needed (Task 20's claim that 9.12-9.13 need one was wrong: they bind the default cache path; R28). The Docker and `docker://`/`oras://` routes are untested. See `tests/hpc/README.md`, Task 20.
 
-**Pins and the full `github()` run (Task 21, `module-v0.1.4`).** Each pinned env was built on the HPC and its `conda list --explicit` checked against the lock: txrevise 272/272 packages in the lock; LaDDR 105 conda packages, all in the lock but scipy (1.16.3, as LaDDR requires < 1.17); the rebuilt MAJIQ image's conda (64) and pip lists equal `majiq3.lock.txt`. The txrevise reference files from the pinned env match the baseline's (merged GFF3s, GTF, tags byte-identical; batch GFF3s except a `##date` line; the `.rds` except its provenance metadata). The `github()` host run (job 8404292; phenotyping `full` + intron_retention from the rebuilt image, pheast `geuvadis`; profile without the source-cache bind) ran 548/548; phenotyping within the noise envelope, intron_retention byte-identical (4 files), cross_modality identical to upstream's script, pheast mismatches only in tensorQTL files (78, R22), heritability, TWAS and genotype_qc passing, tensorQTL command lines 17/17 identical, covariate inputs identical. LaDDR is still verified by dry run only. See `tests/hpc/README.md`, Task 21.
+**Pins and the full `github()` run (Task 21, `module-v0.1.4`).** Each pinned env was built on the HPC and its `conda list --explicit` checked against the lock: txrevise 272/272 packages in the lock; LaDDR 105 conda packages, all in the lock but scipy (1.16.3, as LaDDR requires < 1.17); the rebuilt MAJIQ image's conda (64) and pip lists equal `majiq3.lock.txt`. The txrevise reference files from the pinned env match the baseline's (merged GFF3s, GTF, tags byte-identical; batch GFF3s except a `##date` line; the `.rds` except its provenance metadata). The `github()` host run (job 8404292; phenotyping `full` + intron_retention from the rebuilt image, pheast `geuvadis`; profile without the source-cache bind) ran 548/548; phenotyping within the noise envelope, intron_retention byte-identical (4 files), cross_modality identical to upstream's script, pheast mismatches only in tensorQTL files (78, R22), heritability, TWAS and genotype_qc passing, tensorQTL command lines 17/17 identical, covariate inputs identical. LaDDR was not part of that run (Task 22, below). See `tests/hpc/README.md`, Task 21.
 
 **HPC note: pulling the images.** The images `ghcr.io/twillis209/pantry-tensorqtl` and `ghcr.io/twillis209/pantry-fusion` are public, but stale stored ghcr.io credentials make apptainer fail with 403 on the token request (seen on this account, Task 16). Run `apptainer registry logout docker://ghcr.io` (and drop `ghcr.io` from `~/.docker/config.json`) or refresh the login. The runs here used an anonymous pre-pull into the profile's `apptainer-prefix` (`tests/hpc/README.md`, Tasks 16 and 19).
 
-**LaDDR** was restructured but checked by dry run only (`tests/configs/dryrun_majiq_laddr.yml`), as agreed. It is excluded from every run above.
+**LaDDR at run time (Task 22, R29, `module-v0.1.5`).** Upstream `8da7787` was run twice (U1, U2) on `tests/configs/phenotyping_baseline_laddr.yml` (upstream's config with intron_retention and LaDDR on, upstream's LaDDR defaults, `dataset_name: pantry`, all 8 `regress_modalities`), then the module standalone (M1) and in a `github()` host (M2). Envs:
+- Upstream's env has no LaDDR, and upstream 8da7787 with LaDDR v1.0.0 cannot run in it: `laddr coverage` fails under the lock's scikit-learn 1.9.1 (PCA on a frame with duplicate integer column names). The upstream side therefore ran in a clone of the baseline env (the original untouched) with LaDDR v1.0.0 (`2addf6fe`), and scikit-learn 1.5.2 (LaDDR's `requirements.txt`) and scipy 1.16.3 (LaDDR requires < 1.17) from conda-forge. Its explicit list differs from the lock in those two packages only; pip added the LaDDR stack.
+- The module's `laddr.yaml` has the same two versions and builds. `deeptools.yaml`, which had pinned only deeptools and resolved python 3.13, numpy 2.5 and pyBigWig 0.3.25, now pins its dependency closure from the lock. `laddr.yaml` now also pins pyBigWig, matplotlib, pillow and wrapt from the lock rather than leaving them to pip.
+- Every module that LaDDR's CLI and bamCoverage actually import has the same version on both sides (scipy as the same conda build). The one exception is `psutil`, which only the clone has and which is imported opportunistically.
+
+Results:
+- **LaDDR v1.0.0 is not deterministic.** `remove_pcs_from_phenos` runs an unseeded randomized PCA (scikit-learn's `auto` solver for 16 × thousands). A rerun on identical inputs gives different coverage residuals, models and latent phenotypes, and even a different phenotype count (624 vs 625). Kallisto noise in the regressed modalities adds to this. The U1/U2 noise envelope therefore spans the whole rank-normal range (max |diff| 3.13) and differs in row set, so it is no usable bar; `compare_outputs.py` refuses it.
+- **Acceptance (R29) was on identical inputs with numpy's global RNG seeded.** This used a test-only `sitecustomize.py` with `T22_SEED=0`, and for conda jobs `--conda-not-block-search-path-envvars`. Two seeded upstream reruns were byte-identical. With U1's eight regressed BEDs substituted, the module standalone (M1s) and the `github()` host (M2s) were **byte-identical to seeded upstream**: the final `latent_residual.bed.gz`, `.tbi`, `.phenotype_groups.txt` and `unnorm/latent_residual.bed` (624 phenotypes), and every LaDDR intermediate (bigWigs, `info/`, `gene_bins/`, `covg_norm/`, `models/`, latent table). bigWigs, `info/` and `gene_bins/` are byte-identical across all runs, seeded or not.
+- The LaDDR config written by `write_laddr_config.py` is identical after path normalisation. The 26 LaDDR command lines (16 bamCoverage, config, `laddr setup/binning/coverage/fit/transform`, assemble, normalize, bgzip, groups) are identical once three documented design differences are mapped: the module's `mv` of the latent table to a stable name, the assemble input path that follows from it, and `--samples intermediate/samples.txt` (same content as `input/samples.txt`).
+- `normalize_phenotypes.py` gives byte-identical output in the clone, the baseline env and the module's `python.yaml` env on all 9 unnormalised BEDs, so the clone changed no normalisation.
+- U1's other outputs vs the archive: RNA_editing, splicing, stability and intron_retention byte-identical. Kallisto files exceeded the single-pair envelope (expression 0.744 vs 0.732, isoforms 0.213 vs 0.167). In U2, M1 and M2, `alt_TSS` varied for the first time (the archive pair had it identical), with three concurrent runs. Unnormalised kallisto files stayed within it.
+- M2 (`host-github-v015`, job 8406551, 575/575 = Task 21's 548 + 27 LaDDR jobs) otherwise passed the Task 21 bar: intron_retention byte-identical, cross_modality identical to upstream's script, pheast mismatches only in tensorQTL files (89, R22), and the fetched LaDDR and deeptools envs equal to the local-path ones.
+
+See `tests/hpc/README.md`, Task 22.
 
 **Scaling (dry runs, Task 18).** Synthetic host configs with N datasets (copies of the test `full` dataset, 7 modalities + cross_modality, chained pheast datasets) on the HPC, Snakemake 9.27.1:
 
@@ -186,12 +201,13 @@ About 3 ms per job in all cases, so cost grows roughly linearly with the job cou
 - **Item 11**: standalone works, with the old config format too, but outputs gain a `default/` level (`output/default/…`).
 - **Criterion 1**: kallisto- and tensorQTL-derived files are judged within measured noise or by attribution (R11, R12, R21, R22).
 - MAJIQ: no published image (licence); each user builds one (R27).
+- LaDDR env: scikit-learn 1.5.2 and scipy 1.16.3, not the lock's 1.9.1 and 1.17.1, because LaDDR v1.0.0 cannot run with them (R29).
 - Also: `index_fasta` removed (R15). LaDDR `dataset_name` defaults to the dataset key (R16). Validation is stricter on quoted numbers (R14, R18).
 
 ## Follow-ups
 
-1. Runtime verification of LaDDR (MAJIQ done, Task 17).
-2. Env pinning (mostly done in Task 21): LaDDR's pip dependencies other than `multimethod` are unpinned (no lock covers them). MAJIQ's named env and image are built from the pinned `containers/majiq/` recipes, but the rules name the env or take the image path from config rather than pin them.
+1. Report upstream: LaDDR v1.0.0 fails under scikit-learn ≥ 1.9 (`laddr coverage`), its PCA in `remove_pcs_from_phenos` is unseeded (run-to-run differences, Task 22), and upstream's env cannot run LaDDR as documented. (Runtime verification of MAJIQ and LaDDR: done, Tasks 17 and 22.)
+2. Env pinning (mostly done in Tasks 21 and 22): LaDDR's pip-only dependencies (bx-python, scikit-fda, statsmodels, tqdm, numba and theirs; no lock covers them) are unpinned except `multimethod`; the Task 22 versions are recorded in `tests/hpc/README.md`. MAJIQ's named env and image are built from the pinned `containers/majiq/` recipes, but the rules name the env or take the image path from config rather than pin them.
 3. Report the Snakemake source-cache bugs upstream: binary files fail (no longer affects Pantry since R26), and text files lose their final newline under `github()` (which also makes a `github()` module rebuild its conda envs).
 4. Optional: `log:` directives for all rules; a third baseline run to widen the kallisto and tensorQTL noise envelopes.
 5. Full list: `CHANGES-module.md`, "Known limitations and follow-ups".

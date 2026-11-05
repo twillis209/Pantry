@@ -4,7 +4,7 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
-> **Module branch.** This fork's `module` branch (release `module-v0.1.4`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.14**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+> **Module branch.** This fork's `module` branch (release `module-v0.1.5`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.14**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
 
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
@@ -30,6 +30,8 @@ If you want optional latent residual phenotypes via [LaDDR](https://www.biorxiv.
 cd ../LaDDR
 pip install -e .
 ```
+
+With `--sdm conda` (module branch), the LaDDR rules use `phenotyping/envs/laddr.yaml` instead (LaDDR v1.0.0, scikit-learn 1.5.2). Installing LaDDR v1.0.0 into the env above does not work: with its scikit-learn 1.9.1, `laddr coverage` fails with a narwhals `DuplicateError`; install `scikit-learn=1.5.2` there too.
 
 ### Set up Snakemake
 
@@ -324,7 +326,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.4")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.5")
     config:
         config["pantry"]["phenotyping"]
 
@@ -336,7 +338,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.4")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.5")
     config:
         config["pantry"]["pheast"]
 
