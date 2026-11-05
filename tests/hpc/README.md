@@ -460,3 +460,98 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   the tag was held until the run passed). `github()` dry run of `all` at the tag (job 8404833, `t21/gh_dry.sh`, fork entries cleared from the
   source cache, `host-github-v014` config): fetched f72dc9d (= remote), GH_DRY_TAG_EXIT=0, 481 jobs, no UnicodeEncodeError.
 - `pytest tests/unit -q`: 151 passed (local).
+
+## Task 22: LaDDR at run time against upstream 8da7787 (R29, module-v0.1.5)
+- Scratch `$H/pantry-runs/t22` (scripts `clone.sh`, `menvs.sh`, `sklearn.sh`, `scipy.sh`, `imports.sh`, `run.sh`, `subst.sh`, `compare.sh`,
+  `compare_seed.sh`, `cmds.sh` + `cmds_norm.py`, `cmp_laddr_interm.py`, `latdiff.py`, `normcheck.sh`, `seed/sitecustomize.py`, `gh_run.sh`,
+  `compare_m2.sh`, `subst_m2.sh`). Config `tests/configs/phenotyping_baseline_laddr.yml` = `phenotyping_baseline_ir.yml` with
+  `laddr.enabled: true` (upstream's default LaDDR settings, `dataset_name: pantry`, all 8 `regress_modalities`); nothing adjusted for the
+  small data. The module reads it through the old-format shim (`project_dir` ignored with the note).
+- Upstream env: upstream's `environment.yml` has no LaDDR, so `pantry-baseline-pheno-laddr` = `conda create --clone pantry-baseline-pheno
+  --offline` (the original is untouched) + `pip install` of LaDDR v1.0.0 (`2addf6fe`) and `multimethod==1.12`, with the module LaDDR env's
+  pip versions as constraints for packages the clone lacked (job 8405129). Its `conda list --explicit` equals the lock; pip added only the
+  LaDDR stack (bx-python 0.16.0, scikit-fda 0.10.1, statsmodels 0.15.0, tqdm 4.70.1, numba 0.68.1, …) and replaced scipy 1.17.1 by a 1.16.3 wheel.
+- Module envs (`--conda-create-envs-only` on the m1 config): first build (job 8405131) `deeptools.yaml` (only `deeptools=3.5.5` pinned)
+  resolved python 3.13, numpy 2.5.4, pyBigWig 0.3.25, pysam 0.24.0, scipy 1.18.1; `laddr.yaml` left pyBigWig 0.3.29, matplotlib 3.11.2,
+  pillow 13.0.0, wrapt 2.5.2 to pip although the lock has 0.3.22, 3.10.1, 10.3.0, 1.17.3. Fixed in 35ebcd7 (deeptools: its dependency
+  closure in `pantry-baseline-pheno`'s `conda-meta`, `t22/closure.py`, plus pip/setuptools/wheel, all `name=version=build` from the lock;
+  laddr: those four and their closure from the lock). Job 8405161: deeptools 123/123 conda packages in the lock; laddr all in the lock but scipy.
+- Import-level check (`imports.sh`, jobs 8405430, 8406305): the top-level modules actually loaded by `laddr.{cli,binning,coverage,models,setup,init}`
+  and by `deeptools.bamCoverage`, with versions, in the clone and in the module envs: bamCoverage identical (13 distributions: deeptools 3.5.5,
+  pyBigWig 0.3.22, pysam 0.22.1, numpy 1.26.4, matplotlib 3.10.1, …); LaDDR identical (39 distributions in the module env: laddr 1.0.0, numpy 1.26.4, scipy 1.16.3,
+  pandas 2.3.3, scikit-learn, scikit-fda 0.10.1, statsmodels 0.15.0, pyBigWig 0.3.22, bx-python 0.16.0, polars 0.20.31, …) except `psutil`
+  7.2.2, which the clone has (from the lock) and imports opportunistically, and the module env lacks.
+- First runs (fresh dirs `t22/{u1,u2}` = `git archive 8da7787 phenotyping` + config + `input` link, env `pantry-baseline-pheno-laddr`, upstream's
+  own Snakefile; `t22/m1` = config + `input` link, `$H/Pantry` at 35ebcd7, env pantry-baseline-pheno; all `run.sh` = `snakemake --profile
+  tests/profile --slurm-keep-successful-logs`, `sjob -c 2 -m 7500M -t 0-12:00:00`): U1 8405163, U2 8405164, M1 8405700 all failed in
+  `laddr_coverage` only (U 370/378, M1 372/380 steps; keep-going finished everything else): `narwhals.exceptions.DuplicateError: Expected
+  unique column names` from `sklearn.decomposition.PCA.fit_transform` in LaDDR's `remove_pcs_from_phenos` (the phenotype frame is a
+  `pd.concat` of per-file `reset_index()` frames, so its transpose has duplicate integer column names, which scikit-learn 1.9.1's feature-name
+  check rejects). **Upstream 8da7787 + LaDDR v1.0.0 cannot run in upstream's own env.** LaDDR's own `requirements.txt` pins scikit-learn
+  1.5.2, so both sides now use conda-forge `scikit-learn=1.5.2=py312h7a48858_1` (54423dc for `laddr.yaml`; job 8406302 for the clone, `--no-deps`)
+  and, to make the binaries equal too, conda-forge `scipy=1.16.3=py312h54fa4ab_2` in the clone instead of the pip wheel (job 8406307; the scipy
+  trees and `_flapack` are byte-identical to the module env's). The clone's explicit list now differs from the lock in exactly scikit-learn and
+  scipy, as the module's `laddr.yaml` env (job 8406304: 135 conda packages, the rest in the lock; `laddr --help` OK).
+- Resumed U1 8406309, U2 8406310, M1 8406311 with `--forcerun laddr_setup` (10/10 each, about 8 min): every LaDDR step from `laddr_setup`
+  on ran under the final envs; bigWigs and all non-LaDDR outputs come from the first attempt.
+- Compare 8406340 (`compare.sh m1 … u2`), 8406341 (`cmds.sh`):
+  - bigWigs (bamCoverage, 16), `info/` (5) and `gene_bins/` (3) byte-identical in U1, U2 and M1; `coverage_manifest.tsv` identical.
+  - `covg_norm/pantry/batch_*.npy` (3 of 7 files; the `bins.tsv.gz` and `samples.txt` are identical), `models/` (3) and the latent table differ U1~U2
+    and U1~M1. The final BEDs differ too: U1 624 latent phenotypes, U2 625 (extra `ENSG00000197530__PC8`), M1 624 (same IDs and groups file as U1);
+    max |diff| on common rows 3.13 (normalised) and 41.9 (unnorm) U1~U2, 3.13 and 39.4 U1~M1. `compare_outputs.py U1 M1 --noise U1 U2`: exit 1,
+    "noise pair not numerically comparable: row count differs (624 vs 625)" for both BEDs. The U1/U2 envelope is not usable (a 16-sample
+    rank-normal spans about ±2 so 3.13 is the whole range) and the tool is right to refuse it; it was not extended.
+  - Command lines (`-n -p --forcerun bam_to_bigwig … pheno_groups_latent`, paths normalised): 28 upstream vs 29 module lines; the differences are
+    the module's `mv` of the latent table to `latent_phenos.tsv.gz`, the `assemble_latent_bed` input path that follows from it, and
+    `normalize_latent --samples intermediate/samples.txt` (`cmp`-identical to `input/samples.txt`; as every module normalize rule). With those
+    three design mappings (`cmds_norm.py --design`): CMDS_IDENTICAL_AFTER_DESIGN (26 commands: 16 bamCoverage, `write_laddr_config.py`, `laddr
+    setup/binning/coverage/fit/transform`, assemble, normalize, bgzip, groups; plus two `output:`/`reason:` lines the filter also keeps).
+  - LaDDR config YAML written by `write_laddr_config.py`: identical after replacing the run dirs and `output/default/` → `output/` (CONFIG_SAME_NORM).
+- Determinism with identical inputs: U1b = `cp -a` of U1, LaDDR rerun from `laddr_setup` (job 8406344): the same three `covg_norm` batches, models,
+  latent table and final BEDs differ from U1, again 624 vs 625 rows. Cause: `remove_pcs_from_phenos` calls `PCA(n_components=4)` without
+  `random_state` on a 16 x thousands matrix, for which scikit-learn's `auto` solver is `randomized` (sklearn `_pca.py`: `1 <= n_components <
+  0.8 * min(X.shape)`), seeded from numpy's global RNG, which LaDDR never seeds. LaDDR v1.0.0 is nondeterministic run to run (upstream
+  nondeterminism, not the refactor); the substitution run M1s (`cp -a` of M1 with U1's 8 regressed BEDs + `.tbi`, job 8406345) differs from U1 the same way.
+- Seeded runs (R29 addendum): `seed/sitecustomize.py` seeds numpy's global RNG (`np.random.seed(0)`) in every Python process when `T22_SEED` is set
+  (and logs it in the `laddr` processes); `PYTHONPATH=t22/seed T22_SEED=0`, all rerun with `--forcerun laddr_config`: U1b 8406372, U1c (another
+  `cp -a` of U1) 8406373, M1s 8406432. Snakemake drops `PYTHONPATH` for conda jobs, so M1s needed `--conda-not-block-search-path-envvars` (the
+  first seeded M1s, 8406374, had no seed line in its `laddr_coverage` log; discarded). Compare 8406545 (`compare_seed.sh m1s`):
+  - U1b vs U1c: every LaDDR file byte-identical (bigWigs 16, info 5, gene_bins 3, covg_norm 7, models 3, latent table, config, manifest) and the 4 finals
+    (SEED_u1b_u1c_EXIT=0 without `--noise`). Seeded LaDDR is deterministic.
+  - **M1s vs U1b: byte-identical**: the 4 finals (`latent_residual.bed.gz`, `.tbi`, `.phenotype_groups.txt`, `unnorm/latent_residual.bed`, 624
+    phenotypes), `covg_norm` 7/7, `models` 3/3, the latent table (module `latent_phenos.tsv.gz` vs upstream `phenotypes/latent_phenos.pantry.tsv.gz`),
+    `info`, `gene_bins`, bigWigs; `compare_outputs.py u1b m1s --noise u1b u1c`: exit 0, MATCH; config CONFIG_SAME_NORM. Seed lines present in all
+    three `laddr_coverage` logs.
+- Non-LaDDR sanity (`compare.sh`, U1, U2, M1 vs `archive/phenotyping` with `--noise archive/phenotyping archive/phenotyping_run2`; IR vs
+  `archive/phenotyping_ir`): exit 1 for all three, only in kallisto-derived files. U1: `expression.bed.gz` 0.744 > 0.732 and `isoforms.bed.gz`
+  0.213 > 0.167 (their `unnorm/` files within the envelope: 338/676, 3.0e-3/6.1e-3); U2 and M1: `alt_TSS.bed.gz` and `unnorm/alt_TSS.bed`
+  differ although the archive pair had them identical (noise 0). RNA_editing, splicing, stability and the 4 intron_retention files are
+  byte-identical to the archive in all three. The single-pair envelope broke here (the concern of Task 13); the three runs were concurrent.
+  Env attribution (job 8406357, `normcheck.sh`): `normalize_phenotypes.py` on U1's 9 `unnorm/*.bed` (8 modalities + latent_residual) in the clone
+  (scipy 1.16.3, scikit-learn 1.5.2), in pantry-baseline-pheno (1.17.1, 1.9.1) and in the module's `python.yaml` env: all 27 outputs
+  byte-identical, and equal to U1's `output/*.bed.gz` (KNN imputation ran on 5 of them). So the clone changes no normalisation, and
+  `normalize_latent` (clone upstream, `python.yaml` in the module) is env-independent; `unnorm/latent_residual.bed` has no missing values.
+- M2, full `github()` host run, `$H/pantry-runs/host-github-v015` (`t22/mk_m2.sh`: `host-github-v014`'s config, i.e. phenotyping `full` +
+  intron_retention from `t21/majiq.sif` and pheast `geuvadis`, plus a `laddr:` block for `full` with upstream's defaults written out,
+  `dataset_name: pantry` and all 8 `regress_modalities`); `Snakefile.github` at 7baa456 fetching commit 54423dc (the code M1 ran); fork entries
+  cleared from the source cache first. Job 8406551 (`t22/gh_run.sh`, env pantry-baseline-pheno, `sjob -c 2 -m 7500M -t 0-12:00:00`):
+  DRY_ALL_EXIT=0 (508 = Task 21's 481 + 27 LaDDR jobs), DRY_TESTED_EXIT=0 (449), RUN_EXIT=0, 575/575.
+- Compare 8407162 (`t22/compare_m2.sh`, env pantry-baseline-pheno-laddr; Task 21's compare plus LaDDR):
+  - phenotyping `full` (view without cross_modality, intron_retention, latent_residual) vs `archive/phenotyping` `--noise`: PHENO_COMPARE_EXIT=1, one
+    mismatch, `unnorm/alt_TSS.bed` 1.2e-3 > 0 (the archive pair has it identical; `alt_TSS.bed.gz` itself identical; kallisto, as U2/M1 above);
+    others within the envelope (alt_polyA 0.222/0.328, expression 0.366/0.732, isoforms 0.108/0.167, unnorm 5.8e-4/2.8e-3, 338/676, 3.0e-3/6.1e-3).
+    PHENO_CHECK_EXIT=0 (29/29 targets incl. `latent_residual.bed.gz` 624 rows, `.tbi`, groups). IR_COMPARE_EXIT=0, IR_BYTES_SAME x4. XM_BED_SAME,
+    XM_GROUPS_SAME (771 rows).
+  - pheast `geuvadis`: PHEAST_COMPARE_EXIT=1, 89 mismatches, all in `*.cis_qtl`/`*.cis_independent_qtl` (non-blocking, R22); 0 others;
+    PHEAST_CHECK_EXIT=0 (33/33); covar inputs 21 SAME, `geno_pruned.log` DIFF (as before).
+  - LaDDR envs built from the fetched yamls (`conda-envs/ca351d83…` laddr, `85691e07…` deeptools; new hashes, source-cache bug 2): `conda list
+    --explicit` and `pip list` equal to the local-path envs (job 8406304) for both.
+  - LaDDR raw vs U1 (informational, kallisto noise in the inputs): 624 rows, same IDs, max |diff| 3.13 / 37.9; bigWigs, info, gene_bins, manifest
+    identical; config CONFIG_SAME_NORM. Command lines (`-n -p --forcerun pantry_pheno_<rule>`, host paths mapped to upstream's): the same three
+    design differences as M1; CMDS_IDENTICAL_AFTER_DESIGN.
+- M2 substitution (`t22/subst_m2.sh`, job 8407165): M2's own LaDDR outputs, LaDDR dir and the 8 regressed BEDs kept in
+  `host-github-v015/snap_unseeded/`; U1's 8 BEDs (+ `.tbi`) copied into `results/pantry/phenotypes/full/`, then `tested` with
+  `PYTHONPATH=t22/seed T22_SEED=0 --conda-not-block-search-path-envvars --forcerun pantry_pheno_laddr_config`: RUN_EXIT=0, 15/15 (the LaDDR
+  chain, `combine_modalities` and the groups files of the substituted BEDs; nothing in pheast). Compare 8407187 (`compare_seed.sh m2s`): seed
+  line in the `laddr_coverage` log; **M2s vs U1b byte-identical**: the 4 finals (`compare_outputs.py --noise u1b u1c` exit 0, MATCH), `covg_norm`
+  7/7, models 3/3, latent table, info, gene_bins, bigWigs, manifest; config CONFIG_SAME_NORM.
