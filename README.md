@@ -31,7 +31,7 @@ cd ../LaDDR
 pip install -e .
 ```
 
-With `--sdm conda` (module branch), the LaDDR rules use `phenotyping/envs/laddr.yaml` instead (LaDDR v1.0.0, scikit-learn 1.5.2). Installing LaDDR v1.0.0 into the env above does not work: with its scikit-learn 1.9.1, `laddr coverage` fails with a narwhals `DuplicateError`. The combination tested against it (Task 22) is conda-forge `scikit-learn=1.5.2` and `scipy=1.16.3` in that env.
+With `--sdm conda` (module branch), the LaDDR rules use `phenotyping/envs/laddr.yaml` instead (LaDDR v1.0.0, scikit-learn 1.5.2). Installing LaDDR v1.0.0 into the env above does not work: with its scikit-learn 1.9.1, `laddr coverage` fails with a narwhals `DuplicateError`. Tested (Task 22): the baseline lock of that env (`pantry-baseline-pheno`) with conda-forge `scikit-learn=1.5.2` and `scipy=1.16.3`; a pip scipy wheel was not tested with LaDDR.
 
 ### Set up Snakemake
 

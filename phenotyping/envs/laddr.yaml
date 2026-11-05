@@ -2,10 +2,12 @@
 # baseline env (tests/hpc/envs/baseline-pheno.lock.txt): every conda package,
 # transitive ones included, as name=version=build from that lock, with three
 # exceptions. scipy is 1.16.3 (LaDDR requires scipy<1.17; the lock has 1.17.1,
-# which pip would silently replace). scikit-learn is 1.5.2, as in LaDDR's
-# requirements.txt: with the lock's 1.9.1, `laddr coverage` fails (PCA on a
-# frame with duplicate integer column names, which 1.9.1's feature-name check
-# rejects). icu is unpinned (it resolves to the lock's
+# which pip would silently replace). scikit-learn is 1.5.2 because the lock's
+# 1.9.1 was seen to fail: `laddr coverage` passes PCA a frame with duplicate
+# integer column names, which 1.9.1 rejects (narwhals `DuplicateError`; Task 22).
+# 1.5.2 is a known-good version, chosen because LaDDR's requirements.txt names
+# it (LaDDR's pyproject.toml leaves scikit-learn unbounded, and its other
+# requirements.txt pins are not followed here). icu is unpinned (it resolves to the lock's
 # 73.2=h59595ed_0).
 # pyBigWig, matplotlib (scikit-fda), pillow, wrapt and cffi are in the lock too,
 # so they are pinned here rather than left to pip (Task 22).
