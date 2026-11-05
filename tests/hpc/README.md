@@ -533,7 +533,8 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   `normalize_latent` (clone upstream, `python.yaml` in the module) is env-independent; `unnorm/latent_residual.bed` has no missing values.
 - M2, full `github()` host run, `$H/pantry-runs/host-github-v015` (`t22/mk_m2.sh`: `host-github-v014`'s config, i.e. phenotyping `full` +
   intron_retention from `t21/majiq.sif` and pheast `geuvadis`, plus a `laddr:` block for `full` with upstream's defaults written out,
-  `dataset_name: pantry` and all 8 `regress_modalities`); `Snakefile.github` at 7baa456 fetching commit 54423dc (the code M1 ran); fork entries
+  `dataset_name: pantry` and all 8 `regress_modalities`; committed as `tests/host/config_laddr.yaml`, which also drives the dry run at the tag below;
+  `majiq_container` there is the HPC path of Task 21's `.sif`); `Snakefile.github` at 7baa456 fetching commit 54423dc (the code M1 ran); fork entries
   cleared from the source cache first. Job 8406551 (`t22/gh_run.sh`, env pantry-baseline-pheno, `sjob -c 2 -m 7500M -t 0-12:00:00`):
   DRY_ALL_EXIT=0 (508 = Task 21's 481 + 27 LaDDR jobs), DRY_TESTED_EXIT=0 (449), RUN_EXIT=0, 575/575.
 - Compare 8407162 (`t22/compare_m2.sh`, env pantry-baseline-pheno-laddr; Task 21's compare plus LaDDR):
@@ -558,5 +559,16 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
 - Tag `module-v0.1.5` (annotated) = a8720eb (stage code = 54423dc, which M1 and the M2 run fetched: `git diff 54423dc a8720eb -- phenotyping
   pheast` is empty; then docs, `tests/configs/dryrun_majiq_laddr.yml` header and `Snakefile.github` re-pointed; the tag was held until M2
   passed). `github()` dry run of `all` at the tag (job 8407193, `t22/gh_dry.sh`, fork entries cleared from the source cache, `host-github-v015`
-  config): fetched a8720eb (= remote), GH_DRY_TAG_EXIT=0, 508 jobs, no UnicodeEncodeError.
+  config = `tests/host/config_laddr.yaml`): fetched a8720eb (= remote), GH_DRY_TAG_EXIT=0, 508 jobs, no UnicodeEncodeError.
 - `pytest tests/unit -q`: 151 passed (local).
+- Review fixes (after the tag; docs, tests and the compare tool only, tag unmoved):
+  - pheast command lines of M2 (`t22/cmds_pheast_m2.sh` = `host-github-v014/cmds.sh` for v015, job 8407214, env pantry-baseline-pheno; `Snakefile.github`
+    now fetches the tag, whose pheast equals 54423dc's): CMDS_EXIT=0, 17 vs 17 lines, CMDS_IDENTICAL. With PHENO_COMPARE_EXIT=1 (`unnorm/alt_TSS.bed`,
+    1.2e-3 > 0) as the one exception, M2 met the whole Task 21 bar.
+  - R12 amendment (`docs/module-status.md`): `compare_outputs.py --noise` takes two or more runs; envelope = 2× max |diff| over all pairs. Job 8407236
+    (`t22/r12a.sh`, `t22/pairtable.py`; reports and `pairs_{rest,ir}.tsv` in `t22/cmp/r12a/`): noise `{archive/phenotyping, archive/phenotyping_run2,
+    views/u1_rest, views/u2_rest}` and, for intron_retention, `{archive/phenotyping_ir, archive/phenotyping_ir_run2, views/u1_ir, views/u2_ir}`;
+    candidates U1, U2, M1, M2 (view `views/m2_rest`/`m2_ir` = `host-github-v015/results/.../full` with the 8 normalised BEDs + `.tbi` from
+    `snap_unseeded/orig_beds`, since job 8407165 had put U1's there) and `host-github-v014/cmp_pheno_full`/`cmp_ir` (Task 21). The old (a65ac3e) and new
+    tool give identical two-run reports on M2 (TWO_RUN_REPORT_IDENTICAL), whose lines equal job 8407162's. `{u1,u2,m1,m2,v014}_REST_R12A_EXIT=0`,
+    `_IR_R12A_EXIT=0` for all five.
