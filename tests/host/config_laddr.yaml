@@ -1,0 +1,145 @@
+# Host config of the Task 22 github() LaDDR run M2 (run dir $H/pantry-runs/host-github-v015,
+# job 8406551, 575/575) and of the 508-job github() dry run at tag module-v0.1.5 (job 8407193).
+# Copied verbatim (below this header) from that run dir, where $H/pantry-runs/t22/mk_m2.sh wrote
+# it: Task 21's host-github-v014/config.yaml (= tests/host/config.yaml plus an intron_retention
+# group for 'full' and majiq_container) plus a 'laddr' block for 'full' (upstream's LaDDR
+# defaults, dataset_name pantry, all 8 regress_modalities).
+# To reproduce: copy to config.yaml in a run dir with the input/ links of tests/host/config.yaml,
+# set majiq_container to your MAJIQ image (README, "MAJIQ (intron_retention)"; the path below is
+# the HPC .sif of Task 21), and run tests/host/Snakefile.github (see tests/hpc/README.md, Task 22).
+pantry:
+  phenotyping:
+    majiq_container: /data/hps/assoc/private/gdml/user/twil15/pantry-runs/t21/majiq.sif
+    references:
+      grch38_chr1:
+        genome: input/phenotyping/ref/Homo_sapiens.GRCh38.dna.primary_assembly.chr1_0-2Mb.fa
+        annotation: input/phenotyping/ref/Homo_sapiens.GRCh38.106.chr1_0-2Mb.gtf
+        edit_sites_bed: input/phenotyping/ref/All.AG.stranded.annovar.Hg38_multianno.AnnoAlu.AnnoRep.NR.chr1_0-2Mb.nochr.bed
+    datasets:
+      full:
+        reference: grch38_chr1
+        samples: input/phenotyping/samples.txt
+        fastq_map: input/phenotyping/fastq_map.txt
+        fastq_dir: input/phenotyping/fastq
+        paired_end: true
+        read_length: 75
+        modality_groups:
+          alt_TSS_polyA:
+            files:
+            - alt_TSS.bed.gz
+            - alt_TSS.bed.gz.tbi
+            - alt_TSS.phenotype_groups.txt
+            - alt_polyA.bed.gz
+            - alt_polyA.bed.gz.tbi
+            - alt_polyA.phenotype_groups.txt
+          expression:
+            files:
+            - expression.bed.gz
+            - expression.bed.gz.tbi
+            - isoforms.bed.gz
+            - isoforms.bed.gz.tbi
+            - isoforms.phenotype_groups.txt
+          RNA_editing:
+            edit_sites_min_coverage: 20
+            edit_sites_min_samples: 10
+            edit_sites_min_samples_fraction: 0.1
+            edit_sites_cluster: false
+            edit_sites_correlation_threshold: 0.9
+            files:
+            - RNA_editing.bed.gz
+            - RNA_editing.bed.gz.tbi
+            - RNA_editing.phenotype_groups.txt
+            - RNA_editing.site_to_phenotype.tsv
+          splicing:
+            files:
+            - splicing.bed.gz
+            - splicing.bed.gz.tbi
+            - splicing.phenotype_groups.txt
+          stability:
+            files:
+            - stability.bed.gz
+            - stability.bed.gz.tbi
+          intron_retention:
+            psicov_batch_size: 25
+            min_experiments: 0.01
+            files:
+            - intron_retention.bed.gz
+            - intron_retention.bed.gz.tbi
+            - intron_retention.phenotype_groups.txt
+        cross_modality:
+          modalities:
+          - alt_polyA
+          - alt_TSS
+          - expression
+          - isoforms
+          - RNA_editing
+          - splicing
+          - stability
+        laddr:
+          enabled: true
+          dataset_name: pantry
+          use_existing_bins: false
+          regress_modalities:
+          - alt_TSS
+          - alt_polyA
+          - expression
+          - intron_retention
+          - isoforms
+          - RNA_editing
+          - splicing
+          - stability
+          bam_coverage_threads: 4
+          bam_coverage_bin_size: 1
+          min_samples_expressed: 0.5
+          binning_method: adaptive_diffvar
+          batch_size: 40
+          max_bin_width: 1024
+          adaptive_max_samples: 256
+          adaptive_bins_per_gene: 256
+          adaptive_min_mean_total_covg: 128
+          adaptive_max_corr: 0.8
+          model_var_explained_max: 0.8
+          model_n_pcs_max: 16
+  pheast:
+    defaults:
+      geno_prefix: input/pheast/GEUVADIS.445_samples.GRCh38.chr1_120Mb
+      qtl_min_allele_count: 10
+      twas_snps: input/pheast/ld_snps_chr1.txt
+      twas_models_per_job: 200
+      twas_threads: 4
+      modalities:
+        alt_polyA:
+          grouped: true
+        alt_TSS:
+          grouped: true
+        expression:
+          grouped: false
+        isoforms:
+          grouped: true
+        RNA_editing:
+          grouped: true
+        splicing:
+          grouped: true
+        stability:
+          grouped: false
+      analyses:
+        heritability:
+          files:
+          - '{modality}.hsq.tsv'
+        qtl:
+          files:
+          - '{modality}.cis_qtl.txt.gz'
+          - '{modality}.cis_independent_qtl.txt.gz'
+        twas:
+          files:
+          - '{modality}.tar.bz2'
+    datasets:
+      geuvadis:
+        phenotype_dir: input/pheast/phenotypes
+        samples: input/pheast/samples.txt
+        modalities:
+          intron_retention:
+            grouped: true
+      chained:
+        phenotype_dir: results/pantry/phenotypes/full
+        samples: input/phenotyping/samples.txt
