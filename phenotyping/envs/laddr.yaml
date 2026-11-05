@@ -1,8 +1,12 @@
 # LaDDR release v1.0.0 from its repository, with the Python stack of the test
 # baseline env (tests/hpc/envs/baseline-pheno.lock.txt): every conda package,
-# transitive ones included, as name=version=build from that lock, except scipy
-# (LaDDR requires scipy<1.17; the lock has 1.17.1, which pip would silently
-# replace) and icu (unpinned; it resolves to the lock's 73.2=h59595ed_0).
+# transitive ones included, as name=version=build from that lock, with three
+# exceptions. scipy is 1.16.3 (LaDDR requires scipy<1.17; the lock has 1.17.1,
+# which pip would silently replace). scikit-learn is 1.5.2, as in LaDDR's
+# requirements.txt: with the lock's 1.9.1, `laddr coverage` fails (PCA on a
+# frame with duplicate integer column names, which 1.9.1's feature-name check
+# rejects). icu is unpinned (it resolves to the lock's
+# 73.2=h59595ed_0).
 # pyBigWig, matplotlib (scikit-fda), pillow, wrapt and cffi are in the lock too,
 # so they are pinned here rather than left to pip (Task 22).
 channels:
@@ -14,7 +18,7 @@ dependencies:
   - numpy=1.26.4=py312heda63a1_0
   - pandas=2.3.3=py312hf79963d_1
   - scipy=1.16.3=py312h54fa4ab_2
-  - scikit-learn=1.9.1=np2py312h91ec553_1
+  - scikit-learn=1.5.2=py312h7a48858_1
   - gtfparse=2.5.0=pyh7cba7a3_0
   - polars=0.20.31=py312hd26010a_1
   - pyarrow=16.1.0=py312h8da182e_1
