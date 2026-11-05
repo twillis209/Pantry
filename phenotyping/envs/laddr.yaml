@@ -1,9 +1,10 @@
-# Best effort (LaDDR is verified by dry run only): LaDDR release v1.0.0 from its
-# repository, with the Python stack of the test baseline env
-# (tests/hpc/envs/baseline-pheno.lock.txt): every conda package, transitive ones
-# included, as name=version=build from that lock, except scipy (LaDDR requires
-# scipy<1.17; the lock has 1.17.1, which pip would silently replace) and icu
-# (unpinned; it resolves to the lock's 73.2=h59595ed_0).
+# LaDDR release v1.0.0 from its repository, with the Python stack of the test
+# baseline env (tests/hpc/envs/baseline-pheno.lock.txt): every conda package,
+# transitive ones included, as name=version=build from that lock, except scipy
+# (LaDDR requires scipy<1.17; the lock has 1.17.1, which pip would silently
+# replace) and icu (unpinned; it resolves to the lock's 73.2=h59595ed_0).
+# pyBigWig, matplotlib (scikit-fda), pillow, wrapt and cffi are in the lock too,
+# so they are pinned here rather than left to pip (Task 22).
 channels:
   - conda-forge
   - bioconda
@@ -18,6 +19,10 @@ dependencies:
   - polars=0.20.31=py312hd26010a_1
   - pyarrow=16.1.0=py312h8da182e_1
   - pyyaml=6.0.3=py312hfd18d64_2
+  - matplotlib-base=3.10.1=py312hd3ec401_0
+  - pillow=10.3.0=py312hdcec9eb_0
+  - pybigwig=0.3.22=py312hfa7e9eb_3
+  - wrapt=1.17.3=py312h4c3975b_1
   - pip=26.2.2=pyh8b19718_0
   # Transitive dependencies, from the same lock.
   - _openmp_mutex=4.5=20_gnu
@@ -34,16 +39,26 @@ dependencies:
   - aws-checksums=0.1.18=h83b837d_6
   - aws-crt-cpp=0.26.9=he3a8b3b_0
   - aws-sdk-cpp=1.11.329=hba8bd5f_3
+  - brotli=1.1.1=h505cf86_0
+  - brotli-bin=1.1.1=h9908984_0
   - bzip2=1.0.8=hda65f42_10
   - c-ares=1.34.9=hebe6cf0_0
   - ca-certificates=2026.10.23=hbd8a1cb_0
+  - cffi=2.1.1=py312h703531f_3
   - cloudpickle=3.1.2=pyhcf101f3_1
+  - contourpy=1.3.3=py312h0a2e395_4
+  - cycler=0.12.1=pyhcf101f3_2
+  - fonttools=4.68.0=py312hfd18d64_0
+  - freetype=2.12.1=h267a509_2
   - gflags=2.2.2=h5888daf_1005
   - glog=0.7.1=hbabe93e_0
   - joblib=1.6.0=pyhcf101f3_0
   - keyutils=1.6.3=h7cc23a3_1
+  - kiwisolver=1.5.1=py312h9be0db6_3
   - krb5=1.21.3=h659f571_0
+  - lcms2=2.16=hb7c19ff_0
   - ld_impl_linux-64=2.46.1=bootstrap_ha15bf96_3
+  - lerc=4.3.0=he78707d_0
   - libabseil=20240116.2=cxx17_he02047a_1
   - libarrow=16.1.0=hcb6531f_6_cpu
   - libarrow-acero=16.1.0=hac33072_6_cpu
@@ -56,6 +71,7 @@ dependencies:
   - libcblas=3.11.0=11_h0358290_openblas
   - libcrc32c=1.1.2=h9c3ff4c_0
   - libcurl=8.8.0=hca28451_1
+  - libdeflate=1.25=hd45a770_1
   - libedit=3.1.20260512=pl5321h373387f_0
   - libev=4.33=h280c20c_3
   - libevent=2.1.12=h5348a74_2
@@ -70,6 +86,7 @@ dependencies:
   - libgoogle-cloud-storage=2.24.0=h3d9a0c8_0
   - libgrpc=1.62.2=h15f2491_0
   - libiconv=1.18=h0cb94f2_3
+  - libjpeg-turbo=3.2.1=h7cc23a3_0
   - liblapack=3.11.0=11_h47877c9_openblas
   - liblzma=5.8.3=hb03c661_1
   - liblzma-devel=5.8.3=hb03c661_1
@@ -77,6 +94,7 @@ dependencies:
   - libnsl=2.0.1=hb9d3cd8_1
   - libopenblas=0.3.34=pthreads_hf13c14d_2
   - libparquet=16.1.0=h6a7eafb_6_cpu
+  - libpng=1.6.43=h2797004_0
   - libprotobuf=4.25.3=h08a7969_0
   - libre2-11=2023.09.01=h5a48ba9_2
   - libsqlite=3.46.0=hde9e2c9_0
@@ -84,22 +102,31 @@ dependencies:
   - libstdcxx=16.2.0=h934c35e_7
   - libstdcxx-ng=16.2.0=hdf11a46_7
   - libthrift=0.19.0=hb90f79a_1
+  - libtiff=4.6.0=h1dd3fc0_3
   - libutf8proc=2.8.0=hf23e847_1
   - libuuid=2.42.4=hcfc3c73_0
+  - libwebp-base=1.4.0=hd590300_0
+  - libxcb=1.15=h0b41bf4_0
   - libxcrypt=4.4.38=h280c20c_0
   - libxml2=2.12.7=hc051c1a_1
   - libzlib=1.2.13=h4ab18f5_6
   - lz4-c=1.9.4=hcb278e6_0
+  - munkres=1.1.4=pyhd8ed1ab_1
   - narwhals=2.28.0=pyh5ded981_0
   - ncurses=6.6=hdb14827_1
+  - openjpeg=2.5.2=h488ebb8_0
   - openssl=3.6.5=h781a0a9_0
   - orc=2.0.1=h17fec99_1
   - packaging=25.0=pyh29332c3_1
+  - pthread-stubs=0.4=h7cc23a3_1004
   - pyarrow-core=16.1.0=py312h5429d62_1_cpu
+  - pycparser=3.12=pyh5ded981_1
+  - pyparsing=3.3.3=pyh5ded981_0
   - python-dateutil=4.0.0=pyh5ded981_0
   - python-tzdata=2026.6=pyh5ded981_0
   - python_abi=3.12=9_cp312
   - pytz=2026.6=pyh5ded981_0
+  - qhull=2020.2=h434a139_5
   - re2=2023.09.01=h7f4b329_2
   - readline=8.3=hd6e31c0_1
   - s2n=1.4.15=he19d79f_0
@@ -108,15 +135,19 @@ dependencies:
   - threadpoolctl=3.7.0=pyhc455866_0
   - tk=8.6.13=noxft_h4845f30_101
   - tzdata=2026e=h5d301ff_0
+  - unicodedata2=18.0.0=py312h5cc1888_0
   - wheel=0.48.0=pyhd8ed1ab_0
+  - xorg-libxau=1.0.12=h7cc23a3_2
+  - xorg-libxdmcp=1.1.5=h7cc23a3_2
   - xz=5.8.3=ha02ee65_1
   - xz-gpl-tools=5.8.3=ha02ee65_1
   - xz-tools=5.8.3=hb03c661_1
   - yaml=0.2.5=hebe6cf0_3
+  - zlib=1.2.13=h4ab18f5_6
   - zstd=1.5.6=ha6fb4c9_0
   - pip:
-      # LaDDR's other dependencies (bx-python, pyBigWig, scikit-fda, statsmodels,
-      # tqdm and theirs) are in no lock and resolve at build time, except
+      # LaDDR's other dependencies (bx-python, scikit-fda, statsmodels, tqdm
+      # and theirs) are in no lock and resolve at build time, except
       # multimethod: scikit-fda 0.10.1 fails to import with multimethod 2.x.
       - multimethod==1.12
       # Release v1.0.0.
