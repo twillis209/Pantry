@@ -12,7 +12,9 @@ from pathlib import Path
 # FUSION override keys of module-v0.1.0/v0.1.1, removed once FUSION moved into
 # the container image; rejected wherever they appear, as they would be ignored.
 _REMOVED_KEYS = ("fusion_dir", "gcta", "gcta_url", "gcta_sha256")
-# Top-level keys of the legacy single-dataset format.
+# Top-level keys of the legacy single-dataset format. qtl_seed is new (the
+# module's), but a top-level qtl_seed is still read by the shim, so it is
+# rejected beside 'datasets' like the others (qtl_cis_window is not listed).
 _LEGACY_TOP_LEVEL_KEYS = (
     "phenotype_dir",
     "geno_prefix",
@@ -21,6 +23,7 @@ _LEGACY_TOP_LEVEL_KEYS = (
     "analyses",
     "qtl_min_allele_count",
     "qtl_maf_threshold",
+    "qtl_seed",
     "twas_snps",
     "twas_models_per_job",
     "twas_threads",
@@ -196,6 +199,16 @@ def qtl_filter_args(ds: dict, window: bool = True) -> str:
     if window and ds.get("qtl_cis_window") is not None:
         args += f" --window {int(ds['qtl_cis_window'])}"
     return args
+
+
+def qtl_seed_arg(ds: dict) -> str:
+    """run_tensorqtl.py --seed for the cis and cis_independent rules.
+
+    Empty when qtl_seed is null (unseeded, as upstream).
+    """
+    if ds.get("qtl_seed") is None:
+        return ""
+    return f"--seed {int(ds['qtl_seed'])}"
 
 
 def dataset_targets(ds: dict) -> list:

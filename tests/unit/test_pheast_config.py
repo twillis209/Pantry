@@ -266,6 +266,7 @@ def test_schema_defaults_land_per_dataset(validate):
         assert ds["twas_models_per_job"] == 200
         assert "qtl_cis_window" not in ds  # run_tensorqtl.py's default applies
         assert "qtl_maf_threshold" not in ds
+        assert ds["qtl_seed"] == 0
     assert out["datasets"]["d1"]["twas_threads"] == 4
     assert out["datasets"]["d2"]["twas_threads"] == 8
 
@@ -277,6 +278,10 @@ def test_schema_defaults_land_per_dataset(validate):
         {"twas_threads": 0},
         {"qtl_min_allele_count": "10"},
         {"qtl_cis_window": 1.5},
+        {"qtl_seed": 1.5},
+        {"qtl_seed": "0"},
+        {"qtl_seed": -1},
+        {"qtl_seed": 2**32},
         {"modalities": {"expression": {}}},
         {"analyses": {"eqtl": {"files": ["x"]}}},
     ],
@@ -422,3 +427,55 @@ def test_covariates_keeps_plink_utils_beside_its_script():
     assert '"fusion_twas", "utils", "plink_utils.R"' in r_script
     rule = (PHEAST / "steps" / "covariates.smk").read_text()
     assert 'script("fusion_twas/utils/plink_utils.R")' in rule
+
+
+def test_qtl_seed_null_survives_validation(validate):
+    # null disables seeding; the schema default must not replace it.
+    out = cfg.normalise(new_config(qtl_seed=None))
+    validate(out)
+    assert out["datasets"]["d1"]["qtl_seed"] is None
+    out = cfg.normalise(new_config(qtl_seed=2**32 - 1))
+    validate(out)
+
+
+@pytest.mark.parametrize(
+    "ds, arg",
+    [
+        ({"qtl_seed": 0}, "--seed 0"),
+        ({"qtl_seed": 7}, "--seed 7"),
+        ({"qtl_seed": None}, ""),
+        ({}, ""),
+    ],
+)
+def test_qtl_seed_arg(ds, arg):
+    assert cfg.qtl_seed_arg(ds) == arg
+
+
+def test_qtl_seed_not_in_filter_args():
+    # genotype_qc and trans take the filter args but no seed.
+    ds = {"qtl_min_allele_count": 10, "qtl_seed": 3}
+    assert cfg.qtl_filter_args(ds) == "--min_allele_count 10"
+    assert cfg.qtl_filter_args(ds, window=False) == "--min_allele_count 10"
+
+
+def test_legacy_top_level_qtl_seed(validate):
+    c = legacy_config()
+    c["qtl_seed"] = 3
+    out = cfg.normalise(c)
+    validate(out)
+    assert out["datasets"]["default"]["qtl_seed"] == 3
+    c["qtl_seed"] = None
+    out = cfg.normalise(c)
+    validate(out)
+    assert out["datasets"]["default"]["qtl_seed"] is None
+    # Unset in the legacy config: the default applies.
+    out = cfg.normalise(legacy_config())
+    validate(out)
+    assert out["datasets"]["default"]["qtl_seed"] == 0
+
+
+def test_top_level_qtl_seed_beside_datasets_rejected():
+    c = new_config()
+    c["qtl_seed"] = 1
+    with pytest.raises(ValueError, match="qtl_seed"):
+        cfg.normalise(c)

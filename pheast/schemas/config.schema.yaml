@@ -68,6 +68,15 @@ $defs:
         description: >-
           cis-window size passed to run_tensorqtl.py --window. No default here:
           when unset, run_tensorqtl.py's own default (1000000) applies.
+      qtl_seed:
+        type: [integer, "null"]
+        minimum: 0
+        maximum: 4294967295
+        default: 0
+        description: >-
+          Seed for tensorQTL cis and cis_independent mapping (permutations and
+          the random tie-break), passed as run_tensorqtl.py --seed; null runs
+          unseeded, as upstream. numpy accepts 0 to 2**32 - 1.
       twas_snps:
         type: string
         description: SNP IDs to keep for TWAS weights (e.g. the LD reference panel's).
