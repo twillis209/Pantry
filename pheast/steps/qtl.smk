@@ -32,6 +32,15 @@ def qtl_filter_args(wildcards):
     return pantry_config.qtl_filter_args(ds(wildcards))
 
 
+def qtl_seed_arg(wildcards):
+    """run_tensorqtl.py --seed for the {dataset}, or nothing if qtl_seed is null.
+
+    A wildcards-only function, so its value is a plain param and a changed
+    seed triggers a rerun.
+    """
+    return pantry_config.qtl_seed_arg(ds(wildcards))
+
+
 def genotype_qc_filter_args(wildcards):
     """The same filter settings for genotype_qc.py, which takes no --window."""
     return pantry_config.qtl_filter_args(ds(wildcards), window=False)
@@ -84,6 +93,7 @@ rule tensorqtl_cis:
         qtl_dir=parent_dir,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
+        seed_arg=qtl_seed_arg,
     shell:
         ## Cluster environments may require cuda to be loaded, e.g.:
         # module load cuda
@@ -96,6 +106,7 @@ rule tensorqtl_cis:
             --covariates {input.covar} \
             {params.groups_arg} \
             {params.filter_args} \
+            {params.seed_arg} \
             --mode cis
         """
 
@@ -121,6 +132,7 @@ rule tensorqtl_cis_independent:
         geno_prefix=geno_input_prefix,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
+        seed_arg=qtl_seed_arg,
     shell:
         ## Cluster environments may require cuda to be loaded, e.g.:
         # module load cuda
@@ -133,6 +145,7 @@ rule tensorqtl_cis_independent:
             --cis_output {input.cis} \
             {params.groups_arg} \
             {params.filter_args} \
+            {params.seed_arg} \
             --mode cis_independent
         """
 

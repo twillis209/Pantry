@@ -52,6 +52,12 @@ datasets:
     # Optionally set a fixed MAF threshold instead of the count-derived threshold.
     # qtl_maf_threshold: 0.05
 
+    # Seed for cis and cis_independent mapping (tensorQTL's permutations and
+    # its random tie-break between equally strong top variants), so reruns
+    # give the same results on the same device type (GPU and CPU results still
+    # differ slightly). Default 0; null runs unseeded, as upstream Pantry.
+    # qtl_seed: 0
+
     # -----------------------------------------------------------------------------
     # TWAS Options
     # -----------------------------------------------------------------------------
