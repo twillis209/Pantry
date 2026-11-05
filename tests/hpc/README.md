@@ -492,8 +492,8 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   and, to make the binaries equal too, conda-forge `scipy=1.16.3=py312h54fa4ab_2` in the clone instead of the pip wheel (job 8406307; the scipy
   trees and `_flapack` are byte-identical to the module env's). The clone's explicit list now differs from the lock in exactly scikit-learn and
   scipy, as the module's `laddr.yaml` env (job 8406304: 135 conda packages, the rest in the lock; `laddr --help` OK).
-- Resumed U1 8406309, U2 8406310, M1 8406311 with `--forcerun laddr_setup` (10/10 each, about 8 min): every LaDDR step from `laddr_setup`
-  on ran under the final envs; bigWigs and all non-LaDDR outputs come from the first attempt.
+- Resumed U1 8406309, U2 8406310, M1 8406311 (M1 now at 54423dc, env `conda-envs/640155e0…`) with `--forcerun laddr_setup` (10/10 each,
+  about 8 min): every LaDDR step from `laddr_setup` on ran under the final envs; bigWigs and all non-LaDDR outputs come from the first attempt.
 - Compare 8406340 (`compare.sh m1 … u2`), 8406341 (`cmds.sh`):
   - bigWigs (bamCoverage, 16), `info/` (5) and `gene_bins/` (3) byte-identical in U1, U2 and M1; `coverage_manifest.tsv` identical.
   - `covg_norm/pantry/batch_*.npy` (3 of 7 files; the `bins.tsv.gz` and `samples.txt` are identical), `models/` (3) and the latent table differ U1~U2
@@ -513,7 +513,7 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   0.8 * min(X.shape)`), seeded from numpy's global RNG, which LaDDR never seeds. LaDDR v1.0.0 is nondeterministic run to run (upstream
   nondeterminism, not the refactor); the substitution run M1s (`cp -a` of M1 with U1's 8 regressed BEDs + `.tbi`, job 8406345) differs from U1 the same way.
 - Seeded runs (R29 addendum): `seed/sitecustomize.py` seeds numpy's global RNG (`np.random.seed(0)`) in every Python process when `T22_SEED` is set
-  (and logs it in the `laddr` processes); `PYTHONPATH=t22/seed T22_SEED=0`, all rerun with `--forcerun laddr_config`: U1b 8406372, U1c (another
+  (and logs it in the `laddr` processes). The seed applies to every Python process of the rerun jobs, on both sides alike; `PYTHONPATH=t22/seed T22_SEED=0`, all rerun with `--forcerun laddr_config`: U1b 8406372, U1c (another
   `cp -a` of U1) 8406373, M1s 8406432. Snakemake drops `PYTHONPATH` for conda jobs, so M1s needed `--conda-not-block-search-path-envvars` (the
   first seeded M1s, 8406374, had no seed line in its `laddr_coverage` log; discarded). Compare 8406545 (`compare_seed.sh m1s`):
   - U1b vs U1c: every LaDDR file byte-identical (bigWigs 16, info 5, gene_bins 3, covg_norm 7, models 3, latent table, config, manifest) and the 4 finals
@@ -555,3 +555,8 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   chain, `combine_modalities` and the groups files of the substituted BEDs; nothing in pheast). Compare 8407187 (`compare_seed.sh m2s`): seed
   line in the `laddr_coverage` log; **M2s vs U1b byte-identical**: the 4 finals (`compare_outputs.py --noise u1b u1c` exit 0, MATCH), `covg_norm`
   7/7, models 3/3, latent table, info, gene_bins, bigWigs, manifest; config CONFIG_SAME_NORM.
+- Tag `module-v0.1.5` (annotated) = a8720eb (stage code = 54423dc, which M1 and the M2 run fetched: `git diff 54423dc a8720eb -- phenotyping
+  pheast` is empty; then docs, `tests/configs/dryrun_majiq_laddr.yml` header and `Snakefile.github` re-pointed; the tag was held until M2
+  passed). `github()` dry run of `all` at the tag (job 8407193, `t22/gh_dry.sh`, fork entries cleared from the source cache, `host-github-v015`
+  config): fetched a8720eb (= remote), GH_DRY_TAG_EXIT=0, 508 jobs, no UnicodeEncodeError.
+- `pytest tests/unit -q`: 151 passed (local).
