@@ -19,6 +19,7 @@ parser.add_argument("--window", type=int, default=1000000, help="cis-window size
 parser.add_argument("--output_dir", help="For cis_nominal mode, output directory")
 parser.add_argument("--min_allele_count", type=int, default=10, help="Minimum allele count used to derive the MAF filter. Default 10. Set to 0 to disable when --maf_threshold is not provided.")
 parser.add_argument("--maf_threshold", type=float, help="Fixed MAF threshold. Overrides --min_allele_count if provided.")
+parser.add_argument("--seed", type=int, help="For cis and cis_independent modes, seed for the permutations (numpy) and the random tie-break (torch), for reproducible results")
 parser.add_argument("--mode", required=True, help="Run mode: currently cis, cis_independent, cis_nominal, genome_wide, or trans. genome_wide runs `map_trans` without removing cis-variants, returning all associations with p<1e-5. trans does the same but removes all pairs with TSS distance < 5 Mb. All modes use the configured MAF threshold.")
 args = parser.parse_args()
 
@@ -79,13 +80,18 @@ keep = pheno_pos['chr'].isin(chroms)
 pheno = pheno.loc[keep]
 pheno_pos = pheno_pos.loc[keep]
 
+# tensorQTL's seed= seeds numpy (permutations); random_tiebreak draws from
+# torch's CPU generator (torch.randint without a device), seeded here.
+if args.seed is not None:
+    torch.manual_seed(args.seed)
+
 if args.mode == "cis":
-    d = cis.map_cis(genotype_df, variant_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True)
+    d = cis.map_cis(genotype_df, variant_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
     tensorqtl.calculate_qvalues(d, qvalue_lambda=0.85)
     d.to_csv(args.output, sep="\t", float_format="%.6g")
 elif args.mode == "cis_independent":
     cis_df = pd.read_csv(args.cis_output, sep="\t", index_col=0)
-    d = cis.map_independent(genotype_df, variant_df, cis_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True)
+    d = cis.map_independent(genotype_df, variant_df, cis_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
     d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
 elif args.mode == "genome_wide":
     d = trans.map_trans(genotype_df, pheno, covariates_df=covar, maf_threshold=maf_threshold)
