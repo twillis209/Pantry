@@ -1,5 +1,6 @@
-# Dry-run-only config for the MAJIQ (intron_retention) and LaDDR rules, which
-# are not part of the run-time test configs. Two datasets on two references:
+# Dry-run-only config for the MAJIQ (intron_retention) and LaDDR rules, covering
+# what the run-time configs (phenotyping_baseline_{ir,laddr}.yml) do not: a
+# given annotation_gff3 and existing LaDDR bins. Two datasets on two references:
 # one reference converts its GTF to GFF3 for MAJIQ, the other gives
 # annotation_gff3 (any existing file will do for a dry run; the GTF is reused).
 # LaDDR builds bins for one dataset and links existing (here fake) bins for
