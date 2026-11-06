@@ -572,3 +572,42 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
     `snap_unseeded/orig_beds`, since job 8407165 had put U1's there) and `host-github-v014/cmp_pheno_full`/`cmp_ir` (Task 21). The old (a65ac3e) and new
     tool give identical two-run reports on M2 (TWO_RUN_REPORT_IDENTICAL), whose lines equal job 8407162's. `{u1,u2,m1,m2,v014}_REST_R12A_EXIT=0`,
     `_IR_R12A_EXIT=0` for all five.
+
+## Task 23: seeded tensorQTL (R30, module-v0.1.6)
+- Scratch `$H/pantry-runs/t23` (scripts `run.sh`, `ident.sh`, `gzdiff.sh`, `compare.sh`, `params.sh`, `params2.sh`, `charact.sh`, `upgrade.sh`, `cpusetup.sh`, `cpu.sh`,
+  `cpucheck.sh`, `gh_run.sh`, `compare_gh.sh`, `cmds_gh.sh`, `final_checks.sh`, `gh_dry.sh`; job logs in `t23/logs`). `$H/Pantry` at bb0b690 for the gate runs, then ef7fa12
+  (which changes only `Snakefile.github`). Image `pantry-tensorqtl@sha256:65a42f9f…`.
+- Code: `run_tensorqtl.py --seed` (499d171), `qtl_seed` in schema, shim and `qtl_seed_arg` (a45f030), rules and `pheast/config.yml` (bb0b690). tensorqtl 1.0.10 `cis.py` in the image
+  (job 8433373): `:66 ix = ix[torch.randint(0, len(ix), [1])[0]]` (no device, no generator: torch's default CPU generator, seeded by `torch.manual_seed`), `:674`/`:844
+  np.random.seed(seed)`, followed by `np.random.permutation` at `:675`/`:845`.
+- Gate-3 config, fresh run dirs `t23/gpu-{s0a,s0b,s1}` (`run.sh`: standalone pheast, `tests/profile`, tensorQTL on GPU; `gpu-s1` has `qtl_seed: 1` in its config.yml): jobs 8425913,
+  8425914, 8425915, RUN_EXIT=0 for all. Each of the 32 tensorQTL job logs of s0a and s0b: `using GPU (NVIDIA A100-SXM4-80GB)`, once `using seed 0`; the 16 of s1: A100, `using seed 1`.
+- GPU identity (`ident.sh`, job 8428906; `gzdiff.sh`, job 8433373), s0a vs s0b, decompressed: 16 of 16 same (cis_qtl and cis_independent_qtl for alt_polyA, alt_TSS, expression, intron_retention,
+  isoforms, RNA_editing, splicing, stability). Raw `.gz` `cmp`: same in 3 (`isoforms.cis_qtl`, `splicing.cis_independent_qtl`, `stability.cis_independent_qtl`, written in the same second);
+  the other 13 differ only at bytes 5-8 (gzip MTIME; sizes equal, everything after byte 8 identical).
+- Different seed (`ident.sh`, job 8428907), s0a vs s1: 16 of 16 DIFF; every data row differs in each file; `cis_independent` rows differ in 7 of 8 modalities (e.g. splicing 94/96, expression 117/117;
+  counts without the header). `charact.sh` (job 8429049, `t23/s0a_vs_s1.md`): permutation columns differ in all 16; tie-break-only variant changes in all 16; a variant change with a different p-value in only 2 files.
+- CPU identity: `cpusetup.sh` (job 8428910; `logs/cpu-{a,b}.log`, code ef7fa12): `t23/cpu-{a,b}` = `cp -a` of `gpu-s0a`, rerun with `--forcerun tensorqtl_cis tensorqtl_cis_independent` and `t23/profile-cpu`
+  (`tests/profile` without the GPU `set-resources`). `--forcerun` is variadic, so its target paths were read as rule names and all 8 modalities ran, more than the 2 the brief asked for. 17/17 steps, RUN_EXIT=0 for both.
+  `cpucheck.sh` (job 8432254): all 32 logs `WARNING: using CPU!`, once `using seed 0`; `sacct`: 16 + 16 jobs on `cpu-core`, 1 CPU, COMPLETED, elapsed 3:48 to 1:25:25 (a), 3:48 to 1:31:46 (b). cpu-a vs cpu-b decompressed: 16 of 16 same.
+  Raw `.gz`: 0 same; all 16 differ only at bytes 5-8 (sizes equal, everything after byte 8 identical).
+- GPU vs CPU (`charact.sh`, job 8432254, `t23/gpu_vs_cpu.md`), expected to differ (reduction order): `pval_nominal` and `slope` in 16 of 16 files; `slope_se` in 14; a different top variant with a different
+  p-value in 13; permutation columns in all 16.
+- R22 against the baseline, standalone (`compare.sh gpu-s0a`, job 8428908): COMPARE_EXIT=1, 79 mismatches, all in the 16 `*.cis_qtl`/`*.cis_independent_qtl` files (non-blocking, R22), `--noise pheast_run1 pheast_run2` (the only baseline
+  pheast runs); heritability ×8, TWAS ×8, genotype_qc no mismatch; CHECK_EXIT=0, 33/33; covar inputs 21 SAME, `geno_pruned.log` DIFF (paths, host, times, as in every run); BEDs, groups and genotypes read in place from
+  `pantry-testdata/pheast/input`. Command lines: the normalisation counts `--seed`, then strips it (`sed -E "s# --seed [0-9]+##"`), then compares: 17 lines, `--seed 0` on 16 (cis 8, cis_independent 8), genotype_qc none, no other seed; CMDS_IDENTICAL. The stripping lives
+  in `t23/compare.sh` and `t23/cmds_gh.sh`; the repository has no such script (`tests/compare_outputs.py` does not read commands).
+- `qtl_seed` as a param (`params.sh`, job 8428909; `params2.sh`, job 8428964, both `--rerun-triggers params` in `gpu-s0a`; the profile itself has `mtime`): unchanged config, nothing to do; `--config qtl_seed=5`, 8 + 8 jobs (`Params have changed … before: '--seed 0' now: '--seed 5'` on
+  the 8 cis jobs; the 8 cis_independent jobs run as their input changes); `--config qtl_seed=null`, EXIT=1 (a string; schema rejects it); `qtl_seed: null` in a config file, 8 + 8 jobs (`now: ''`), and its command lines have no `--seed` and equal the baseline's without stripping (NULL_CMDS_IDENTICAL_UNSTRIPPED).
+- Upgrade (`upgrade.sh`, job 8429050): dry run of `tested` in `host-github-v014` (Task 21's run, no seed) with bb0b690 and `--rerun-triggers params`: 8 + 8 tensorQTL jobs and the target, nothing else (`before: <nothing exclusive> now: '--seed 0'`).
+- Full `github()` host run, `$H/pantry-runs/host-github-v016` (config as `host-github-v014`; `tests/host/profile`; `Snakefile.github` at ef7fa12 fetching commit bb0b690). Job 8426134 (`t23/gh_run.sh`, Snakemake 9.27.1, `--slurm-keep-successful-logs`): DRY_ALL_EXIT=0
+  (481), DRY_TESTED_EXIT=0 (422), RUN_EXIT=0, 548/548, 1:47:49 (job logs: `t23/logs`, not the run dir). MAJIQ jobs 8428574, 8428874, 8428901: `Activating singularity image …/t21/majiq.sif`, no conda line. All 16 tensorQTL jobs: A100, `using seed 0`.
+- Compare 8429054 (`t23/compare_gh.sh`), 8429055 (`t23/cmds_gh.sh`), 8433373 (`t23/final_checks.sh`, env pantry-baseline-pheast):
+  - phenotyping `full` single-pair `--noise`: PHENO_COMPARE_EXIT=0 (`cmp_pheno_full`, 27 files); PHENO_CHECK_EXIT=0 (26/26).
+  - phenotyping under the R12 amendment (noise `archive/phenotyping`, `archive/phenotyping_run2`, `t22/views/u1_rest`, `t22/views/u2_rest`; as job 8407236; reports `host-github-v016/cmp_r12a/`): v016_REST_R12A_EXIT=0, 0 mismatches (alt_polyA 0.0835/0.444, expression 0.366/1.488,
+    isoforms 0.0835/0.426, unnorm 1.1e-3/2.8e-3, 338/676, 3.0e-3/6.1e-3; `alt_TSS` and `unnorm/alt_TSS` identical); v016_IR_R12A_EXIT=0.
+  - IR_COMPARE_EXIT=0, IR_BYTES_SAME ×4. XM_BED_SAME, XM_GROUPS_SAME (771 rows).
+  - pheast `geuvadis`: PHEAST_COMPARE_EXIT=1, 79 mismatches, all in the 16 tensorQTL files (non-blocking, R22); heritability ×8, TWAS ×8, genotype_qc none; PHEAST_CHECK_EXIT=0 (33/33); covar inputs 21 SAME, `geno_pruned.log` DIFF. CMDS_EXIT=0, 17/17, `--seed 0` on 16, genotype_qc none, CMDS_IDENTICAL after stripping.
+  - HOSTDIFF vs the Task 14 local-path run: `alt_polyA.bed.gz(.tbi)`, `unnorm/alt_polyA.bed`, `cross_modality.bed.gz(.tbi)` (kallisto noise, as before); no pheast file.
+  - **HOST_VS_S0A content same=16 diff=0**: host tensorQTL files identical decompressed to the standalone `gpu-s0a`, on the same seed and device.
+- `pytest tests/unit -q`: 174 passed (local).
