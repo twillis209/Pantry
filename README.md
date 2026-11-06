@@ -4,7 +4,7 @@ Pantry (PAN-TRanscriptomic phenotYping) is a framework for generating multimodal
 
 **Contact us** if you have a method for an additional modality that you would like to add to Pantry. Your collaboration will result in authorship on a subsequent Pantry publication, and Pantry users will be instructed to cite your original study every time they use the results in a publication.
 
-> **Module branch.** This fork's `module` branch (release `module-v0.1.5`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.14**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
+> **Module branch.** This fork's `module` branch (release `module-v0.1.6`) makes `phenotyping/` and `pheast/` importable as Snakemake modules that run many datasets in one workflow, with a new multi-dataset config format (the old format is still accepted). It needs **Snakemake ≥ 9.14**. See [Using Pantry as a module](#using-pantry-as-a-module), `CHANGES-module.md` (all changes and config migration) and `docs/module-status.md` (status and test results).
 
 The guide below begins with software environment setup, followed by a run-through with a small example dataset to test the setup and demonstrate the overall structure, and finally descriptions of the code and expected file formats so you can run Pantry on real datasets.
 
@@ -309,6 +309,8 @@ It is recommended to run the script before executing the Pheast snakemake workfl
 
 The Pheast config also lists datasets under `datasets:` (each with `phenotype_dir`, `geno_prefix`, `samples`, `modalities`, `analyses` and the QTL/TWAS settings), with an optional `defaults:` block shared by all of them; see `pheast/config.yml`. The old single-dataset format is still accepted. Outputs go to `output/<dataset>/`. FUSION, bundled in `scripts/fusion_twas/`, runs from the pinned image `ghcr.io/twillis209/pantry-fusion` (built from those files by `containers/fusion/`), so TWAS needs apptainer; nothing is downloaded at run time beyond the image.
 
+`qtl_seed` (per dataset, default `0`) seeds tensorQTL's cis and cis_independent mapping: its permutations and its random tie-break between equally strong top variants, which upstream Pantry leaves unseeded. With a seed, rerunning on the same inputs gives the same `cis_qtl` and `cis_independent_qtl` results on the same device type: the decompressed files are byte-identical (compare with `zcat`; the `.gz` files themselves differ in the write timestamp in their gzip header). GPU and CPU results still differ slightly from each other (floating-point reduction order). Set `qtl_seed: null` in the config file to run unseeded, as upstream (`--config qtl_seed=null` passes a string, which is rejected). Changing the seed reruns those jobs under Snakemake's default rerun triggers (it is a params change), but not with `rerun-triggers: mtime`, as in `tests/profile`. For the same reason, a run directory from before `module-v0.1.6` reruns its `tensorqtl_cis` and `tensorqtl_cis_independent` jobs under the default triggers, since their command lines gain `--seed 0`.
+
 #### Pheast output files
 
 TWAS batch workers automatically limit OpenBLAS, OpenMP, MKL, BLIS, and Accelerate to one thread per subprocess; `twas_threads` controls the number of phenotypes fitted concurrently. No shell environment settings are needed. Each phenotype's wall time, including input preparation and cleanup but excluding time queued for a worker, is recorded in `elapsed_seconds` in the batch status table. A sibling `<batch_start>_<batch_end>.timings.tsv` table is updated atomically after every completed phenotype, including scientific skips and failures, so completed timings remain available when a batch fails or is interrupted. An interrupted phenotype has no completed timing.
@@ -326,7 +328,7 @@ module pantry_pheno:
         pantry_intermediate="<results>/pantry/intermediate/phenotyping",
         pantry_reference="<resources>/pantry/reference",
     snakefile:
-        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.5")
+        github("twillis209/Pantry", path="phenotyping/Snakefile", tag="module-v0.1.6")
     config:
         config["pantry"]["phenotyping"]
 
@@ -338,7 +340,7 @@ module pantry_pheast:
         pantry_intermediate="<results>/pantry/intermediate/pheast",
         pantry_resources="<resources>/pantry",
     snakefile:
-        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.5")
+        github("twillis209/Pantry", path="pheast/Snakefile", tag="module-v0.1.6")
     config:
         config["pantry"]["pheast"]
 

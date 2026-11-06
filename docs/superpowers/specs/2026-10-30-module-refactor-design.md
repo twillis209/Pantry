@@ -12,7 +12,7 @@ Pantry's `phenotyping/` and `pheast/` are standalone projects run once per datas
 
 Goals: handover contract items 1–11 and acceptance criteria 1–6.
 
-Non-goals (from the handover): changing analysis logic, defaults or output formats; TWAS association/coloc; anything scPantry-specific. Also out of scope here: wrapping `pheast/scripts/prepare_phenotypes.py` (sample-ID remapping) in a rule — a host that needs it runs it itself; moving to the standard `workflow/` layout (would rewrite every path and make the upstream diff unreadable).
+Non-goals (from the handover; the one later exception is tensorQTL's default seed, `qtl_seed: 0`, ruling R30, asked for by the user on 2026-11-05): changing analysis logic, defaults or output formats; TWAS association/coloc; anything scPantry-specific. Also out of scope here: wrapping `pheast/scripts/prepare_phenotypes.py` (sample-ID remapping) in a rule — a host that needs it runs it itself; moving to the standard `workflow/` layout (would rewrite every path and make the upstream diff unreadable).
 
 Anti-goals (a technically working result that would still be a failure):
 - Any output differing from upstream `8da7787` on the test data beyond documented nondeterminism.
