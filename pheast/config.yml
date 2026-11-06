@@ -54,8 +54,10 @@ datasets:
 
     # Seed for cis and cis_independent mapping (tensorQTL's permutations and
     # its random tie-break between equally strong top variants), so reruns
-    # give the same results on the same device type (GPU and CPU results still
-    # differ slightly). Default 0; null runs unseeded, as upstream Pantry.
+    # give the same results on the same device type (shown for an NVIDIA A100
+    # and 1 CPU core; GPU and CPU results still differ slightly). Default 0; null
+    # runs unseeded, as upstream Pantry. With rerun-triggers: mtime, a changed
+    # seed reruns nothing: use -R tensorqtl_cis tensorqtl_cis_independent.
     # qtl_seed: 0
 
     # -----------------------------------------------------------------------------
