@@ -1,21 +1,22 @@
 # Pantry as a reusable, multi-dataset Snakemake module: changes
 
-Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.6` (earlier: `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
+Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.7` (earlier: `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
 Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Status and acceptance results: `docs/module-status.md`.
 Test commands and HPC run records: `tests/hpc/README.md`.
 
 **What it does.** `phenotyping/` and `pheast/` can now each be imported once as a Snakemake `module` and run any number of datasets in one DAG. The host sets the output roots with pathvars. Datasets that name the same reference share its reference files. Standalone use inside `phenotyping/` or `pheast/` still works, and the old single-dataset config format is still accepted.
 
-**What it does not change.** Analysis logic, default parameters and output file formats are unchanged, with one deliberate exception: tensorQTL's cis and cis_independent mapping are seeded by default (R30, `module-v0.1.6`; `qtl_seed: null` runs as upstream). Rule bodies changed only where a path or parameter now comes from somewhere else, plus that seed. `git diff 8da7787 -- pheast/scripts` shows only `run_tensorqtl.py --seed`. In `phenotyping/scripts`, only a usage comment was added to `combine_modalities.sh`. The exceptions to "same software" are the runtimes of tensorQTL and FUSION: under apptainer they run in pinned containers (see [Environments](#environments-containers-gpu) and [FUSION](#fusion)).
+**What it does not change.** Analysis logic, default parameters and output file formats are unchanged, with one deliberate exception: tensorQTL's cis and cis_independent mapping are seeded by default (R30, `module-v0.1.6`; `qtl_seed: null` runs as upstream). Rule bodies changed only where a path or parameter now comes from somewhere else, plus that seed. `git diff 8da7787 -- pheast/scripts` shows only `run_tensorqtl.py --seed` and, in `fit_twas_weights.py`, a skip for phenotypes on chromosomes absent from the genotypes (R31, `module-v0.1.7`), which upstream fails on. In `phenotyping/scripts`, only a usage comment was added to `combine_modalities.sh`. The exceptions to "same software" are the runtimes of tensorQTL and FUSION: under apptainer they run in pinned containers (see [Environments](#environments-containers-gpu) and [FUSION](#fusion)).
 
 Requires **Snakemake ≥ 9.14** (R28, `module-v0.1.4`; pathvars need 9.12). Both Snakefiles set `min_version("9.14")`: 9.14.0 is the first release with Snakemake commit f1e8b629 (PR #3840), which binds the source cache path actually in use and the local storage prefix into container jobs. Tested with 9.27.1 (HPC runs and local dry runs) and 9.27.0 (local spike).
 
 ## Differences from upstream at a glance
 
-Everything a user of upstream `8da7787` would notice, as of `module-v0.1.6`. Details are in the sections below.
+Everything a user of upstream `8da7787` would notice, as of `module-v0.1.7`. Details are in the sections below.
 
 | Difference | Changes results? | Since | Ruling |
 |---|---|---|---|
+| TWAS weights skip phenotypes whose chromosome is not in the genotype `.bim` (diagnostic `chromosome not in genotypes`); upstream fails the whole batch, since plink rejects contig names such as `GL000219.1` as chromosome codes | no: those phenotypes can have no cis-variants, so upstream gets no weights for them either | v0.1.7 | R31 |
 | tensorQTL cis and cis_independent are seeded by default (`qtl_seed: 0`); `qtl_seed: null` runs unseeded, as upstream | yes: one fixed draw instead of a random one (upstream varies run to run) | v0.1.6 | R30 |
 | Standalone outputs gain a dataset level: `output/default/…`, `intermediate/default/…`, `intermediate/reference/default/…` | no (paths only) | v0.1.0 | spec §1 |
 | Config format is `references:` + `datasets:`; old single-dataset configs still load through a shim | no | v0.1.0 | — |
@@ -204,6 +205,7 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 
 ## FUSION
 
+- **R31 (`module-v0.1.7`): phenotypes on chromosomes absent from the genotypes are skipped.** `fit_twas_weights.py` reads the chromosome codes in `<geno>.bim` once per batch and records a phenotype on any other chromosome as `skipped`, `chromosome not in genotypes`, without calling plink. Before, plink 1.90 exited with status 5 (`Invalid --chr chromosome code 'GL000219.1'`) for a contig name, the model was recorded as `failed`, and the batch, with all its other models, failed. This happened in a real run: OneK1K all-cell, where expression, isoforms, splicing, alt_polyA and stability BEDs have phenotypes on MT, GL… and KI… contigs and the genotypes have chromosomes 1-22. The skip also covers codes plink accepts (MT, or X when the genotypes lack it): no such phenotype can have cis-variants, so none can get weights. Tests: `pheast/tests/test_twas_weights.py`. The FUSION image is unchanged: the script comes from the source cache.
 - **R26 (Task 19, supersedes R24): FUSION runs in a digest-pinned container.** `twas_compute_weights_batch` and `twas_assemble_summary` have no `conda:`, only `container: docker://ghcr.io/twillis209/pantry-fusion@sha256:87335916…4009`.
   - The image is built from `containers/fusion/` by `.github/workflows/fusion-image.yml` (public; tag `sha-<commit>`), from the repository root. It holds the vendored FUSION of `pheast/scripts/fusion_twas/` (`FUSION.compute_weights.R`, `utils/plink_utils.R`, `utils/FUSION.profile_wgt.R`, Linux x86-64 `gcta_nr_robust`, sha256-checked at build time and made executable) under `/opt/fusion`, keeping the `utils/` layout that `compute_weights` sources relative to itself, and the env of `pheast/envs/fusion.yaml`: R 4.5.3, r-glmnet 5.0, r-optparse 1.8.2, r-matrix 1.7_6, plink 1.90, gemma 0.98.5, Python 3.12.16, the baseline env's versions. `check_image.py` gates the build on these versions, on gcta running (statically linked), on the R packages loading, and on plink and gemma running.
   - The rules pass `/opt/fusion/...` paths as params, not inputs (they exist only in the container). `pheast/scripts/fusion_twas/` stays the image's source of truth; changing it (or the env file) rebuilds the image, and the new digest must be pinned in `pheast/steps/twas.smk`.

@@ -1,5 +1,5 @@
 # Host workflow test (criterion 3), remote variant: as tests/host/Snakefile,
-# but both stages are fetched from GitHub at tag module-v0.1.6 with github().
+# but both stages are fetched from GitHub at tag module-v0.1.7 with github().
 # FUSION and gcta come from pheast's TWAS container image, so nothing binary is
 # fetched (Snakemake's git source cache cannot fetch binary files; see
 # tests/hpc/README.md, Tasks 14 and 19).
@@ -31,7 +31,7 @@ module pantry_pheno:
         github(
             "twillis209/Pantry",
             path="phenotyping/Snakefile",
-            tag="module-v0.1.6",
+            tag="module-v0.1.7",
         )
     config:
         config["pantry"]["phenotyping"]
@@ -49,7 +49,7 @@ module pantry_pheast:
         github(
             "twillis209/Pantry",
             path="pheast/Snakefile",
-            tag="module-v0.1.6",
+            tag="module-v0.1.7",
         )
     config:
         config["pantry"]["pheast"]

@@ -60,6 +60,8 @@ class TestTwasWeightWorker(unittest.TestCase):
                 fit, "validate_tools"
             ), patch.object(fit, "read_batch", return_value=(["S1"], [model])), patch.object(
                 fit, "read_sample_ids", return_value=[("S1", "S1")]
+            ), patch.object(
+                fit, "read_genotype_chromosomes", return_value=frozenset({"1"})
             ), patch.object(fit, "fit_model", return_value=row):
                 with self.assertRaisesRegex(RuntimeError, "1 of 1 TWAS models failed"):
                     fit.main()
@@ -96,6 +98,7 @@ class TestTwasWeightWorker(unittest.TestCase):
             rscript="Rscript",
             fusion_script=root / "FUSION.compute_weights.R",
             gcta=root / "gcta",
+            geno_chromosomes=frozenset({"1"}),
         )
         model = fit.Model(1, "1", 1_000_000, "gene1", ("2.5",))
         return args, model, root / "tmp", root / "weights"
@@ -208,6 +211,29 @@ class TestTwasWeightWorker(unittest.TestCase):
             self.assertEqual(row["outcome"], "skipped")
             self.assertEqual(row["diagnostic"], "no variants in cis-window")
             self.assertFalse(batch_temp.joinpath("000000001_gene1").exists())
+
+    def test_read_genotype_chromosomes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bim = Path(directory) / "geno.bim"
+            bim.write_text("1\tchr1:10\t0\t10\tA\tG\n1\tchr1:20\t0\t20\tC\tT\n22\tchr22:5\t0\t5\tG\tA\n")
+            self.assertEqual(fit.read_genotype_chromosomes(bim), frozenset({"1", "22"}))
+
+    def test_chromosome_absent_from_genotypes_skips_without_plink(self):
+        # plink rejects contig names such as GL000219.1 as chromosome codes,
+        # so a phenotype there cannot reach the empty cis-window skip.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args, _, batch_temp, weights_dir = self.worker_fixture(root)
+            for chromosome in ["GL000219.1", "MT", "X"]:
+                with self.subTest(chromosome=chromosome):
+                    model = fit.Model(1, chromosome, 85_000, "gene1", ("2.5",))
+                    with patch.object(fit, "run_logged") as run:
+                        row = fit.fit_model(model, [("F1", "S1")], args, batch_temp, weights_dir)
+                    run.assert_not_called()
+                    self.assertEqual(row["outcome"], "skipped")
+                    self.assertEqual(row["diagnostic"], "chromosome not in genotypes")
+                    self.assertIn("elapsed_seconds", row)
+                    self.assertFalse(batch_temp.joinpath("000000001_gene1").exists())
 
     def test_other_plink_exit_12_remains_fatal(self):
         with tempfile.TemporaryDirectory() as directory:

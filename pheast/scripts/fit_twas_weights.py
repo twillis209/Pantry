@@ -133,6 +133,11 @@ def read_sample_ids(fam_path, samples):
     return [sample_ids[sample] for sample in samples]
 
 
+def read_genotype_chromosomes(bim_path):
+    with bim_path.open() as handle:
+        return frozenset(line.split(maxsplit=1)[0] for line in handle if line.strip())
+
+
 def run_logged(command, log_handle):
     # Each batch worker owns one CPU; descendants must not start BLAS pools.
     env = os.environ.copy()
@@ -236,6 +241,11 @@ def _fit_model(model, sample_ids, args, batch_temp, weights_dir):
     fusion_tmp = work_dir / "fusion_tmp"
     final_weight = weights_dir / f"{model.phenotype_id}.wgt.RDat"
     final_weight.unlink(missing_ok=True)
+    # plink rejects contig names (GL000219.1, KI270711.1) as chromosome codes
+    # instead of reporting an empty cis-window, so skip these before calling it.
+    if model.chromosome not in args.geno_chromosomes:
+        shutil.rmtree(work_dir)
+        return result_row(model, "skipped", diagnostic="chromosome not in genotypes")
     start = max(1, model.position - 500_000)
     end = model.position + 500_000
 
@@ -344,6 +354,7 @@ def main():
     args.status = args.status.resolve()
     samples, models = read_batch(args.bed, args.batch_start, args.batch_end)
     sample_ids = read_sample_ids(Path(f"{args.geno}.fam"), samples)
+    args.geno_chromosomes = read_genotype_chromosomes(Path(f"{args.geno}.bim"))
     batch_name = f"{args.batch_start}_{args.batch_end}"
     batch_temp = args.output_dir / f"tmp_{args.modality}" / batch_name
     weights_dir = args.output_dir / args.modality

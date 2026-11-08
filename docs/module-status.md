@@ -5,7 +5,7 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 
 ## Branch and tag
 
-- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.6`** (earlier `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
+- Fork `twillis209/Pantry`, branch **`module`**, release tag **`module-v0.1.7`** (earlier `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`). Base: upstream `PejLab/Pantry` `8da7787`. Nothing was pushed to upstream.
 - What ran at which commit:
   - gates 1–3 and the multi-dataset runs ran at earlier commits of the branch (see `tests/hpc/README.md`);
   - the full local-path host run (job 8396531) ran at `56c8c22`;
@@ -27,6 +27,7 @@ Changes in full: `CHANGES-module.md`. Design: `docs/superpowers/specs/2026-10-30
 - `module-v0.1.3` (Task 20, R27) adds the optional `majiq_container`: MAJIQ in an image each user builds from `containers/majiq/` (not published: Penn's academic licence forbids redistribution). With it unset, the MAJIQ rules and every other job dry-run unchanged. It was re-run on the Task 17 MAJIQ configs (below).
 - `module-v0.1.4` (Task 21, R28) raises the floor to Snakemake 9.14, pins the txrevise and LaDDR envs (LaDDR v1.0.0) and the MAJIQ recipes to the lock files, removes the test profiles' source-cache bind, adds the `image-pins` CI check (`containers/check_pins.sh`) and headers on the legacy `environment.yml` files. Dry-run job sets are unchanged. A full `github()` host run with `majiq_container` set and no cache bind passed the Task 18/19 bar (below).
 - `module-v0.1.5` (Task 22, R29) verifies LaDDR at run time against upstream (below). It fully pins `deeptools.yaml` and more of `laddr.yaml` to the lock, and sets scikit-learn 1.5.2 in `laddr.yaml`, because LaDDR v1.0.0 fails in `laddr coverage` with the lock's 1.9.1. Rule code is unchanged.
+- `module-v0.1.7` (R31) makes TWAS weights skip phenotypes on chromosomes absent from the genotypes, which failed their batch before (see `CHANGES-module.md`, FUSION). Tested by unit tests only; no HPC acceptance run of its own.
 - `module-v0.1.6` (Task 23, R30) seeds tensorQTL's cis and cis_independent mapping by default (`qtl_seed: 0`; below). The full `github()` run fetched commit `bb0b690`; the tag adds only docs and `tests/host/Snakefile.github` on top of it. Later commits on `module` only add run records to the docs.
 
 ## How a host imports it
