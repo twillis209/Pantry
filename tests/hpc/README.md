@@ -636,8 +636,9 @@ pantry-baseline-pheno (Snakemake 9.27.1), fresh run dirs: all 8 EXIT=0.
   identical. Pheast multi and host differ only in `install_fusion` (removed, R26), the TWAS assemble shell and inputs (`/opt/fusion/…`
   instead of the installed copy, R26) and `--seed 0` on the 16 (pheast multi) / 15 (host, cold DAG) tensorQTL jobs (R30).
 - After normalising exactly those (`residual.py`, job 8452610): identical job sets in all four. The one remaining host line was a parsing
-  artifact: the dry run's single `Would remove temporary output …/cross_modality_tmp.bed` line prints after a different job in each run, and
-  the parser appends it to the preceding job's shell.
+  artifact (field-level diff, `fielddiff.py`, job 8452625: only `shell` differs): the dry run's single `Would remove temporary output
+  …/cross_modality_tmp.bed` line prints after a different job in each run; in v0.1.1 it directly follows the `chained`/alt_TSS checkpoint's
+  `DAG of jobs will be updated after completion.` and the parser absorbs it into that shell text, in v0.1.6 it follows a block already closed.
 - Unit tests at v0.1.6: 174 passed in a clean venv with Snakemake 9.27.1. (The local base env, which imports `~/projects/snakemake` as an
   editable install, failed 17 tests with `ImportError: AccessPattern` because that clone is on a newer Snakemake branch; not a Pantry issue.)
 

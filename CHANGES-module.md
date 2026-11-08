@@ -29,6 +29,7 @@ Everything a user of upstream `8da7787` would notice, as of `module-v0.1.6`. Det
 | MAJIQ: either the named env `majiq3` or an image each user builds from `containers/majiq/` (`majiq_container`); none is published (Penn licence) | no | v0.1.3 | R27 |
 | Per-rule conda envs pinned to the baseline lock; the LaDDR env uses scikit-learn 1.5.2 and scipy 1.16.3, since LaDDR v1.0.0 fails with the lock's versions | no | v0.1.0, v0.1.4, v0.1.5 | R29 |
 | A `github()` module builds its own conda envs (Snakemake source-cache bug: fetched files lose their final newline) | no (a one-off env build) | v0.1.0 | — |
+| Cross-modality BEDs are built by rules (`combine_modalities`), not only by the manual script; a sample-header mismatch fails the job, where the script printed the `diff` and went on | no (byte-identical to the script's output) | v0.1.0 | R17 |
 | `defaults:` can add to a dataset but not remove from it | — | v0.1.0 | deferred |
 
 ## Contents
