@@ -132,6 +132,18 @@ Everything ran on the GDML HPC (SLURM, `sjob`, profile `tests/profile` or `tests
 - **kallisto 0.48.0 quant** varies run to run. It depends on node/load, not on thread count. This affects 6 of 21 phenotyping files: `{alt_polyA,expression,isoforms}.bed.gz` and their `unnorm/` sources.
 - **tensorQTL** permutations and tie-breaks are unseeded upstream (the module seeds them by default since `module-v0.1.6`, R30). Even `cis_independent` row sets differ between the two baseline runs.
 
+**Nondeterminism by source, as of `module-v0.1.6`.** Later runs found LaDDR and MAJIQ sources too (Tasks 17, 22).
+
+| Source | Rules | In the module | How outputs were judged |
+|---|---|---|---|
+| kallisto 0.48.0 quant (thread/load dependent; no seed exists) | `kallisto_quant` → expression, isoforms, alt_polyA BEDs and `unnorm/` | not seedable | R11 (substitution: exact), R12 + amendment (2× max over four upstream runs) |
+| tensorQTL permutations (numpy) and random tie-break (`torch.randint`) | `tensorqtl_cis`, `tensorqtl_cis_independent` | seeded, `qtl_seed: 0` (R30); two runs identical decompressed on an A100 and on 1 CPU core; other GPUs and multithreaded CPU untested | R22: identical inputs and command lines (apart from `--seed`); upstream is unseeded, and its envelope comes from one pair of runs |
+| GPU or multithreaded reduction order | the same tensorQTL rules | not seedable; about 1×10⁻⁴ relative in `pval_nominal` | 1 CPU core reproduces upstream's nominal statistics exactly (Task 16) |
+| LaDDR randomized PCA (no `random_state`) and `np.random.choice` above `adaptive_max_samples` (`cli.py:226,248`) | `laddr_coverage` and downstream LaDDR rules | unseeded (upstream LaDDR's code) | R29: byte-identical to upstream with numpy seeded by a test-only `sitecustomize.py`, on identical regressed inputs |
+| MAJIQ bootstrap sampling | `majiq_psi` (`majiq.psi.tsv` bootstrap columns) | unseeded; not used downstream | final intron_retention files byte-identical (Tasks 17, 20, 21) |
+| Timestamps only (gzip header write time, `geno_pruned.log`, txrevise date stamps, FUSION `.profile.err`) | various | content unaffected | compared decompressed or excluded, named in each run record |
+| Everything else (STAR, regtools, leafcutter, featureCounts, RNA editing, txrevise, cross_modality, covariates, genotype QC, GCTA heritability, FUSION weights) | — | deterministic | byte-identical to upstream in every gate |
+
 **Comparison method.** `tests/compare_outputs.py <baseline> <new> --noise <run1> <run2>`:
 - All other files must be byte-identical (`.gz` compared decompressed).
 - Kallisto-derived BEDs must fall within 2× the baseline pair's max |diff| (R12). Since the R12 amendment (Task 22 review, below), `--noise` takes two or more runs and the envelope is 2× the max over all pairs.

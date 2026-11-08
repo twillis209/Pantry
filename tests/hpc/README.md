@@ -2,6 +2,18 @@
 
 H=/data/hps/assoc/private/gdml/user/twil15. All via `sjob`; ssh prefix: `source /etc/profile; module load slurm; source ~/.dotfiles/.bash_functions;`
 
+**Which runs validated which tag.** Details in the task sections below.
+
+| Tag | Commit (stage code run) | Main run | Compare jobs | Bar |
+|---|---|---|---|---|
+| `module-v0.1.1` | befa72c | `github()` host, `host-github-v011`, job 8399793 (549/549) | 8400338, 8400342 | Task 18 |
+| `module-v0.1.2` | 0d30215 | gate 3 FUSION image, `gate3-pheast-fusion`; `github()` host, `host-github-v012`, job 8402594 | 8400498; 8403790 | Task 18/19 |
+| `module-v0.1.3` | da54ff9 | Task 17 MAJIQ configs with `majiq_container`, job 8403914; `github()` dry run 8403936 | in 8403914 (`cmp`) | Task 17 |
+| `module-v0.1.4` | f72dc9d (01b8623) | `github()` host, `host-github-v014`, job 8404292 (548/548) | 8404824, 8404825 | Task 18/19 |
+| `module-v0.1.5` | a8720eb (54423dc) | LaDDR U1/U2/M1 (`t22`); `github()` host M2, `host-github-v015`, job 8406551 (575/575), seeded rerun 8407165 | 8406545, 8407162, 8407214 | R29 |
+| `module-v0.1.6` | 10f91d2 (bb0b690) | seed identity (`t23`); `github()` host, `host-github-v016`, job 8426134 (548/548) | 8428908, 8429054, 8429055, 8433373 | Task 21 + R30 |
+| `module-v0.1.6` re-check | 10f91d2 vs befa72c | multi-dataset and host dry runs (`t24`), job 8452594 | 8452610 | same job sets (Task 24) |
+
 - Test data: tarballs from README.md (dropbox, `dl=1`) extracted locally, then `tar | ssh` to `$H/pantry-testdata/{phenotyping,pheast}/input`.
 - `git clone https://github.com/twillis209/Pantry.git $H/Pantry -b module` (profile at `$H/Pantry/tests/profile`);
   `git clone ... $H/pantry-baseline && git checkout 8da7787`.
@@ -612,3 +624,20 @@ As in the baseline env, pip replaces conda's numpy 1.26.4 with the numpy 2.5.4 w
   - **HOST_VS_S0A content same=16 diff=0**: host tensorQTL files identical decompressed to the standalone `gpu-s0a`, on the same seed and device.
 - `pytest tests/unit -q`: 174 passed (local).
 - Tag `module-v0.1.6` (annotated) = 10f91d2 (stage code = bb0b690, which the run above fetched: `git diff bb0b690 module-v0.1.6` touches only CHANGES-module.md, README.md, `docs/module-status.md`, the design spec, `tests/hpc/README.md` and `tests/host/Snakefile.github`; the tag was held until the run passed). `github()` dry run of `all` at the tag (job 8433568, `t23/gh_dry.sh`, `host-github-v016` config; `XDG_CACHE_HOME` set to a new directory, so the fork was cloned afresh without clearing the shared `~/.cache/snakemake`, unlike `t22/gh_dry.sh`): local, tag and remote all 10f91d2, source cache under `Pantry/module-v0.1.6/`, GH_DRY_TAG_EXIT=0, 481 jobs, no UnicodeEncodeError.
+
+## Task 24: multi-dataset dry runs at module-v0.1.6 vs module-v0.1.1 (whole-project review)
+The multi-dataset configs were last run in Task 13, before the FUSION image, the env pins, the LaDDR env change and the seed. Scratch
+`$H/pantry-runs/t24` (`dry.sh`, `jobsets.py`, `residual.py`; worktrees `repo-v011` = befa72c, `repo-v016` = 10f91d2, each run with its own
+configs and profile, which are unchanged between the tags apart from `dryrun_majiq_laddr.yml`). Job 8452594, `-n -p all`, env
+pantry-baseline-pheno (Snakemake 9.27.1), fresh run dirs: all 8 EXIT=0.
+- Job counts v0.1.1 / v0.1.6: `phenotyping_multi.yml` 468 / 468, `pheast_multi.yml` 136 / 135, `dryrun_multi.yml` 421 / 421, local-path host
+  (`tests/host/config.yaml`) 472 / 471.
+- Full job sets (rule, input, output, wildcards, threads, resources, log, params, shell; `jobsets.py`): phenotyping multi and `dryrun_multi`
+  identical. Pheast multi and host differ only in `install_fusion` (removed, R26), the TWAS assemble shell and inputs (`/opt/fusion/…`
+  instead of the installed copy, R26) and `--seed 0` on the 16 (pheast multi) / 15 (host, cold DAG) tensorQTL jobs (R30).
+- After normalising exactly those (`residual.py`, job 8452610): identical job sets in all four. The one remaining host line was a parsing
+  artifact: the dry run's single `Would remove temporary output …/cross_modality_tmp.bed` line prints after a different job in each run, and
+  the parser appends it to the preceding job's shell.
+- Unit tests at v0.1.6: 174 passed in a clean venv with Snakemake 9.27.1. (The local base env, which imports `~/projects/snakemake` as an
+  editable install, failed 17 tests with `ImportError: AccessPattern` because that clone is on a newer Snakemake branch; not a Pantry issue.)
+

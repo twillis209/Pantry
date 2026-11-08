@@ -10,7 +10,29 @@ Test commands and HPC run records: `tests/hpc/README.md`.
 
 Requires **Snakemake ≥ 9.14** (R28, `module-v0.1.4`; pathvars need 9.12). Both Snakefiles set `min_version("9.14")`: 9.14.0 is the first release with Snakemake commit f1e8b629 (PR #3840), which binds the source cache path actually in use and the local storage prefix into container jobs. Tested with 9.27.1 (HPC runs and local dry runs) and 9.27.0 (local spike).
 
+## Differences from upstream at a glance
+
+Everything a user of upstream `8da7787` would notice, as of `module-v0.1.6`. Details are in the sections below.
+
+| Difference | Changes results? | Since | Ruling |
+|---|---|---|---|
+| tensorQTL cis and cis_independent are seeded by default (`qtl_seed: 0`); `qtl_seed: null` runs unseeded, as upstream | yes: one fixed draw instead of a random one (upstream varies run to run) | v0.1.6 | R30 |
+| Standalone outputs gain a dataset level: `output/default/…`, `intermediate/default/…`, `intermediate/reference/default/…` | no (paths only) | v0.1.0 | spec §1 |
+| Config format is `references:` + `datasets:`; old single-dataset configs still load through a shim | no | v0.1.0 | — |
+| Stricter validation: quoted or non-integral numbers, malformed names, duplicate modalities, legacy keys beside `datasets:` (including `--config read_length=…` in a stage directory) are errors | no (some configs need editing) | v0.1.0 | R14, R18 |
+| `index_fasta` rule removed | no (unused) | v0.1.0 | R15 |
+| LaDDR's internal `dataset_name` defaults to the dataset key, not `pantry` | no (LaDDR's internal file names only) | v0.1.0 | R16 |
+| Hosts must pass `config:` in each `module` directive; pheast's `phenotype_dir` links to phenotyping by exact path text | — | v0.1.0 | — |
+| Snakemake ≥ 9.14 | no | v0.1.4 | R28 |
+| tensorQTL (QTL) and FUSION (TWAS) run only in digest-pinned images, so pheast needs `--sdm conda apptainer` | no (same versions; GPU runs differ at float level, as multithreaded CPU does) | v0.1.0 (tensorQTL; 1.0.10 image since Task 16), v0.1.2 (FUSION) | R26 |
+| `fusion_dir`, `gcta`, `gcta_url`, `gcta_sha256` and the `install_fusion` job removed; the keys are rejected | no | v0.1.2 | R26 |
+| MAJIQ: either the named env `majiq3` or an image each user builds from `containers/majiq/` (`majiq_container`); none is published (Penn licence) | no | v0.1.3 | R27 |
+| Per-rule conda envs pinned to the baseline lock; the LaDDR env uses scikit-learn 1.5.2 and scipy 1.16.3, since LaDDR v1.0.0 fails with the lock's versions | no | v0.1.0, v0.1.4, v0.1.5 | R29 |
+| A `github()` module builds its own conda envs (Snakemake source-cache bug: fetched files lose their final newline) | no (a one-off env build) | v0.1.0 | — |
+| `defaults:` can add to a dataset but not remove from it | — | v0.1.0 | deferred |
+
 ## Contents
+- [Differences from upstream at a glance](#differences-from-upstream-at-a-glance)
 - [Layout and pathvars](#layout-and-pathvars)
 - [Config format and migration table](#config-format)
 - [Validation](#validation)
