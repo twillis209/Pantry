@@ -668,4 +668,8 @@ BAM header), `-c4`.
   new adds 32 `Would remove temporary output …_STAR{genome,pass1}` lines.
 - Unit tests 174 passed; `snakefmt --check` clean (20 files incl. `Snakefile.github`). `snakemake --lint` (phenotyping, `dryrun_majiq_laddr.yml`):
   the only difference is that `star_align` no longer gets "No log directive defined" (65 → 64 rules with it; the earlier record says 66).
-- Not yet run: the `github()` host dry run at `module-v0.1.8`, which needs the tag pushed.
+- `github()` host dry run of `all` at the tag (job 8471957, `$H/pantry-runs/r32/gh_dry.sh` = `t23/gh_dry.sh` with the tag changed, plus a
+  `-n -p` pass; `host-github-v016` config, fresh private `XDG_CACHE_HOME`): local, tag and remote all b863198, GH_DRY_TAG_EXIT=0, 481 jobs
+  (as Task 23), 16 `pantry_pheno_star_align`, no UnicodeEncodeError. `-n -p`: EXIT=0, `star_align` outputs include `Log.final.out`,
+  `SJ.out.tab`, `._STARgenome`, `._STARpass1`; 32 distinct `Would remove temporary output …_STAR…` lines (16 jobs × 2; the log prints each
+  twice, once with an `INFO:snakemake.logging:` prefix).
