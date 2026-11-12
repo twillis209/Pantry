@@ -642,3 +642,30 @@ pantry-baseline-pheno (Snakemake 9.27.1), fresh run dirs: all 8 EXIT=0.
 - Unit tests at v0.1.6: 174 passed in a clean venv with Snakemake 9.27.1. (The local base env, which imports `~/projects/snakemake` as an
   editable install, failed 17 tests with `ImportError: AccessPattern` because that clone is on a newer Snakemake branch; not a Pantry issue.)
 
+## R32: STAR scratch declared as temp outputs (module-v0.1.8)
+All local (macOS arm64), no HPC: a throwaway env with Snakemake 9.27.1 (`uv run --isolated --with snakemake==9.27.1 …`), and STAR 2.7.11b plus
+samtools 1.21 from bioconda on PATH (no `--sdm conda`). "Old" = worktree at `3d2a543` (`module-v0.1.7`); "new" = the R32 rule. Config
+`tests/configs/dryrun_majiq_laddr.yml`, one run directory `/tmp/starrun` (same paths for old and new, since STAR writes its command line into the
+BAM header), `-c4`.
+- Old rule, target `intermediate/full/star_out/NA20516.Aligned.sortedByCoord.out.bam`: EXIT=0. `star_out/` holds the BAM (23.5 MB),
+  `._STARgenome/`, `._STARpass1/`, `Log.final.out`, `Log.out`, `Log.progress.out`, `SJ.out.tab`. BAM copied aside.
+- Upgrade: new-rule dry run on that tree: `Nothing to be done`. Only notice: "missing provenance/metadata" for `star_align`, which does not
+  trigger a rerun. `--list-changes code`: empty. `--list-changes params` lists the same three files under the old rule as under the new one, so
+  it is not caused by R32. Snakemake's code trigger compares `rule.shellcmd` (`persistence/__init__.py`, `_code`), which R32 leaves unchanged.
+- New rule, BAM deleted, same target: EXIT=0, `cmp` with the old BAM: identical. The scratch folders were **kept**: Snakemake keeps temp
+  outputs of a job that produces a requested target (`dag.py`, `handle_temp`).
+- New rule, `star_out/` deleted, target `intermediate/full/bam/NA20516.bam` (`shrink_bam`): EXIT=0, `Removing temporary output …_STARgenome`
+  and `…_STARpass1`; `star_out/` holds the BAM (`cmp`: identical to the old one), `Log.final.out`, `Log.out`, `Log.progress.out`, `SJ.out.tab`.
+  A dry run afterwards finds nothing to do, so missing temp outputs do not cause a rerun.
+- Failure: a stub `STAR` first on PATH that writes both scratch folders, `Log.out`, `Log.progress.out` and `SJ.out.tab` under the prefix, then
+  exits 1; target `shrink_bam`'s output: EXIT=1, "Removing output files of failed job star_align"; left in `star_out/`: `Log.out` and
+  `Log.progress.out` only. Real STAR afterwards: EXIT=0, BAM identical.
+- Upgrade as a host sees it (fresh `/tmp/starrun2`): old rule, target `shrink_bam`'s output, leaves both scratch folders. New rule dry run:
+  `Nothing to be done`. `--delete-temp-output -n` lists exactly `._STARgenome` and `._STARpass1`, and the real run deletes them. A dry run
+  afterwards: `Nothing to be done`.
+- Standalone phenotyping dry run (`dryrun_majiq_laddr.yml`): EXIT=0, `star_align` shows the 5 outputs and 2 logs, the STAR command is
+  unchanged. Local-path host dry run of `all` (`tests/host/config.yaml`): EXIT=0, 471 jobs old and new (16 `pantry_pheno_star_align`), and
+  new adds 32 `Would remove temporary output …_STAR{genome,pass1}` lines.
+- Unit tests 174 passed; `snakefmt --check` clean (20 files incl. `Snakefile.github`). `snakemake --lint` (phenotyping, `dryrun_majiq_laddr.yml`):
+  the only difference is that `star_align` no longer gets "No log directive defined" (65 → 64 rules with it; the earlier record says 66).
+- Not yet run: the `github()` host dry run at `module-v0.1.8`, which needs the tag pushed.

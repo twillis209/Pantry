@@ -65,7 +65,27 @@ rule star_align:
         fastq=fastq_inputs,
         index=star_index_path,
     output:
-        "<pantry_intermediate>/{dataset}/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
+        # The BAM must stay first: params.prefix and parent_dir use output[0].
+        bam="<pantry_intermediate>/{dataset}/star_out/{sample_id}.Aligned.sortedByCoord.out.bam",
+        log_final="<pantry_intermediate>/{dataset}/star_out/{sample_id}.Log.final.out",
+        sj="<pantry_intermediate>/{dataset}/star_out/{sample_id}.SJ.out.tab",
+        # STAR's two-pass scratch (pass-1 junctions, junction-inserted genome).
+        # Nothing reads it; declared so Snakemake deletes it after the job.
+        genome_scratch=temp(
+            directory(
+                "<pantry_intermediate>/{dataset}/star_out/{sample_id}._STARgenome"
+            )
+        ),
+        pass1_scratch=temp(
+            directory(
+                "<pantry_intermediate>/{dataset}/star_out/{sample_id}._STARpass1"
+            )
+        ),
+    log:
+        # Written by STAR at fixed names under --outFileNamePrefix; logs, unlike
+        # outputs, are kept when the job fails.
+        "<pantry_intermediate>/{dataset}/star_out/{sample_id}.Log.out",
+        "<pantry_intermediate>/{dataset}/star_out/{sample_id}.Log.progress.out",
     conda:
         "../envs/star.yaml"
     threads: 16
