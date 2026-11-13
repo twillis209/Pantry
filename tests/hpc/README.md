@@ -13,6 +13,7 @@ H=/data/hps/assoc/private/gdml/user/twil15. All via `sjob`; ssh prefix: `source 
 | `module-v0.1.5` | a8720eb (54423dc) | LaDDR U1/U2/M1 (`t22`); `github()` host M2, `host-github-v015`, job 8406551 (575/575), seeded rerun 8407165 | 8406545, 8407162, 8407214 | R29 |
 | `module-v0.1.6` | 10f91d2 (bb0b690) | seed identity (`t23`); `github()` host, `host-github-v016`, job 8426134 (548/548) | 8428908, 8429054, 8429055, 8433373 | Task 21 + R30 |
 | `module-v0.1.6` re-check | 10f91d2 vs befa72c | multi-dataset and host dry runs (`t24`), job 8452594 | 8452610 | same job sets (Task 24) |
+| `module-v0.1.9` | a418f3b | R33 rule-level runs (`r33`), jobs 8484898, 8485093, 8485252; `github()` host at a418f3b, job 8485331 | in 8485093, 8485331 (`cmp` vs `host-github-v016`) | R33, R34 |
 
 - Test data: tarballs from README.md (dropbox, `dl=1`) extracted locally, then `tar | ssh` to `$H/pantry-testdata/{phenotyping,pheast}/input`.
 - `git clone https://github.com/twillis209/Pantry.git $H/Pantry -b module` (profile at `$H/Pantry/tests/profile`);
@@ -734,3 +735,9 @@ GNU tar 1.35); the `covariates` rule's env from `pheast/envs/covariates.yaml` (R
     genotype PCs only; cis header only (`no testable phenotypes (1 in the BED, none with varying values)`); cis_independent header only;
     `hsq.tsv` one row of `NA` (GCTA writes no `.hsq`; upstream `heritability.py` behaviour); TWAS skipped as `GCTA did not converge`, empty
     archive with that reason in `.profile.err`. `empty.hsq.tsv`'s header line equals `stability.hsq.tsv`'s (`cmp`).
+- **`github()` host at the pushed commit** a418f3b (job 8485331, `$H/pantry-runs/r33/gh/gh_run.sh`, env pantry-baseline-pheno; host
+  `tests/host/Snakefile.github` with `tag=` replaced by `commit="a418f3b…"`, `host-github-v016` config and inputs, fresh private
+  `XDG_CACHE_HOME`): remote `module` = a418f3b. Dry run of `all`: GH_DRY_EXIT=0, 481 jobs (as R32). Real run of geuvadis stability
+  `cis_qtl`, `cis_independent_qtl`, `hsq.tsv` and `tar.bz2`: 23/23 steps, GH_RUN_EXIT=0; `qtl_edge_cases.py` fetched into the source
+  cache beside `run_tensorqtl.py`; all four outputs and the TWAS `.list`, `.profile` and `.pos` byte-identical to `host-github-v016`'s
+  (`module-v0.1.6`). Tag `module-v0.1.9` set after this run.
