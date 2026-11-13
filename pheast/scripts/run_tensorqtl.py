@@ -99,8 +99,8 @@ if args.seed is not None:
     torch.manual_seed(args.seed)
 
 if args.mode == "cis":
-    if pheno.shape[0] == 0:
-        print("  * NOTE: no phenotypes to test; writing a header-only cis table")
+    if qtl_edge_cases.n_testable_phenotypes(pheno) == 0:
+        print(f"  * NOTE: no testable phenotypes ({pheno.shape[0]} in the BED, none with varying values); writing a header-only cis table")
         qtl_edge_cases.empty_cis_table(groups is not None).to_csv(args.output, sep="\t")
     else:
         d = cis.map_cis(genotype_df, variant_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)

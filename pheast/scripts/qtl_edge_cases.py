@@ -40,6 +40,21 @@ def empty_independent_table(grouped: bool) -> pd.DataFrame:
     return pd.DataFrame(columns=columns)
 
 
+def n_testable_phenotypes(pheno: pd.DataFrame) -> int:
+    """Phenotypes left after tensorQTL's constant-phenotype filter.
+
+    map_cis drops phenotypes whose values are all equal (genotypeio
+    InputGeneratorCis, same test) and raises "No phenotypes remain after
+    filters" if none is left. The phenotypes passed in are already limited to
+    chromosomes in the genotypes, tensorQTL's other filter before that check.
+    """
+    values = pheno.to_numpy()
+    if values.shape[0] == 0:
+        return 0
+    constant = np.all(values == values[:, [0]], 1)
+    return int((~constant).sum())
+
+
 def qvalue_pval_column(res_df: pd.DataFrame) -> str:
     """The p-value column tensorQTL's calculate_qvalues uses."""
     return "pval_beta" if not res_df["pval_beta"].isnull().all() else "pval_perm"

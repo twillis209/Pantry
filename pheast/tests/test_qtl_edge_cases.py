@@ -92,6 +92,16 @@ class TestHeaders(unittest.TestCase):
             self.assertFalse(edge.has_significant(cis_df, 0.05, "qval"))
 
 
+class TestTestablePhenotypes(unittest.TestCase):
+    def test_constant_rows_do_not_count(self):
+        pheno = pd.DataFrame([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [5.0, 5.0, 5.0]])
+        self.assertEqual(edge.n_testable_phenotypes(pheno), 1)
+        self.assertEqual(edge.n_testable_phenotypes(pheno.iloc[[0, 2]]), 0)
+
+    def test_no_rows(self):
+        self.assertEqual(edge.n_testable_phenotypes(pd.DataFrame(columns=["S1", "S2"])), 0)
+
+
 class TestPi0FallbackReason(unittest.TestCase):
     def test_one_phenotype(self):
         self.assertIn("1 phenotype tested", edge.pi0_fallback_reason(cis_table([0.9]), 0.85))

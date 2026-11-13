@@ -725,3 +725,12 @@ GNU tar 1.35); the `covariates` rule's env from `pheast/envs/covariates.yaml` (R
     TWAS `.list` and `.profile`: all `cmp` identical.
   - `strong` in the rule gets 2 phenotype PCs (3 phenotypes, k - 1), and 2 of its 3 phenotypes stay significant (`cis_independent` 3
     rows): the known limitation on phenotype PCs of small modalities.
+  - Plasma's failing stability phenotype (read-only, `scpantry/repo/results/pantry/phenotypes/onek1k_Plasma/stability.bed.gz`) is a
+    single row, 0 for all 793 donors. Fixture `const` = `one` with every value 0: old `covariates.R` gives Plasma's `svd` error; in the
+    image, old-path tensorQTL raises `No phenotypes remain after filters` (it drops constant phenotypes). Fixed by
+    `n_testable_phenotypes` (header-only cis). Local re-checks, old script: `zerovar` wrote `pheno_PC1` (did not fail); `na1` failed in
+    `impute.knn` (`a column has more than 80 % missing values`).
+  - Job 8485252 (`run3.sh`, `const` added, updated `run_tensorqtl.py` and `qtl_edge_cases.py`): 21/21 steps, EXIT=0. `const`: covariates
+    genotype PCs only; cis header only (`no testable phenotypes (1 in the BED, none with varying values)`); cis_independent header only;
+    `hsq.tsv` one row of `NA` (GCTA writes no `.hsq`; upstream `heritability.py` behaviour); TWAS skipped as `GCTA did not converge`, empty
+    archive with that reason in `.profile.err`. `empty.hsq.tsv`'s header line equals `stability.hsq.tsv`'s (`cmp`).
