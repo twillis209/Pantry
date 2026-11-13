@@ -2,11 +2,14 @@
 # Based on examples at https://github.com/broadinstitute/tensorqtl
 
 import argparse
+import inspect
 import pandas as pd
 from rpy2.robjects.packages import importr
 import tensorqtl
 from tensorqtl import genotypeio, cis, trans
 import torch
+
+import qtl_edge_cases  # beside this script (R33)
 
 parser = argparse.ArgumentParser(description="Run tensorQTL from command line but with extra options")
 parser.add_argument("geno_prefix")
@@ -43,6 +46,16 @@ def subset_to_shared_samples(genotype_df, pheno, covar):
     if covar is not None:
         covar = covar.loc[samples]
     return genotype_df, pheno, covar
+
+
+def qvalue_pi0_one(p):
+    """q-values of p from R's qvalue with pi0 fixed at 1 (Benjamini-Hochberg)."""
+    from rpy2.robjects.vectors import FloatVector
+    q = importr("qvalue").qvalue(FloatVector(p), pi0=1, **{"lfdr.out": False})
+    return list(q.rx2("qvalues"))
+
+
+QVALUE_LAMBDA = 0.85
 
 
 # Check for rpy2 and qvalue packages first, since otherwise tensorQTL will do
@@ -86,13 +99,32 @@ if args.seed is not None:
     torch.manual_seed(args.seed)
 
 if args.mode == "cis":
-    d = cis.map_cis(genotype_df, variant_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
-    tensorqtl.calculate_qvalues(d, qvalue_lambda=0.85)
-    d.to_csv(args.output, sep="\t", float_format="%.6g")
+    if pheno.shape[0] == 0:
+        print("  * NOTE: no phenotypes to test; writing a header-only cis table")
+        qtl_edge_cases.empty_cis_table(groups is not None).to_csv(args.output, sep="\t")
+    else:
+        d = cis.map_cis(genotype_df, variant_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
+        reason = qtl_edge_cases.pi0_fallback_reason(d, QVALUE_LAMBDA)
+        if reason is None:
+            tensorqtl.calculate_qvalues(d, qvalue_lambda=QVALUE_LAMBDA)
+        else:
+            print(f"  * NOTE: {reason}; computing q-values with pi0 = 1 (Benjamini-Hochberg)")
+            fdr = inspect.signature(tensorqtl.calculate_qvalues).parameters["fdr"].default
+            qtl_edge_cases.calculate_qvalues_pi0_one(d, qvalue_pi0_one, fdr)
+        d.to_csv(args.output, sep="\t", float_format="%.6g")
 elif args.mode == "cis_independent":
     cis_df = pd.read_csv(args.cis_output, sep="\t", index_col=0)
-    d = cis.map_independent(genotype_df, variant_df, cis_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
-    d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
+    # map_independent's own significance cut (its defaults, as called below):
+    # it raises if no phenotype passes.
+    independent_defaults = inspect.signature(cis.map_independent).parameters
+    fdr = independent_defaults["fdr"].default
+    fdr_col = independent_defaults["fdr_col"].default
+    if not qtl_edge_cases.has_significant(cis_df, fdr, fdr_col):
+        print(f"  * NOTE: no significant phenotypes at {fdr_col} <= {fdr} ({cis_df.shape[0]} tested); writing a header-only cis_independent table")
+        qtl_edge_cases.empty_independent_table(groups is not None).to_csv(args.output, sep="\t", index=False)
+    else:
+        d = cis.map_independent(genotype_df, variant_df, cis_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
+        d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
 elif args.mode == "genome_wide":
     d = trans.map_trans(genotype_df, pheno, covariates_df=covar, maf_threshold=maf_threshold)
     d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")

@@ -218,6 +218,36 @@ class TestTwasWeightWorker(unittest.TestCase):
             bim.write_text("1\tchr1:10\t0\t10\tA\tG\n1\tchr1:20\t0\t20\tC\tT\n22\tchr22:5\t0\t5\tG\tA\n")
             self.assertEqual(fit.read_genotype_chromosomes(bim), frozenset({"1", "22"}))
 
+    def test_read_genotype_chromosomes_as_plink_codes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bim = Path(directory) / "geno.bim"
+            bim.write_text("chr1\tv1\t0\t10\tA\tG\nchrX\tv2\t0\t20\tC\tT\nMT\tv3\t0\t5\tG\tA\nGL000219.1\tv4\t0\t5\tG\tA\n")
+            self.assertEqual(fit.read_genotype_chromosomes(bim), frozenset({"1", "23", "26", "GL000219.1"}))
+
+    def test_plink_chromosome_code(self):
+        for code, expected in [("1", "1"), ("chr1", "1"), ("CHR1", "1"), ("01", "1"), ("chr22", "22"),
+                               ("X", "23"), ("chrX", "23"), ("23", "23"), ("Y", "24"), ("XY", "25"),
+                               ("MT", "26"), ("chrM", "26"), ("GL000219.1", "GL000219.1"),
+                               ("KI270711.1", "KI270711.1")]:
+            with self.subTest(code=code):
+                self.assertEqual(fit.plink_chromosome_code(code), expected)
+
+    def test_chr_prefixed_phenotype_reaches_plink(self):
+        # twas_geno's plink --make-bed writes 1 where the input .bim and the
+        # BED say chr1; R31 compared the names as text and skipped everything.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args, _, batch_temp, weights_dir = self.worker_fixture(root)
+            model = fit.Model(1, "chr1", 1_000_000, "gene1", ("2.5",))
+
+            def fake_run(command, log_handle):
+                raise fit.subprocess.CalledProcessError(3, command)
+
+            with patch.object(fit, "run_logged", side_effect=fake_run) as run:
+                row = fit.fit_model(model, [("F1", "S1")], args, batch_temp, weights_dir)
+            run.assert_called()
+            self.assertNotEqual(row["diagnostic"], "chromosome not in genotypes")
+
     def test_chromosome_absent_from_genotypes_skips_without_plink(self):
         # plink rejects contig names such as GL000219.1 as chromosome codes,
         # so a phenotype there cannot reach the empty cis-window skip.
@@ -264,6 +294,91 @@ class TestTwasWeightWorker(unittest.TestCase):
                 row = fit.fit_model(model, [("F1", "S1")], args, batch_temp, weights_dir)
             self.assertEqual(row["outcome"], "failed")
             self.assertTrue(batch_temp.joinpath("000000001_gene1", "model.log").exists())
+
+
+
+# Header line of a real FUSION.profile_wgt.R output (module-v0.1.6 github()
+# host run, host-github-v016, geuvadis RNA_editing.profile).
+REAL_PROFILE_HEADER = (
+    "id\tnsnps\thsq\thsq.se\thsq.pv\ttop1.r2\tblup.r2\tenet.r2\tbslmm.r2\tlasso.r2\t"
+    "top1.pv\tblup.pv\tenet.pv\tbslmm.pv\tlasso.pv"
+)
+
+
+class TestAssembleNoWeights(unittest.TestCase):
+    """R33: a modality with no weights gets an empty list and stand-in profile."""
+
+    def write_rows(self, root, specs):
+        status = root / "status.tsv"
+        rows = []
+        for index, outcome, gene, diagnostic in specs:
+            row = {field: "" for field in fit.STATUS_FIELDS}
+            row.update(
+                bed_index=index,
+                phenotype_id=gene,
+                outcome=outcome,
+                diagnostic=diagnostic,
+                weight_path=str(root / "M" / f"{gene}.wgt.RDat") if outcome == "success" else "",
+            )
+            rows.append(row)
+        fit.write_status(status, rows)
+        return status
+
+    def run_main(self, root, statuses):
+        out = {name: root / f"M.{name}" for name in ("list", "profile", "profile.err")}
+        argv = ["assemble", "--status", *map(str, statuses), "--weights-dir", str(root),
+                "--output", str(out["list"]), "--profile", str(out["profile"]),
+                "--profile-err", str(out["profile.err"])]
+        with patch.object(sys, "argv", argv):
+            assemble.main()
+        return out
+
+    def test_profile_columns_match_fusion(self):
+        self.assertEqual("\t".join(assemble.PROFILE_COLUMNS), REAL_PROFILE_HEADER)
+        source = (SCRIPTS / "fusion_twas" / "utils" / "FUSION.profile_wgt.R").read_text()
+        self.assertIn('models = c("' + '","'.join(assemble.PROFILE_MODELS) + '")', source)
+
+    def test_all_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            status = self.write_rows(root, [(2, "skipped", "g2", "insufficient heritability"),
+                                            (1, "skipped", "g1", "GCTA did not converge")])
+            out = self.run_main(root, [status])
+            self.assertEqual(out["list"].read_text(), "")
+            self.assertEqual(out["profile"].read_text(), REAL_PROFILE_HEADER + "\n")
+            err = out["profile.err"].read_text()
+            self.assertIn("FUSION skipped all 2 phenotypes", err)
+            self.assertIn("phenotype_id\tdiagnostic\ng1\tGCTA did not converge\ng2\tinsufficient heritability\n", err)
+
+    def test_no_phenotypes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = self.run_main(root, [])
+            self.assertEqual(out["list"].read_text(), "")
+            self.assertEqual(out["profile"].read_text(), REAL_PROFILE_HEADER + "\n")
+            self.assertIn("the modality has no phenotypes", out["profile.err"].read_text())
+
+    def test_some_weights_leave_profile_to_fusion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            status = self.write_rows(root, [(1, "success", "g1", ""), (2, "skipped", "g2", "only one cis-SNP")])
+            out = self.run_main(root, [status])
+            self.assertEqual(out["list"].read_text(), "M/g1.wgt.RDat\n")
+            self.assertFalse(out["profile"].exists())
+            self.assertFalse(out["profile.err"].exists())
+
+    def test_failed_outcome_still_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            status = self.write_rows(root, [(1, "skipped", "g1", "x"), (2, "failed", "g2", "Command exited with status 1")])
+            with self.assertRaisesRegex(ValueError, "Unexpected outcome"):
+                self.run_main(root, [status])
+
+    def test_missing_status_file_still_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(FileNotFoundError):
+                self.run_main(root, [root / "absent.tsv"])
 
 
 if __name__ == "__main__":

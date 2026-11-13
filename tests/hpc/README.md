@@ -673,3 +673,55 @@ BAM header), `-c4`.
   (as Task 23), 16 `pantry_pheno_star_align`, no UnicodeEncodeError. `-n -p`: EXIT=0, `star_align` outputs include `Log.final.out`,
   `SJ.out.tab`, `._STARgenome`, `._STARpass1`; 32 distinct `Would remove temporary output …_STAR…` lines (16 jobs × 2; the log prints each
   twice, once with an `INFO:snakemake.logging:` prefix).
+
+## R33: small modalities (`module-v0.1.9`)
+
+Local (macOS arm64) unless stated. Throwaway envs: Snakemake 9.27.1 (conda-forge `snakemake-minimal`, plus pytest, scipy, htslib,
+GNU tar 1.35); the `covariates` rule's env from `pheast/envs/covariates.yaml` (R 4.5.3, impute 1.84.0); the tensorQTL image itself
+(`ghcr.io/twillis209/pantry-tensorqtl@sha256:65a42f9f…`, pulled into a Lima VM and run under Rosetta, CPU). Synthetic BEDs from the test
+`stability.bed.gz` (445 samples): `one` (its first phenotype), `noise` (5 phenotypes, values N(0,1), seed 1), `gnoise` (the same, grouped
+3 + 2 with shared coordinates), `strong` (the 3 stability phenotypes with the smallest `pval_beta` in `host-github-v016`), `empty`
+(header only; bgzip and tabix accept it), and for `covariates.R` only `na1` (`one` with one NA) and `zerovar` (`one` plus a constant row).
+- Reproduced first, in an env with the image's pins (tensorqtl 1.0.10, scipy 1.18.1, R qvalue 2.42.0, pandas 2.3.3):
+  `calculate_qvalues(…, qvalue_lambda=0.85)` on 1 row: `ValueError: x and y must have length at least 2`; on 4 rows with all
+  p < 0.85, and on 4 strong rows: `RRuntimeError … The estimated pi0 <= 0`; with one p ≥ 0.85: OK. `qvalue(p, pi0=1, lfdr.out=FALSE)`
+  equals `p.adjust(p, "BH")` on all three inputs.
+- `covariates.R`, old (`module-v0.1.8`) vs new, genotypes pruned as `prune_for_covar` does: `one`: old wrote `pheno_PC1` = the phenotype;
+  `empty`, `na1`: old failed (`svd`: a dimension is zero, for `empty`; `Execution halted`); `zerovar`: old wrote 1 phenotype PC. New: all
+  four write the 5 genotype PCs and the `NOTE`. `noise` and all 8 test modalities: `cmp` identical, old vs new.
+- `run_tensorqtl.py` (new) in the image, `--min_allele_count 10 --seed 0`, covariates from the new `covariates.R` (`strong` with genotype
+  PCs only, to keep its signal):
+  - `one`: cis EXIT=0, `NOTE: 1 phenotype tested …; computing q-values with pi0 = 1`, q = p_beta = 0.914; cis_independent EXIT=0,
+    `NOTE: no significant phenotypes at qval <= 0.05 (1 tested)`, header only.
+  - `noise`, `gnoise`: tensorQTL's own q-values (some p ≥ 0.85); cis_independent header only, with `group_id group_size` for `gnoise`.
+  - `strong`: `NOTE: no p-value >= lambda 0.85 among 3 phenotypes …`, q-values = BH (6.66e-51, 3.09e-07, 5.16e-21), 3 significant,
+    `pval_nominal_threshold` present; cis_independent runs as usual (4 rows, ranks 1-2).
+  - `empty`: both header only, with notes.
+  - Every header equals the real `host-github-v016` header for its kind (cis without `pval_nominal_threshold` when nothing is significant).
+  - Normal modality: test `stability` (200 phenotypes), old (`module-v0.1.8`) vs new script, same image, covariates and seed:
+    cis (201 lines) and cis_independent (93 lines) identical after decompression (`cmp`).
+- TWAS assembly: an all-skipped status table and no status tables give an empty `.list`, a header-only `.profile` and a `.profile.err`
+  with the reason (and the skip diagnostics); `twas_pos_file`'s body under `bash -euo pipefail` gives the header-only `.pos`; GNU tar
+  archives the four files with `--files-from` an empty list (bsdtar rejects that option syntax; the rule runs on Linux).
+- Dry runs: standalone pheast (default config): EXIT=0, 68 jobs, same job stats as HEAD. Synthetic config (`one`, `noise`, `gnoise`,
+  `empty`) after running the `phenotype_summary` checkpoints: 69 jobs, incl. `combine_heritability_chr` and `twas_assemble_summary` for
+  `empty` with no batches. Local-path host (`tests/host/config.yaml`): EXIT=0, 471 jobs old and new, same job stats.
+- Rerun triggers (toy workflow): adding a params callable taking `input` → `Nothing to be done`; changing the shell → `Code has changed`.
+- Unit tests: `tests/unit` 174 passed, `pheast/tests` 38 passed (22 new; 41 with the 3 R34 tests). `snakefmt --check` unchanged (19 files + `Snakefile.github`).
+  `snakemake --lint` (pheast, default config): same as HEAD except `combine_heritability_chr` no longer has the index-access warning.
+- **HPC, rule level** (`$H/pantry-runs/r33`: `Pantry/` = this working tree copied by `tar` over ssh, not pushed; `run/` with
+  `input/` linked to `$H/pantry-testdata/pheast/input` and the synthetic BEDs above plus the test `stability.bed.gz` as a control; config
+  dataset `r33` with modalities `one`, `noise`, `gnoise` (grouped), `strong`, `empty`, `stability`; `tests/profile`,
+  `--slurm-keep-successful-logs`, env pantry-baseline-pheno, Snakemake 9.27.1, `sjob -c 2 -m 7500M -t 0-12:00:00`):
+  - Job 8484898 (`run.sh`, target `all`): 113/113 steps, EXIT=0, no errors. Every `NOTE` appeared once per expected job (covariates for
+    `one` and `empty`; pi0 = 1 for `one` and `strong`; header-only cis for `empty`; header-only cis_independent for `one`, `noise`,
+    `gnoise`, `empty`; header-only hsq for `empty`; empty TWAS for `empty`). But TWAS skipped **every** phenotype of every modality,
+    including all 200 of `stability`, as `chromosome not in genotypes`: R31 compared the BED's `chr1` with `twas_geno`'s `1` as text.
+    Fixed as R34 (`CHANGES-module.md`, FUSION); the TWAS archives of this pass are kept in `run/before_fix/`.
+  - Job 8485093 (`run2.sh`, R34 script uploaded, `-R twas_compute_weights_batch all`): 21/21 steps, EXIT=0. Weights: `stability` 51,
+    `strong` 2, others 0 (`one`, `noise`, `gnoise`: all `insufficient heritability`, listed in `.profile.err`; `empty`: "the modality
+    has no phenotypes"). Archives hold `.list`, `.profile`, `.profile.err`, `.pos` (+ weights).
+  - Control `stability` vs `host-github-v016` (`module-v0.1.6`, geuvadis): `cis_qtl`, `cis_independent_qtl` (decompressed), `hsq.tsv`,
+    TWAS `.list` and `.profile`: all `cmp` identical.
+  - `strong` in the rule gets 2 phenotype PCs (3 phenotypes, k - 1), and 2 of its 3 phenotypes stay significant (`cis_independent` 3
+    rows): the known limitation on phenotype PCs of small modalities.

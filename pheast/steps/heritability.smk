@@ -54,7 +54,10 @@ def heritability_batches(w) -> list:
 
 
 rule combine_heritability_chr:
-    """Combine per-chromosome heritability stats into one file"""
+    """Combine per-chromosome heritability stats into one file.
+
+    A modality with no phenotypes has no batches: the header is written alone (R33).
+    """
     input:
         heritability_batches,
     output:
@@ -66,7 +69,13 @@ rule combine_heritability_chr:
     shell:
         """
         mkdir -p {params.hsq_dir}
-        head -n 1 {input[0]} >{output.hsq}
+        if [ -z "{input}" ]; then
+            echo "NOTE: no phenotypes; writing a header-only heritability table"
+            printf 'phenotype_id\thsq\tse\tpval\n' >{output.hsq}
+            exit 0
+        fi
+        FILES=({input})
+        head -n 1 ${{FILES[0]}} >{output.hsq}
         for FILE in {input}; do
             tail -n +2 $FILE >>{output.hsq}
         done

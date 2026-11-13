@@ -93,10 +93,12 @@ rule twas_compute_weights_batch:
 
 
 def twas_batch_status_input(wildcards):
-    """Get the status files for all model-sized TWAS batches."""
+    """Get the status files for all model-sized TWAS batches.
+
+    None if the modality has no phenotypes: twas_assemble_summary then writes
+    empty outputs (R33).
+    """
     _, n_models = phenotype_summary(wildcards)
-    if n_models < 1:
-        raise ValueError(f"No TWAS models found for modality {wildcards.modality}")
     for start, end in twas_batch_ranges(n_models, ds(wildcards)["twas_models_per_job"]):
         yield f"<pantry_intermediate>/{wildcards.dataset}/twas/status_{wildcards.modality}/{start}_{end}.tsv"
 
@@ -106,6 +108,8 @@ rule twas_assemble_summary:
 
     Batch status tables define which phenotypes produced weights and retain
     compact diagnostics for phenotypes that FUSION intentionally skipped.
+    If no phenotype has weights, FUSION.profile_wgt.R is not run: the script
+    writes a header-only profile and, in .profile.err, the skip reasons (R33).
     """
     input:
         status=twas_batch_status_input,
@@ -125,12 +129,16 @@ rule twas_assemble_summary:
         python {params.script} \
             --status {input.status} \
             --weights-dir {params.twas_interm_dir} \
-            --output {output.file_list}
-        cd {params.twas_interm_dir}
-        Rscript {params.profile_script} \
-            {wildcards.modality}.list \
-            >{wildcards.modality}.profile \
-            2>{wildcards.modality}.profile.err
+            --output {output.file_list} \
+            --profile {output.profile} \
+            --profile-err {output.summary}
+        if [ -s {output.file_list} ]; then
+            cd {params.twas_interm_dir}
+            Rscript {params.profile_script} \
+                {wildcards.modality}.list \
+                >{wildcards.modality}.profile \
+                2>{wildcards.modality}.profile.err
+        fi
         """
 
 

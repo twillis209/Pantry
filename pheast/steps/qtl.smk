@@ -89,6 +89,9 @@ rule tensorqtl_cis:
         runtime="12h",
     params:
         script=script("run_tensorqtl.py"),
+        # Unused here: run_tensorqtl.py imports it from its own directory, and
+        # source_path puts it beside the cached script (as covariates' plink_utils).
+        edge_cases=script("qtl_edge_cases.py"),
         geno_prefix=geno_input_prefix,
         qtl_dir=parent_dir,
         groups_arg=groups_arg,
@@ -129,6 +132,7 @@ rule tensorqtl_cis_independent:
         runtime="20h",
     params:
         script=script("run_tensorqtl.py"),
+        edge_cases=script("qtl_edge_cases.py"),
         geno_prefix=geno_input_prefix,
         groups_arg=groups_arg,
         filter_args=qtl_filter_args,
@@ -169,6 +173,7 @@ rule tensorqtl_trans:
         runtime="12h",
     params:
         script=script("run_tensorqtl.py"),
+        edge_cases=script("qtl_edge_cases.py"),
         geno_prefix=geno_input_prefix,
         qtl_dir=parent_dir,
         filter_args=qtl_filter_args,

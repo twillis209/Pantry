@@ -133,9 +133,29 @@ def read_sample_ids(fam_path, samples):
     return [sample_ids[sample] for sample in samples]
 
 
+# plink 1.9's codes for the human non-autosomes.
+PLINK_CHROMOSOME_CODES = {"X": "23", "Y": "24", "XY": "25", "M": "26", "MT": "26"}
+
+
+def plink_chromosome_code(code):
+    """The chromosome a code names for plink 1.9: 'chr1', '1' and '01' are all '1'.
+
+    plink drops a 'chr' prefix and reads X, Y, XY and MT as 23-26, and its
+    --make-bed writes those numeric codes (twas_geno turns 'chr1' into '1').
+    Other names (contigs such as GL000219.1) are returned as they are.
+    """
+    name = code[3:] if code[:3].lower() == "chr" else code
+    if name.isdigit():
+        return str(int(name))
+    return PLINK_CHROMOSOME_CODES.get(name.upper(), code)
+
+
 def read_genotype_chromosomes(bim_path):
+    """plink codes (plink_chromosome_code) of the chromosomes in a .bim."""
     with bim_path.open() as handle:
-        return frozenset(line.split(maxsplit=1)[0] for line in handle if line.strip())
+        return frozenset(
+            plink_chromosome_code(line.split(maxsplit=1)[0]) for line in handle if line.strip()
+        )
 
 
 def run_logged(command, log_handle):
@@ -243,7 +263,8 @@ def _fit_model(model, sample_ids, args, batch_temp, weights_dir):
     final_weight.unlink(missing_ok=True)
     # plink rejects contig names (GL000219.1, KI270711.1) as chromosome codes
     # instead of reporting an empty cis-window, so skip these before calling it.
-    if model.chromosome not in args.geno_chromosomes:
+    # Compared as plink codes: the BED may say chr1 where the .bim says 1.
+    if plink_chromosome_code(model.chromosome) not in args.geno_chromosomes:
         shutil.rmtree(work_dir)
         return result_row(model, "skipped", diagnostic="chromosome not in genotypes")
     start = max(1, model.position - 500_000)
