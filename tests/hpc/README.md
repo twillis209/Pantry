@@ -741,3 +741,18 @@ GNU tar 1.35); the `covariates` rule's env from `pheast/envs/covariates.yaml` (R
   `cis_qtl`, `cis_independent_qtl`, `hsq.tsv` and `tar.bz2`: 23/23 steps, GH_RUN_EXIT=0; `qtl_edge_cases.py` fetched into the source
   cache beside `run_tensorqtl.py`; all four outputs and the TWAS `.list`, `.profile` and `.pos` byte-identical to `host-github-v016`'s
   (`module-v0.1.6`). Tag `module-v0.1.9` set after this run.
+
+## R35: STAR BAM-sorting memory from mem_mb (module-v0.1.10)
+Trigger: scPantry GTEx whole-blood pilot, controller 8523435. `star_align` for GTEX-WOFL-0006-SM-3TW8K (73,192,360 read pairs, 76 bp)
+mapped from 17:42 to 20:22 (39.9% unique, ~51% multimapped), then failed sorting (job 8523437, 9577 s): `Max memory needed for sorting =
+65111640395`, `re-run STAR with at least --limitBAMsortRAM 66111640395`. The other two pilot samples (GTEX-1CB4H, GTEX-14PJM) finished.
+- STAR 2.7.11b source: `STAR.cpp` calls `genomeMain.freeMemory()` after mapping and before `bamSortByCoordinate`, so the sort limit can be
+  most of the job's memory. Headroom 8000 MiB.
+- Local (macOS arm64): unit tests 174 passed; `snakefmt --check` clean; standalone dry run (`dryrun_majiq_laddr.yml`, default `mem_mb` 60000)
+  shows `--limitBAMsortRAM 54525952000`, and `--set-resources star_align:mem_mb=20000` gives 12582912000. A local STAR run was not
+  possible: the bioconda STAR on this Mac read 0 reads, even from plain FASTQ.
+- HPC job 8524432 (`cpu-core`, 16 threads, STAR 2.7.11b from the host's star env): first 4M read pairs of GTEX-1CB4H, `ensembl106/star_index_76`,
+  the R32 command with and without `--limitBAMsortRAM 54525952000`. `samtools view` output (9,056,624 records) identical (`cmp`),
+  `SJ.out.tab` identical, 93.76% unique in both, MaxRSS 34.3 GB in both. The headers differ only in the recorded command lines.
+- Globin load across the 755 GTEx v8 whole-blood samples (RNA-SeQC gene reads; HPC job 8524459): WOFL has 5.51M HBA1+HBA2 reads, 12.7%
+  of its gene reads; 8 samples have at least as many, none 1.5 times as many (max 7.54M). Use it to size `mem_mb` for whole blood.

@@ -97,6 +97,11 @@ rule star_align:
         index_dir=lambda w, input: str(Path(input.index).parent),
         star_out_dir=parent_dir,
         prefix=lambda w, output: output[0].removesuffix("Aligned.sortedByCoord.out.bam"),
+        # STAR frees the genome before sorting, so the sort may use the job's
+        # memory less headroom for its chunk buffers. Its default (genome size,
+        # ~32 GB) fails on samples with one huge coordinate bin, such as
+        # whole blood's globin pile-up (R35). 0 keeps STAR's default.
+        sort_ram=lambda w, resources: max(resources.mem_mb - 8000, 0) * 1024**2,
     shell:
         """
         mkdir -p {params.star_out_dir}
@@ -108,6 +113,7 @@ rule star_align:
             --outSAMstrandField intronMotif \
             --outSAMtype BAM SortedByCoordinate \
             --outFileNamePrefix {params.prefix} \
+            --limitBAMsortRAM {params.sort_ram} \
             --runThreadN {threads}
         """
 
