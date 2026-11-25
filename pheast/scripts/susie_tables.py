@@ -92,3 +92,60 @@ def summary_row(phenotype_id, group_id, n_variants, status, fit=None):
             sigma2=float(fit["sigma2"]) if fit.get("sigma2") is not None else None,
         )
     return row
+
+
+def _matches(ref_base, chrom, pos, allele):
+    return ref_base(chrom, int(pos), len(allele)).upper() == allele.upper()
+
+
+def orient_alleles(bim, ref_base, counted):
+    """GRCh38 ref/alt and Open Targets IDs for a bim's variants.
+
+    bim: chrom, snp, pos, a1 (column 5), a2 (column 6). counted names the
+    column whose allele tensorQTL's dosage counts; the other is taken as REF.
+    ref_base(chrom, pos, length) gives the reference sequence (chrom without
+    'chr'). The bim's orientation is kept when its REF matches the reference,
+    so indels where both alleles match stay as the bim has them; otherwise the
+    alleles are swapped if the counted one matches (flip: tensorQTL's dosage
+    counts ref), else the variant is a mismatch with no ot_variant_id.
+    """
+    other = "a2" if counted == "a1" else "a1"
+    rows = []
+    for chrom, snp, pos, c, o in zip(
+        bim["chrom"].astype(str).str.removeprefix("chr"), bim["snp"], bim["pos"],
+        bim[counted], bim[other],
+    ):
+        if _matches(ref_base, chrom, pos, o):
+            ref, alt, flip, status = o, c, False, "ok"
+        elif _matches(ref_base, chrom, pos, c):
+            ref, alt, flip, status = c, o, True, "flipped"
+        else:
+            ref, alt, flip, status = o, c, False, "mismatch"
+        ot = "" if status == "mismatch" else f"{chrom}_{int(pos)}_{ref}_{alt}"
+        rows.append((snp, chrom, int(pos), ref, alt, ot, flip, status))
+    return pd.DataFrame(
+        rows, columns=["variant_id", "chrom", "pos", "ref", "alt", "ot_variant_id", "flip", "status"]
+    ).set_index("variant_id")
+
+
+def read_fasta(path, keep):
+    """Yield (name, sequence) for the FASTA records named in keep, one at a time.
+
+    The name is the header's first word without 'chr'. No index is read or
+    written, so the FASTA may sit in a read-only directory.
+    """
+    import gzip
+
+    opener = gzip.open if str(path).endswith(".gz") else open
+    name, parts = None, []
+    with opener(path, "rt") as f:
+        for line in f:
+            if line.startswith(">"):
+                if name in keep:
+                    yield name, "".join(parts)
+                name = line[1:].split()[0].removeprefix("chr")
+                parts = []
+            elif name in keep:
+                parts.append(line.strip())
+    if name in keep:
+        yield name, "".join(parts)

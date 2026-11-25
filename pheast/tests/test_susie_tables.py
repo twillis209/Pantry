@@ -119,3 +119,85 @@ def test_summary_row_ok_and_without_fit():
     empty = st.summary_row("P2", "G2", 0, "no_variants")
     assert list(empty) == st.SUMMARY_COLUMNS
     assert empty["n_cs"] == 0 and empty["status"] == "no_variants"
+
+
+# Task 2: orient_alleles against a 30-base reference for chromosome 1.
+REF_SEQ = "ACGTACGTAATGCATGCAGGTTCCAAGGTT"  # position 1 = 'A'
+
+
+def ref_base(chrom, pos, length):
+    assert chrom == "1"
+    return REF_SEQ[pos - 1 : pos - 1 + length]
+
+
+def bim(rows):
+    return pd.DataFrame(rows, columns=["chrom", "snp", "pos", "a1", "a2"])
+
+
+def test_orient_snp_ok():
+    # position 10 = 'A'; counted a1 = G (ALT), a2 = A (REF)
+    out = st.orient_alleles(bim([["1", "v1", 10, "G", "A"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert (r.ref, r.alt, bool(r.flip), r.status) == ("A", "G", False, "ok")
+    assert r.ot_variant_id == "1_10_A_G"
+
+
+def test_orient_snp_swapped():
+    # counted allele is the reference base: flip
+    out = st.orient_alleles(bim([["1", "v1", 10, "A", "G"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert (r.ref, r.alt, bool(r.flip), r.status) == ("A", "G", True, "flipped")
+    assert r.ot_variant_id == "1_10_A_G"
+
+
+def test_orient_indel():
+    # positions 10-11 = 'AT': deletion REF 'AT', counted ALT 'A'
+    out = st.orient_alleles(bim([["1", "v1", 10, "A", "AT"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert (r.ref, r.alt, bool(r.flip), r.status) == ("AT", "A", False, "ok")
+    # swapped: bim says REF 'A' (matches too), keep the bim's orientation
+    out = st.orient_alleles(bim([["1", "v1", 10, "AT", "A"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert (r.ref, r.alt, bool(r.flip)) == ("A", "AT", False)
+    # bim REF 'AG' does not match 'AT', counted 'A' does: flip
+    out = st.orient_alleles(bim([["1", "v1", 10, "A", "AG"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert (r.ref, r.alt, bool(r.flip), r.status) == ("A", "AG", True, "flipped")
+
+
+def test_orient_mismatch():
+    out = st.orient_alleles(bim([["1", "v1", 10, "C", "T"]]), ref_base, "a1")
+    r = out.loc["v1"]
+    assert r.status == "mismatch" and r.ot_variant_id == "" and not bool(r.flip)
+
+
+def test_chr_prefix_stripped():
+    out = st.orient_alleles(bim([["chr1", "chr1:10", 10, "G", "A"]]), ref_base, "a1")
+    assert out.loc["chr1:10"].ot_variant_id.startswith("1_")
+    assert out.loc["chr1:10"].chrom == "1"
+
+
+def test_read_fasta_by_chrom(tmp_path):
+    fa = tmp_path / "ref.fa"
+    fa.write_text(">1 dna:chromosome\nACGT\nACGT\n>2\nTTTT\n>X\nGGGG\n")
+    got = dict(st.read_fasta(fa, keep={"1", "2"}))
+    assert got == {"1": "ACGTACGT", "2": "TTTT"}
+
+
+def test_variant_alleles_cli(tmp_path):
+    import subprocess
+    import sys as _sys
+
+    (tmp_path / "ref.fa").write_text(">chr1\n" + REF_SEQ + "\n>2\nAAAA\n")
+    (tmp_path / "g.bim").write_text("1\tchr1:10\t0\t10\tG\tA\n1\tchr1:12\t0\t12\tC\tT\n")
+    out = tmp_path / "alleles.tsv.gz"
+    r = subprocess.run(
+        [_sys.executable, str(SCRIPTS / "variant_alleles.py"), str(tmp_path / "g.bim"),
+         str(tmp_path / "ref.fa"), str(out), "a1"],
+        capture_output=True, text=True, check=True,
+    )
+    assert "ok 1, flipped 0, mismatch 1" in r.stdout
+    t = pd.read_csv(out, sep="\t", index_col=0, keep_default_na=False)
+    assert list(t.index) == ["chr1:10", "chr1:12"]
+    assert t.loc["chr1:10", "ot_variant_id"] == "1_10_A_G"
+    assert t.loc["chr1:12", "status"] == "mismatch"

@@ -70,6 +70,45 @@ rule qtl_genotype_qc:
         """
 
 
+# tensorQTL 1.0.10's PlinkReader takes 2 - pandas_plink's dosage
+# (genotypeio.py: "flip allele order: PLINK uses REF as effect allele"), so it
+# counts bim column 5 (a1, ALT in plink2 output); checked against allele
+# frequencies in the R36 pilot.
+SUSIE_COUNTED_ALLELE = "a1"
+
+
+def reference_fasta(wildcards):
+    """The {dataset}'s reference FASTA, needed only for SuSiE's variant IDs."""
+    if "reference_fasta" not in ds(wildcards):
+        raise ValueError(
+            f"dataset {wildcards.dataset}: SuSiE outputs need reference_fasta"
+        )
+    return ds(wildcards)["reference_fasta"]
+
+
+rule variant_alleles:
+    """GRCh38 ref/alt and Open Targets variant IDs of the genotypes (R36)."""
+    input:
+        geno=geno_files,
+        fasta=reference_fasta,
+    output:
+        "<pantry_intermediate>/{dataset}/variant_alleles.tsv.gz",
+    conda:
+        "../envs/python.yaml"
+    resources:
+        mem_mb=16000,
+        runtime="2h",
+    params:
+        script=script("variant_alleles.py"),
+        tables=script("susie_tables.py"),
+        bim=lambda w, input: input.geno[1],
+        counted=SUSIE_COUNTED_ALLELE,
+    shell:
+        """
+        python3 {params.script} {params.bim} {input.fasta} {output} {params.counted}
+        """
+
+
 rule tensorqtl_cis:
     """Map cis-QTLs, determining significance using permutations.
     Outputs the top association per phenotype.

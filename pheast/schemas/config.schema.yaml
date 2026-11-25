@@ -77,6 +77,12 @@ $defs:
           Seed for tensorQTL cis and cis_independent mapping (permutations and
           the random tie-break), passed as run_tensorqtl.py --seed; null runs
           unseeded, as upstream. numpy accepts 0 to 2**32 - 1.
+      reference_fasta:
+        type: string
+        description: >-
+          GRCh38 FASTA (plain or gzipped) of the genotypes' reference, read to
+          give SuSiE credible sets Open Targets variant IDs (R36). Only needed
+          when the qtl analysis lists the susie files.
       twas_snps:
         type: string
         description: SNP IDs to keep for TWAS weights (e.g. the LD reference panel's).
