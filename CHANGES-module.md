@@ -1,6 +1,6 @@
 # Pantry as a reusable, multi-dataset Snakemake module: changes
 
-Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.10` (earlier: `module-v0.1.9`, `module-v0.1.8`, `module-v0.1.7`, `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
+Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.11` (earlier: `module-v0.1.10`, `module-v0.1.9`, `module-v0.1.8`, `module-v0.1.7`, `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
 Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Status and acceptance results: `docs/module-status.md`.
 Test commands and HPC run records: `tests/hpc/README.md`.
 
@@ -12,7 +12,7 @@ Requires **Snakemake ≥ 9.14** (R28, `module-v0.1.4`; pathvars need 9.12). Both
 
 ## Differences from upstream at a glance
 
-Everything a user of upstream `8da7787` would notice, as of `module-v0.1.10`. Details are in the sections below.
+Everything a user of upstream `8da7787` would notice, as of `module-v0.1.11`. Details are in the sections below.
 
 | Difference | Changes results? | Since | Ruling |
 |---|---|---|---|

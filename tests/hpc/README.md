@@ -756,3 +756,23 @@ mapped from 17:42 to 20:22 (39.9% unique, ~51% multimapped), then failed sorting
   `SJ.out.tab` identical, 93.76% unique in both, MaxRSS 34.3 GB in both. The headers differ only in the recorded command lines.
 - Globin load across the 755 GTEx v8 whole-blood samples (RNA-SeQC gene reads; HPC job 8524459): WOFL has 5.51M HBA1+HBA2 reads, 12.7%
   of its gene reads; 8 samples have at least as many, none 1.5 times as many (max 7.54M). Use it to size `mem_mb` for whole blood.
+
+## R36: SuSiE fine-mapping (module-v0.1.11)
+For scPantry's colocalisation analysis (`coloc_pip` on Open Targets 26.06 credible sets). Inputs: scPantry `gtex_whlbld_eur` (573 GTEx v8
+whole-blood donors, genotypes restricted to OneK1K's 8,412,848 variants), tensorQTL image `pantry-tensorqtl@sha256:65a42f…` on an A100.
+- Local (macOS arm64): `pheast/tests` 59 passed (16 new in `test_susie_tables.py`), `tests/unit` 174 passed. Dry run of a stub
+  standalone config with the two SuSiE files under `qtl`: `variant_alleles` and `tensorqtl_susie` resolve, commands as expected.
+- `variant_alleles` on `gtex_eur`: 8,412,848 ok, 0 flipped, 0 mismatch against the Ensembl 106 GRCh38 FASTA; 1.6 min, 3.8 GB.
+- Counted allele: tensorQTL's cis `af` equals plink2's ALT (bim column 5) frequency for 30,284 of 30,301 expression lead variants;
+  the other 17 have af near 0.5, where the two cannot be told apart.
+- `pheast/tests/check_susie_equivalence.py` (HPC job 8541361, in the image) on the first 200 expression phenotypes: EQUIVALENT
+  (same 67 credible sets as `tensorqtl.susie.map(summary_only=False)`, PIP and alpha to 1e-5).
+- Stability, 5,470 phenotypes: 15 min, MaxRSS 16 GB, 1,036 credible sets, alpha sums 0.95-1.0, min purity 0.50; one phenotype
+  `no_variants`. First run found `beta` per genotype SD (tensorQTL's SuSiE standardises genotypes); fixed in ba852ff. After the fix
+  (job 8541434), at the 842 credible sets whose top variant is the cis lead: `beta` / cis `slope` median 0.98, correlation 0.997,
+  signs all agree.
+- `ot_variant_id` against Open Targets 26.06 credible-set lead variants: 12,184 of the 29,051 credible-set variants found as written,
+  6 with alleles swapped.
+- Host run through `github(commit=ba852ff)` (scPantry controller 8541838): `variant_alleles` and `tensorqtl_susie` on `gpu-core`
+  (`gres/gpu:a100=1`), output identical to job 8541434's; dry runs of the existing cis, cis_independent and TWAS targets of three
+  datasets: nothing to be done.
