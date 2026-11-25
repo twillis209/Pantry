@@ -65,6 +65,8 @@ def fine_map(genotype_df, variant_df, pheno, pheno_pos, covar, groups, alleles,
                 "lbf_variable": _numpy(res["lbf_variable"]), "pip": _numpy(res["pip"]),
                 "sets": res["sets"], "converged": bool(res["converged"]), "niter": res["niter"],
                 "elbo": _numpy(res["elbo"]), "sigma2": float(_numpy(res["sigma2"])),
+                # susie() standardises genotypes; per-allele effects need their SDs.
+                "x_scale": _numpy(susie.get_x_attributes(genotypes_res_t.T)["scaled_scale"]),
             }
             status = "ok" if fit["converged"] else "not_converged"
             summary[phenotype_id] = susie_tables.summary_row(

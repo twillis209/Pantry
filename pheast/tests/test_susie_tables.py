@@ -201,3 +201,15 @@ def test_variant_alleles_cli(tmp_path):
     assert list(t.index) == ["chr1:10", "chr1:12"]
     assert t.loc["chr1:10", "ot_variant_id"] == "1_10_A_G"
     assert t.loc["chr1:12", "status"] == "mismatch"
+
+
+def test_cs_rows_rescales_effects_to_genotype_units():
+    # tensorQTL's SuSiE works on standardised genotypes: mu is per genotype SD.
+    vids = pd.Index(["chr1:10", "chr1:20"])
+    fit = make_fit(L=1, p=2, cs={"L1": np.array([0, 1])})
+    fit["mu"][:] = [[0.2, 0.4]]
+    fit["mu2"][:] = [[0.05, 0.17]]
+    fit["x_scale"] = np.array([0.5, 2.0])
+    out = st.cs_rows("P1", "P1", vids, fit, np.full(2, 0.3), alleles_for(vids))
+    np.testing.assert_allclose(out.beta, [0.4, 0.2])
+    np.testing.assert_allclose(out.beta_sd, [0.2, 0.05])

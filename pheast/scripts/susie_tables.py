@@ -34,7 +34,10 @@ def cs_rows(phenotype_id, group_id, variant_ids, fit, af, alleles):
     """Credible-set rows of one phenotype's SuSiE fit.
 
     fit: numpy alpha, mu, mu2, lbf_variable (L x p), pip (p), and tensorQTL's
-    sets ({'cs': {'L<k>': indices}, 'purity': frame indexed by 'L<k>'}).
+    sets ({'cs': {'L<k>': indices}, 'purity': frame indexed by 'L<k>'}), and
+    optionally x_scale (p): the SD of each residualised genotype, since
+    tensorQTL's SuSiE fits standardised genotypes and mu is per SD; beta and
+    beta_sd are per allele.
     alleles: indexed by variant_id, with chrom, pos, ref, alt, ot_variant_id
     and flip (the counted allele is GRCh38's ref: negate beta, af -> 1 - af).
     """
@@ -47,7 +50,9 @@ def cs_rows(phenotype_id, group_id, variant_ids, fit, af, alleles):
         vids = variant_ids[ix]
         a = alleles.loc[vids]
         flip = np.where(a["flip"].to_numpy(dtype=bool), -1.0, 1.0)
+        scale = np.asarray(fit.get("x_scale", np.ones(fit["mu"].shape[1])), dtype=float)[ix]
         mu = fit["mu"][l, ix]
+        sd = np.sqrt(np.maximum(fit["mu2"][l, ix] - mu**2, 0))
         alpha = fit["alpha"][l, ix]
         afs = np.asarray(af, dtype=float)[ix]
         out.append(pd.DataFrame({
@@ -63,8 +68,8 @@ def cs_rows(phenotype_id, group_id, variant_ids, fit, af, alleles):
             "alpha": alpha,
             "pip": np.asarray(fit["pip"])[ix],
             "lbf": fit["lbf_variable"][l, ix],
-            "beta": flip * mu,
-            "beta_sd": np.sqrt(np.maximum(fit["mu2"][l, ix] - mu**2, 0)),
+            "beta": flip * mu / scale,
+            "beta_sd": sd / scale,
             "af": np.where(flip < 0, 1 - afs, afs),
             "cs_coverage": alpha.sum(),
             "cs_purity": float(fit["sets"]["purity"].loc[name, "min_abs_corr"]),
