@@ -18,12 +18,13 @@ parser.add_argument("output", help="Output file path, or, for cis_nominal mode, 
 parser.add_argument("--covariates", help="Covariates file")
 parser.add_argument("--cis_output", help="For cis_independent mode, output of tensorQTL in cis mode")
 parser.add_argument("--groups", help="File with phenotype groups if applicable")
+parser.add_argument("--alleles", help="For susie mode, variant_alleles.py output for the genotypes (R36)")
 parser.add_argument("--window", type=int, default=1000000, help="cis-window size, default 1000000")
 parser.add_argument("--output_dir", help="For cis_nominal mode, output directory")
 parser.add_argument("--min_allele_count", type=int, default=10, help="Minimum allele count used to derive the MAF filter. Default 10. Set to 0 to disable when --maf_threshold is not provided.")
 parser.add_argument("--maf_threshold", type=float, help="Fixed MAF threshold. Overrides --min_allele_count if provided.")
 parser.add_argument("--seed", type=int, help="For cis and cis_independent modes, seed for the permutations (numpy) and the random tie-break (torch), for reproducible results")
-parser.add_argument("--mode", required=True, help="Run mode: currently cis, cis_independent, cis_nominal, genome_wide, or trans. genome_wide runs `map_trans` without removing cis-variants, returning all associations with p<1e-5. trans does the same but removes all pairs with TSS distance < 5 Mb. All modes use the configured MAF threshold.")
+parser.add_argument("--mode", required=True, help="Run mode: currently cis, cis_independent, cis_nominal, susie, genome_wide, or trans. susie fine-maps every phenotype (susie_map.py) and writes the credible sets to the output, a .susie_cs.tsv.gz path, and a summary beside it (.susie_summary.tsv.gz). genome_wide runs `map_trans` without removing cis-variants, returning all associations with p<1e-5. trans does the same but removes all pairs with TSS distance < 5 Mb. All modes use the configured MAF threshold.")
 args = parser.parse_args()
 
 
@@ -125,6 +126,23 @@ elif args.mode == "cis_independent":
     else:
         d = cis.map_independent(genotype_df, variant_df, cis_df, pheno, pheno_pos, covar, group_s=groups, maf_threshold=maf_threshold, window=args.window, random_tiebreak=True, seed=args.seed)
         d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
+elif args.mode == "susie":
+    import numpy as np
+    import susie_map  # beside this script (R36)
+
+    assert args.alleles is not None and ".susie_cs." in args.output
+    if args.seed is not None:
+        np.random.seed(args.seed)
+    alleles = pd.read_csv(args.alleles, sep="\t", index_col=0, keep_default_na=False,
+                          dtype={"chrom": str, "ref": str, "alt": str, "ot_variant_id": str})
+    cs_df, summary_df = susie_map.fine_map(genotype_df, variant_df, pheno, pheno_pos, covar, groups,
+                                           alleles, maf_threshold, args.window)
+    cs_df.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
+    summary_df.to_csv(args.output.replace(".susie_cs.", ".susie_summary."), sep="\t", index=False,
+                      float_format="%.6g")
+    counts = summary_df["status"].value_counts()
+    print(f"  * SuSiE: {len(summary_df)} phenotypes ({', '.join(f'{k} {v}' for k, v in counts.items())}), "
+          f"{cs_df.groupby(['phenotype_id', 'cs_id']).ngroups if len(cs_df) else 0} credible sets")
 elif args.mode == "genome_wide":
     d = trans.map_trans(genotype_df, pheno, covariates_df=covar, maf_threshold=maf_threshold)
     d.to_csv(args.output, sep="\t", index=False, float_format="%.6g")
