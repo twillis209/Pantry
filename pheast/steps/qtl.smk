@@ -193,6 +193,53 @@ rule tensorqtl_cis_independent:
         """
 
 
+rule tensorqtl_susie:
+    """Fine-map every phenotype with SuSiE (R36).
+
+    Per-signal credible sets with posteriors and effects of the alt allele,
+    and a status line for each phenotype (susie_map.py).
+    """
+    input:
+        geno=geno_files,
+        bed=pheno_bed,
+        bedi=pheno_file(".bed.gz.tbi"),
+        covar="<pantry_intermediate>/{dataset}/covar/{modality}.covar.tsv",
+        groups=groups_input,
+        alleles="<pantry_intermediate>/{dataset}/variant_alleles.tsv.gz",
+    output:
+        cs="<pantry_output>/{dataset}/qtl/{modality}.susie_cs.tsv.gz",
+        summary="<pantry_output>/{dataset}/qtl/{modality}.susie_summary.tsv.gz",
+    container:
+        TENSORQTL_CONTAINER
+    resources:
+        mem_mb=32000,
+        runtime="12h",
+    params:
+        script=script("run_tensorqtl.py"),
+        edge_cases=script("qtl_edge_cases.py"),
+        susie_map=script("susie_map.py"),
+        tables=script("susie_tables.py"),
+        geno_prefix=geno_input_prefix,
+        qtl_dir=parent_dir,
+        groups_arg=groups_arg,
+        filter_args=qtl_filter_args,
+        seed_arg=qtl_seed_arg,
+    shell:
+        """
+        mkdir -p {params.qtl_dir}
+        python3 {params.script} \
+            {params.geno_prefix} \
+            {input.bed} \
+            {output.cs} \
+            --covariates {input.covar} \
+            --alleles {input.alleles} \
+            {params.groups_arg} \
+            {params.filter_args} \
+            {params.seed_arg} \
+            --mode susie
+        """
+
+
 rule tensorqtl_trans:
     """Map trans-QTL associations without permutation testing.
     Outputs all variant pairs with TSS distance > 5 Mb, configured MAF threshold, and p < 1e-5.
