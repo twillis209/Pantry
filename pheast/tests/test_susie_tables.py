@@ -213,3 +213,15 @@ def test_cs_rows_rescales_effects_to_genotype_units():
     out = st.cs_rows("P1", "P1", vids, fit, np.full(2, 0.3), alleles_for(vids))
     np.testing.assert_allclose(out.beta, [0.4, 0.2])
     np.testing.assert_allclose(out.beta_sd, [0.2, 0.05])
+
+
+def test_cs_rows_alpha_sum_stays_a_probability_after_rounding():
+    # Six variants in perfect LD share a signal: alphas of 1/6 round to
+    # 0.166667 (%.6g) and sum above 1, which coloc_pip's check_PP rejects.
+    vids = pd.Index([f"chr1:{10 * (i + 1)}" for i in range(6)])
+    fit = make_fit(L=1, p=6, cs={"L1": np.arange(6)})
+    fit["alpha"][:] = 1 / 6
+    out = st.cs_rows("P1", "P1", vids, fit, np.full(6, 0.3), alleles_for(vids))
+    written = np.array([float(f"{a:.6g}") for a in out.alpha])
+    assert written.sum() <= 1
+    assert out.cs_coverage.iloc[0] == pytest.approx(out.alpha.sum())

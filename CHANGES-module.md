@@ -1,6 +1,6 @@
 # Pantry as a reusable, multi-dataset Snakemake module: changes
 
-Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.11` (earlier: `module-v0.1.10`, `module-v0.1.9`, `module-v0.1.8`, `module-v0.1.7`, `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
+Branch `module` of `twillis209/Pantry`, based on upstream `PejLab/Pantry` `8da7787`. Release tag `module-v0.1.12` (earlier: `module-v0.1.11`, `module-v0.1.10`, `module-v0.1.9`, `module-v0.1.8`, `module-v0.1.7`, `module-v0.1.6`, `module-v0.1.5`, `module-v0.1.4`, `module-v0.1.3`, `module-v0.1.2`, `module-v0.1.1`, `module-v0.1.0`, `module-rc1`).
 Design: `docs/superpowers/specs/2026-10-30-module-refactor-design.md`. Status and acceptance results: `docs/module-status.md`.
 Test commands and HPC run records: `tests/hpc/README.md`.
 
@@ -12,11 +12,11 @@ Requires **Snakemake ≥ 9.14** (R28, `module-v0.1.4`; pathvars need 9.12). Both
 
 ## Differences from upstream at a glance
 
-Everything a user of upstream `8da7787` would notice, as of `module-v0.1.11`. Details are in the sections below.
+Everything a user of upstream `8da7787` would notice, as of `module-v0.1.12`. Details are in the sections below.
 
 | Difference | Changes results? | Since | Ruling |
 |---|---|---|---|
-| New pheast mode `run_tensorqtl.py --mode susie` and rules `tensorqtl_susie`, `variant_alleles`: SuSiE fine-mapping of every phenotype with tensorQTL's own SuSiE and `susie.map`'s defaults, writing per-signal credible sets (`{modality}.susie_cs.tsv.gz`: posterior `alpha`, PIP, log BF, posterior effect of `alt`, GRCh38 `ot_variant_id`) and a status per phenotype (`{modality}.susie_summary.tsv.gz`). Opt in by listing the two files under `qtl`; needs the new dataset key `reference_fasta` | no (new outputs only; existing rules' commands and params unchanged) | v0.1.11 | R36 |
+| New pheast mode `run_tensorqtl.py --mode susie` and rules `tensorqtl_susie`, `variant_alleles`: SuSiE fine-mapping of every phenotype with tensorQTL's own SuSiE and `susie.map`'s defaults, writing per-signal credible sets (`{modality}.susie_cs.tsv.gz`: posterior `alpha`, PIP, log BF, posterior effect of `alt`, GRCh38 `ot_variant_id`) and a status per phenotype (`{modality}.susie_summary.tsv.gz`). Opt in by listing the two files under `qtl`; needs the new dataset key `reference_fasta` | no (new outputs only; existing rules' commands and params unchanged) | v0.1.11 (v0.1.12: alpha sums kept below 1) | R36 |
 | `star_align` passes `--limitBAMsortRAM` = (`mem_mb` − 8000) MiB, so STAR may use most of the job's memory to sort the BAM. Upstream used STAR's default, the genome's size (~32 GB for GRCh38), and a sample with one huge coordinate bin failed after mapping (GTEx whole blood: the α-globin pile-up needed 65 GB) | no (alignment records identical; the BAM header records the new command line) | v0.1.10 | R35 |
 | Small modalities finish with valid, explicitly empty outputs and a `NOTE` in the job log where upstream fails: no phenotype PCs in the covariates when fewer than 2 phenotypes vary; q-values with pi0 = 1 (Benjamini–Hochberg) when qvalue's pi0 estimate is impossible; header-only `cis_independent` when no phenotype is significant; empty TWAS list and profile when FUSION skips every phenotype; a BED with no phenotypes runs through | only for modalities that failed before, and for a modality with exactly 1 phenotype, whose covariates upstream gave that phenotype itself as `pheno_PC1` | v0.1.9 | R33 |
 | `star_align` declares STAR's other files: its two-pass scratch (`{sample_id}._STARgenome/`, `._STARpass1/`, ~20 MB per sample) is a `temp()` output that Snakemake deletes after the job; `Log.final.out` and `SJ.out.tab` are kept outputs; `Log.out` and `Log.progress.out` are `log:` files. Upstream left all of these untracked in `star_out/` | no (STAR command unchanged; BAM byte-identical) | v0.1.8 | R32 |
@@ -269,6 +269,8 @@ Both stages take a multi-dataset config: `datasets: {name: {...}}`, plus an opti
 Upstream has no fine-mapping step. `--mode susie` (`pheast/scripts/susie_map.py`) runs the per-phenotype loop of tensorQTL 1.0.10's `susie.map` (genotype masks, covariate residualisation, `susie.susie` with `L=10`, `scaled_prior_variance=0.2`, `coverage=0.95`, `min_abs_corr=0.5`, `max_iter=200`), on the same inputs and MAF filter as `tensorqtl_cis`, but keeps what `susie.map` drops: each signal's `alpha` and posterior moments `mu`, `mu2`, and a summary row for every phenotype in the BED (`ok`, `not_converged`, `no_variants`, `constant`). Non-converged fits get no credible sets, as in `susie.map`. `pheast/tests/check_susie_equivalence.py` checks the loop against `susie.map` inside the container.
 
 Credible-set rows carry the genotypes' variant ID and an Open Targets-style `ot_variant_id` (`{chrom}_{pos}_{ref}_{alt}`, chromosome without `chr`, GRCh38 REF). `variant_alleles` builds these once per dataset by streaming `reference_fasta` (no index is read or written, so the FASTA may be read-only). tensorQTL counts bim column 5 (`2 - pandas_plink dosage`), taken as `alt`; where column 6 does not match the reference but column 5 does, the alleles are swapped and `beta` and `af` flipped (`status flipped`); where neither matches, `ot_variant_id` is empty (`mismatch`). `beta` is the posterior mean effect of `alt` given that the variant is the signal's causal one, on the normalised phenotype.
+
+Since `module-v0.1.12`, a set whose `alpha` sums to more than 1 − 1e-5 is scaled to sum to 1 − 1e-5, and `cs_coverage` is the scaled sum. Written to 6 significant digits, the alphas of near-complete sets otherwise summed slightly above 1 (2 of 1,036 sets in the R36 pilot, max 1.0000005), which `coloc_pip`'s `check_PP` rejects.
 
 ## Tests
 

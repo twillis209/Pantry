@@ -8,6 +8,11 @@ alt, and ot_variant_id the GRCh38 chrom_pos_ref_alt ID Open Targets uses.
 import numpy as np
 import pandas as pd
 
+# Written alphas (6 significant digits) are each off by up to 5e-6 of their
+# value, so a set's alphas are scaled to sum to at most 1 - ALPHA_MARGIN:
+# coloc_pip's check_PP rejects sums above 1 beyond all.equal's 1.5e-8.
+ALPHA_MARGIN = 1e-5
+
 CS_COLUMNS = [
     "phenotype_id", "group_id", "cs_id", "variant_id", "chrom", "pos", "ref", "alt",
     "ot_variant_id", "alpha", "pip", "lbf", "beta", "beta_sd", "af",
@@ -53,7 +58,9 @@ def cs_rows(phenotype_id, group_id, variant_ids, fit, af, alleles):
         scale = np.asarray(fit.get("x_scale", np.ones(fit["mu"].shape[1])), dtype=float)[ix]
         mu = fit["mu"][l, ix]
         sd = np.sqrt(np.maximum(fit["mu2"][l, ix] - mu**2, 0))
-        alpha = fit["alpha"][l, ix]
+        alpha = np.asarray(fit["alpha"][l, ix], dtype=float)
+        if alpha.sum() > 1 - ALPHA_MARGIN:
+            alpha = alpha * (1 - ALPHA_MARGIN) / alpha.sum()
         afs = np.asarray(af, dtype=float)[ix]
         out.append(pd.DataFrame({
             "phenotype_id": phenotype_id,

@@ -776,3 +776,6 @@ whole-blood donors, genotypes restricted to OneK1K's 8,412,848 variants), tensor
 - Host run through `github(commit=ba852ff)` (scPantry controller 8541838): `variant_alleles` and `tensorqtl_susie` on `gpu-core`
   (`gres/gpu:a100=1`), output identical to job 8541434's; dry runs of the existing cis, cis_independent and TWAS targets of three
   datasets: nothing to be done.
+- Review follow-up (`module-v0.1.12`): written alphas of 2 of the 1,036 pilot sets summed to more than 1 (max 1.0000005), which
+  `coloc_pip`'s `check_PP` rejects; `cs_rows` now scales a set to sum to at most 1 − 1e-5 (`test_cs_rows_alpha_sum_stays_a_probability_after_rounding`).
+  `pheast/tests` 60 passed.
